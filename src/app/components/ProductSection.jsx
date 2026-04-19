@@ -68,7 +68,7 @@ export default function ProductSection() {
       : products.filter((p) => p.category === activeCategory);
 
   return (
-    <section className="relative bg-white dark:bg-black py-24 px-6 overflow-hidden transition-colors duration-500">
+    <section className="relative bg-white dark:bg-black py-16 px-6 overflow-hidden transition-colors duration-500">
       {/* Background glow */}
       <div className="pointer-events-none absolute top-1/3 -left-40 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/10 blur-[140px]" />
       <div className="pointer-events-none absolute bottom-0 -right-40 h-[400px] w-[400px] rounded-full bg-purple-600/10 blur-[140px]" />
