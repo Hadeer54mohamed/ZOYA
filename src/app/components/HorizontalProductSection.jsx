@@ -8,124 +8,13 @@ import {
   animate,
 } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
-
-const products = [
-  {
-    id: 1,
-    name: "Midnight Dress",
-    price: 120,
-    category: "Dresses",
-    colors: [
-      { name: "Black", value: "#000000", image: "/images/photo (1).jpeg" },
-      { name: "Pink", value: "#FF4DA3", image: "/images/photo (2).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 2,
-    name: "Velvet Blazer",
-    price: 185,
-    category: "Outerwear",
-    colors: [
-      { name: "Noir", value: "#0a0a0a", image: "/images/photo (6).jpeg" },
-      { name: "Wine", value: "#722f37", image: "/images/photo (7).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 3,
-    name: "Silk Slip",
-    price: 95,
-    category: "Dresses",
-    colors: [
-      { name: "Blush", value: "#f3c6c6", image: "/images/photo (3).jpeg" },
-      { name: "Black", value: "#000000", image: "/images/photo (1).jpeg" },
-      { name: "Sage", value: "#a6b89a", image: "/images/photo (5).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 4,
-    name: "Neon Set",
-    price: 140,
-    category: "Sets",
-    colors: [
-      { name: "Pink", value: "#FF4DA3", image: "/images/photo (2).jpeg" },
-      { name: "Red", value: "#ff0000", image: "/images/photo (4).jpeg" },
-      { name: "Black", value: "#000000", image: "/images/photo (6).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 5,
-    name: "Satin Skirt",
-    price: 95,
-    category: "Dresses",
-    colors: [
-      { name: "Blush", value: "#f3c6c6", image: "/images/photo (3).jpeg" },
-      { name: "Sage", value: "#a6b89a", image: "/images/photo (5).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 6,
-    name: "Structured Coat",
-    price: 185,
-    category: "Outerwear",
-    colors: [
-      { name: "Noir", value: "#0a0a0a", image: "/images/photo (6).jpeg" },
-      { name: "Wine", value: "#722f37", image: "/images/photo (7).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 7,
-    name: "Cream Top",
-    price: 95,
-    category: "Tops",
-    colors: [
-      { name: "Ivory", value: "#f5f0e6", image: "/images/photo (8).jpeg" },
-      { name: "Black", value: "#000000", image: "/images/photo (1).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 8,
-    name: "Leather Jacket",
-    price: 185,
-    category: "Outerwear",
-    colors: [
-      { name: "Noir", value: "#0a0a0a", image: "/images/photo (6).jpeg" },
-      { name: "Wine", value: "#722f37", image: "/images/photo (7).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 9,
-    name: "Evening Gown",
-    price: 95,
-    category: "Dresses",
-    colors: [
-      { name: "Blush", value: "#f3c6c6", image: "/images/photo (3).jpeg" },
-      { name: "Black", value: "#000000", image: "/images/photo (1).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 10,
-    name: "Wool Trench",
-    price: 185,
-    category: "Outerwear",
-    colors: [
-      { name: "Noir", value: "#0a0a0a", image: "/images/photo (6).jpeg" },
-      { name: "Wine", value: "#722f37", image: "/images/photo (7).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-];
+import { products } from "../data/products";
+import Image from "next/image";
 
 export default function HorizontalProductSection() {
+  const router = useRouter();
   const containerRef = useRef(null);
   const trackRef = useRef(null);
   const draggedRef = useRef(false);
@@ -178,6 +67,12 @@ export default function HorizontalProductSection() {
   const handleCardClick = (product) => {
     if (draggedRef.current) return;
     setSelectedProduct(product);
+  };
+
+  const handleGoToProduct = (e, product) => {
+    e.stopPropagation();
+    if (draggedRef.current) return;
+    router.push(`/product/${product.id}`);
   };
 
   return (
@@ -275,8 +170,10 @@ export default function HorizontalProductSection() {
               className="shrink-0 w-[260px] sm:w-[300px] md:w-[340px] group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] rounded-2xl"
             >
               <div className="relative overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
-                <img
-                  src={p.colors[0].image}
+                <Image
+                  width={100}
+                  height={100}
+                  src={p.colors[0].images[0]}
                   alt={p.name}
                   draggable={false}
                   className="w-full h-[380px] md:h-[420px] object-cover pointer-events-none group-hover:scale-110 transition-transform duration-700 ease-out"
@@ -293,10 +190,28 @@ export default function HorizontalProductSection() {
                   #{String(i + 1).padStart(2, "0")}
                 </span>
 
-                {/* Quick view label on hover */}
-                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-[#FF4DA3]/90 text-black text-[9px] font-bold tracking-widest uppercase shadow opacity-0 group-hover:opacity-100 transition-opacity">
-                  Quick View
-                </div>
+                {/* Details pill — always visible on mobile, hover-only on desktop */}
+                <button
+                  type="button"
+                  onClick={(e) => handleGoToProduct(e, p)}
+                  aria-label="View full details"
+                  className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 hover:bg-black backdrop-blur-md text-white text-[9px] font-bold tracking-widest uppercase shadow opacity-100 md:opacity-0 md:group-hover:opacity-100 transition"
+                >
+                  Details
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </button>
 
                 {/* Info */}
                 <div className="absolute inset-x-0 bottom-0 p-5 text-white flex items-end justify-between">
@@ -312,13 +227,9 @@ export default function HorizontalProductSection() {
                     </p>
                   </div>
                   <button
-                    aria-label="Open quick view"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (draggedRef.current) return;
-                      setSelectedProduct(p);
-                    }}
-                    className="h-10 w-10 grid place-items-center rounded-full bg-[#FF4DA3] text-black translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105"
+                    aria-label="View full details"
+                    onClick={(e) => handleGoToProduct(e, p)}
+                    className="h-10 w-10 grid place-items-center rounded-full bg-[#FF4DA3] text-black md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 transition-all duration-300 hover:scale-105"
                   >
                     <svg
                       width="14"

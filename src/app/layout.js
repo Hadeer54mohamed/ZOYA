@@ -3,6 +3,7 @@ import "./globals.css";
 import { CartProvider } from "./context/CartContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import CartDrawer from "./components/CartDrawer";
+import ScrollToTopOnLoad from "./components/ScrollToTopOnLoad";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,6 +46,7 @@ export default function RootLayout({ children }) {
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
         <ThemeProvider>
           <CartProvider>
+            <ScrollToTopOnLoad />
             {children}
             <CartDrawer />
           </CartProvider>

@@ -17,6 +17,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --animate-shimmer: shimmer 1.2s ease-in-out;
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
 }
 
 html,
@@ -27,14 +38,84 @@ body {
   transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-/* Custom scrollbar */
+/* ---------- Themed Scrollbar (global) ---------- */
+/* Firefox */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 77, 163, 0.45) transparent;
+}
+.dark {
+  scrollbar-color: rgba(255, 77, 163, 0.55) transparent;
+}
+
+/* WebKit (Chrome / Safari / Edge) */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 77, 163, 0.55),
+    rgba(255, 77, 163, 0.35)
+  );
+  border-radius: 999px;
+  border: 2px solid var(--background);
+  background-clip: padding-box;
+  transition: background 0.3s ease;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 77, 163, 0.85),
+    rgba(255, 77, 163, 0.6)
+  );
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dark mode: stronger glow so it reads on black */
+.dark *::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 77, 163, 0.7),
+    rgba(255, 77, 163, 0.4)
+  );
+  border: 2px solid var(--background);
+  background-clip: padding-box;
+}
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 77, 163, 0.95),
+    rgba(255, 77, 163, 0.65)
+  );
+  background-clip: padding-box;
+}
+
+/* Optional legacy class — still works */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 77, 163, 0.3);
+  background: rgba(255, 77, 163, 0.4);
   border-radius: 999px;
+  border: none;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Hidden scrollbar utility (used in sticky purchase bar size picker) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

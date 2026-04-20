@@ -1,18 +1,20 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
 import Skeleton from "./Skeleton";
 import Image from "next/image";
 import { useCart } from "../context/CartContext";
 
 export default function ProductCard({ product }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [activeColor, setActiveColor] = useState(product.colors[0]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const { addToCart, cartIconRef } = useCart();
-  const cardImageRef = useRef(null);
+  const imgWrapRef = useRef(null);
+  const { addToCart } = useCart();
 
   const originalPrice = Math.round(product.price * 1.25);
   const discount = Math.round(
@@ -21,14 +23,34 @@ export default function ProductCard({ product }) {
 
   const stop = (e) => e.stopPropagation();
 
+  // When color changes, reset then immediately check if the new image is
+  // already cached by the browser — avoids flashing the skeleton on refresh.
   useEffect(() => {
     setIsLoaded(false);
+    const el = imgWrapRef.current?.querySelector("img");
+    if (el && el.complete && el.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
   }, [activeColor]);
+
+  const goToProduct = () => {
+    router.push(`/product/${product.id}`);
+  };
 
   const handleQuickAdd = (e) => {
     stop(e);
     const defaultSize = product.sizes[0];
-    addToCart(product, activeColor, defaultSize, 1);
+    const colorForCart = {
+      name: activeColor.name,
+      value: activeColor.value,
+      image: activeColor.images[0],
+    };
+    addToCart(product, colorForCart, defaultSize, 1);
+  };
+
+  const handleQuickView = (e) => {
+    stop(e);
+    setIsOpen(true);
   };
 
   return (
@@ -48,13 +70,16 @@ export default function ProductCard({ product }) {
         className="group relative rounded-2xl overflow-hidden bg-gradient-to-b from-black/[0.04] to-black/[0.01] dark:from-white/[0.06] dark:to-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 hover:shadow-[0_20px_60px_-15px_rgba(255,46,136,0.25)] transition-all duration-500 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3]"
       >
         {/* Image Section */}
-        <div className="relative aspect-[3/4] overflow-hidden bg-black/5 dark:bg-white/5">
+        <div
+          ref={imgWrapRef}
+          className="relative aspect-[3/4] overflow-hidden bg-black/5 dark:bg-white/5"
+        >
           {!isLoaded && (
             <Skeleton className="absolute inset-0 z-10 h-full w-full" />
           )}
 
           <Image
-            src={activeColor.image}
+            src={activeColor.images[0]}
             alt={product.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -63,6 +88,32 @@ export default function ProductCard({ product }) {
               isLoaded ? "opacity-100" : "opacity-0"
             }`}
           />
+
+          {/* View Details pill on hover (top right) — navigates to full page */}
+          <button
+            type="button"
+            onClick={(e) => {
+              stop(e);
+              goToProduct();
+            }}
+            aria-label="View full details"
+            className="hidden md:flex absolute top-3 right-3 z-[4] items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 hover:bg-black backdrop-blur-md text-white text-[9px] font-bold tracking-widest uppercase shadow opacity-0 group-hover:opacity-100 transition"
+          >
+            Details
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" />
+            </svg>
+          </button>
 
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 dark:from-black/80 via-black/10 to-transparent opacity-90 z-[2]" />
@@ -79,35 +130,57 @@ export default function ProductCard({ product }) {
             )}
           </div>
 
-          {/* Mobile: always-visible add button */}
-          <button
-            onClick={handleQuickAdd}
-            aria-label="Quick add"
-            className="md:hidden absolute bottom-2 right-2 h-9 w-9 grid place-items-center rounded-full bg-[#FF4DA3] text-black shadow-lg z-[3] active:scale-90 transition"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          {/* Mobile: always-visible actions (Details + Quick Add) */}
+          <div className="md:hidden absolute bottom-2 right-2 z-[3] flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                stop(e);
+                goToProduct();
+              }}
+              aria-label="View full details"
+              className="h-9 px-3 flex items-center gap-1 rounded-full bg-white/90 backdrop-blur-md text-black text-[10px] font-bold tracking-widest uppercase shadow-lg active:scale-90 transition"
             >
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-          </button>
+              Details
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </button>
+            <button
+              onClick={handleQuickAdd}
+              aria-label="Quick add"
+              className="h-9 w-9 grid place-items-center rounded-full bg-[#FF4DA3] text-black shadow-lg active:scale-90 transition"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+          </div>
 
           {/* Desktop: hover actions */}
           <div className="hidden md:block absolute bottom-0 left-0 right-0 p-3 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition duration-300 z-[3]">
             <div className="flex gap-2">
               <button
-                onClick={(e) => {
-                  stop(e);
-                  setIsOpen(true);
-                }}
+                onClick={handleQuickView}
                 className="flex-1 px-4 py-2.5 text-xs font-semibold rounded-full bg-white text-black hover:bg-white/90 transition"
               >
                 Quick View
@@ -137,39 +210,29 @@ export default function ProductCard({ product }) {
 
         {/* Info Section */}
         <div className="p-3 sm:p-4">
-          {!isLoaded ? (
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-1/3" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-24 mt-2" />
-            </div>
-          ) : (
-            <>
-              <p className="text-black/50 dark:text-white/40 text-[9px] sm:text-[10px] tracking-[0.2em] uppercase">
-                {product.category}
-              </p>
-              <h3 className="text-black dark:text-white text-sm sm:text-[15px] font-medium truncate mt-0.5 sm:mt-1">
-                {product.name}
-              </h3>
+          <p className="text-black/50 dark:text-white/40 text-[9px] sm:text-[10px] tracking-[0.2em] uppercase">
+            {product.category}
+          </p>
+          <h3 className="text-black dark:text-white text-sm sm:text-[15px] font-medium truncate mt-0.5 sm:mt-1">
+            {product.name}
+          </h3>
 
-              {/* Price row */}
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="text-[#FF4DA3] text-sm sm:text-base font-bold">
-                  EGP ${product.price}
-                </span>
-                {originalPrice > product.price && (
-                  <span className="text-black/40 dark:text-white/30 text-[11px] sm:text-xs line-through">
-                    EGP ${originalPrice}
-                  </span>
-                )}
-                {originalPrice > product.price && (
-                  <span className="ml-auto text-[9px] sm:text-[10px] font-bold text-[#FF4DA3] bg-[#FF4DA3]/10 border border-[#FF4DA3]/20 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
-                    SAVE EGP {originalPrice - product.price}
-                  </span>
-                )}
-              </div>
-            </>
-          )}
+          {/* Price row */}
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="text-[#FF4DA3] text-sm sm:text-base font-bold">
+              EGP {product.price}
+            </span>
+            {originalPrice > product.price && (
+              <span className="text-black/40 dark:text-white/30 text-[11px] sm:text-xs line-through">
+                EGP {originalPrice}
+              </span>
+            )}
+            {originalPrice > product.price && (
+              <span className="ml-auto text-[9px] sm:text-[10px] font-bold text-[#FF4DA3] bg-[#FF4DA3]/10 border border-[#FF4DA3]/20 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
+                SAVE EGP {originalPrice - product.price}
+              </span>
+            )}
+          </div>
 
           {/* Divider */}
           <div className="h-px bg-black/10 dark:bg-white/5 my-2.5 sm:my-3" />

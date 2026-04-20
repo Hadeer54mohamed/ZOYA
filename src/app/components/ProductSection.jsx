@@ -3,61 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ProductCard from "./ProductCard";
-
-const products = [
-  {
-    id: 1,
-    name: "Midnight Dress",
-    price: 120,
-    category: "Dresses",
-    colors: [
-      { name: "Black", value: "#000000", image: "/images/photo (1).jpeg" },
-      { name: "Pink", value: "#FF4DA3", image: "/images/photo (2).jpeg" },
-      { name: "White", value: "#ffffff", image: "/images/photo (3).jpeg" },
-      { name: "Red", value: "#ff0000", image: "/images/photo (4).jpeg" },
-      { name: "Beige", value: "#d6c2a8", image: "/images/photo (5).jpeg" },
-    ],
-    sizes: ["S", "M", "L", "XL"],
-  },
-  {
-    id: 2,
-    name: "Velvet Blazer",
-    price: 185,
-    category: "Outerwear",
-    colors: [
-      { name: "Noir", value: "#0a0a0a", image: "/images/photo (6).jpeg" },
-      { name: "Wine", value: "#722f37", image: "/images/photo (7).jpeg" },
-      { name: "Ivory", value: "#f5f0e6", image: "/images/photo (8).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-  {
-    id: 3,
-    name: "Silk Slip",
-    price: 95,
-    category: "Dresses",
-    colors: [
-      { name: "Blush", value: "#f3c6c6", image: "/images/photo (3).jpeg" },
-      { name: "Black", value: "#000000", image: "/images/photo (1).jpeg" },
-      { name: "Sage", value: "#a6b89a", image: "/images/photo (5).jpeg" },
-    ],
-    sizes: ["XS", "S", "M", "L"],
-  },
-  {
-    id: 4,
-    name: "Neon Set",
-    price: 140,
-    category: "Sets",
-    colors: [
-      { name: "Pink", value: "#FF4DA3", image: "/images/photo (2).jpeg" },
-      { name: "Red", value: "#ff0000", image: "/images/photo (4).jpeg" },
-      { name: "Black", value: "#000000", image: "/images/photo (6).jpeg" },
-    ],
-    sizes: ["S", "M", "L"],
-  },
-];
-
-const categories = ["All", "Dresses", "Outerwear", "Sets"];
+import { products, categories } from "../data/products";
 
 export default function ProductSection() {
   const [activeCategory, setActiveCategory] = useState("All");

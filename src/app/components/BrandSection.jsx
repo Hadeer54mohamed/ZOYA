@@ -31,7 +31,7 @@ export default function BrandSection() {
         {/* TEXT SIDE */}
         <div>
           <span className="text-[#FF4DA3] text-[10px] tracking-[0.4em] uppercase font-bold">
-            Brand Philosophy
+          ●  Branding
           </span>
 
           <h2 className="text-black dark:text-white text-4xl md:text-5xl font-bold mt-4 leading-tight">
