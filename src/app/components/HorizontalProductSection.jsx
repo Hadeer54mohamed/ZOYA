@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  motion,
-  useMotionValue,
-  useTransform,
-  animate,
-} from "framer-motion";
+import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
@@ -15,68 +10,54 @@ import Image from "next/image";
 
 export default function HorizontalProductSection() {
   const router = useRouter();
-  const containerRef = useRef(null);
-  const trackRef = useRef(null);
-  const draggedRef = useRef(false);
+  const scrollRef = useRef(null);
 
-  const [constraint, setConstraint] = useState(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [progress, setProgress] = useState(12);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const x = useMotionValue(0);
-
-  useEffect(() => {
-    const update = () => {
-      if (!containerRef.current || !trackRef.current) return;
-      const containerW = containerRef.current.offsetWidth;
-      const trackW = trackRef.current.scrollWidth;
-      const diff = Math.max(0, trackW - containerW);
-      setConstraint(diff);
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  useEffect(() => {
-    const unsub = x.on("change", (v) => {
-      setCanScrollLeft(v < -4);
-      setCanScrollRight(v > -constraint + 4);
-    });
-    return unsub;
-  }, [x, constraint]);
-
-  const scrollBy = (dir) => {
-    const step = 320;
-    const current = x.get();
-    const next = Math.min(0, Math.max(-constraint, current + dir * -step));
-    animate(x, next, {
-      type: "spring",
-      stiffness: 140,
-      damping: 20,
-    });
+  const updateScrollState = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const max = Math.max(1, scrollWidth - clientWidth);
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < max - 4);
+    setProgress(12 + (scrollLeft / max) * 88);
   };
 
-  const progress = useTransform(
-    x,
-    [0, -Math.max(constraint, 1)],
-    ["12%", "100%"]
-  );
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    window.addEventListener("resize", updateScrollState);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, []);
+
+  const scrollBy = (dir) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const step = Math.min(el.clientWidth * 0.8, 340);
+    el.scrollBy({ left: dir * step, behavior: "smooth" });
+  };
 
   const handleCardClick = (product) => {
-    if (draggedRef.current) return;
     setSelectedProduct(product);
   };
 
   const handleGoToProduct = (e, product) => {
     e.stopPropagation();
-    if (draggedRef.current) return;
     router.push(`/product/${product.id}`);
   };
 
   return (
-    <section className="relative py-24 bg-white dark:bg-black overflow-hidden transition-colors duration-500">
+    <section id="collections" className="relative py-24 bg-white dark:bg-black overflow-hidden transition-colors duration-500">
       {/* Background accents */}
       <div className="pointer-events-none absolute top-10 right-0 h-[300px] w-[300px] rounded-full bg-[#FF4DA3]/10 blur-[120px]" />
       <div className="pointer-events-none absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-purple-500/10 blur-[120px]" />
@@ -124,31 +105,16 @@ export default function HorizontalProductSection() {
         </div>
       </div>
 
-      {/* Drag Container */}
-      <div
-        ref={containerRef}
-        className="relative overflow-hidden cursor-grab active:cursor-grabbing"
-      >
+      {/* Scroll Container */}
+      <div className="relative">
         {/* Edge fades */}
         <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-white dark:from-black to-transparent z-10" />
         <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white dark:from-black to-transparent z-10" />
 
-        <motion.div
-          ref={trackRef}
-          drag="x"
-          style={{ x }}
-          dragConstraints={{ left: -constraint, right: 0 }}
-          dragElastic={0.08}
-          dragTransition={{ bounceStiffness: 300, bounceDamping: 30 }}
-          onDragStart={() => {
-            draggedRef.current = true;
-          }}
-          onDragEnd={() => {
-            setTimeout(() => {
-              draggedRef.current = false;
-            }, 50);
-          }}
-          className="flex gap-5 md:gap-6 px-6 select-none"
+        <div
+          ref={scrollRef}
+          className="flex gap-5 md:gap-6 px-6 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory no-scrollbar"
+          style={{ WebkitOverflowScrolling: "touch" }}
         >
           {products.map((p, i) => (
             <motion.div
@@ -167,7 +133,7 @@ export default function HorizontalProductSection() {
                   setSelectedProduct(p);
                 }
               }}
-              className="shrink-0 w-[260px] sm:w-[300px] md:w-[340px] group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] rounded-2xl"
+              className="shrink-0 snap-start w-[260px] sm:w-[300px] md:w-[340px] group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] rounded-2xl"
             >
               <div className="relative overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
                 <Image
@@ -249,19 +215,20 @@ export default function HorizontalProductSection() {
               </div>
             </motion.div>
           ))}
-        </motion.div>
+        </div>
       </div>
 
       {/* Progress bar */}
       <div className="max-w-6xl mx-auto px-6 mt-8 flex items-center gap-4">
         <div className="flex-1 h-[2px] bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
           <motion.div
-            style={{ width: progress }}
+            animate={{ width: `${progress}%` }}
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
             className="h-full bg-[#FF4DA3] rounded-full"
           />
         </div>
         <span className="text-[10px] text-black/40 dark:text-white/40 tracking-[0.3em] uppercase font-bold shrink-0">
-          Drag / Swipe
+          Scroll / Swipe
         </span>
       </div>
 

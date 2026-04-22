@@ -143,6 +143,94 @@ export const products = [
     ],
     sizes: ["S", "M", "L", "XL"],
   },
+  {
+    id: "graphic-print-tee-2",
+    name: "Racing Graphic Tee",
+    category: "T-Shirts",
+    price: 530,
+    description:
+      "Bold automotive-inspired graphic print on a soft-hand, heavyweight tee. Relaxed and effortless.",
+    badge: "HOT",
+    colors: [
+      {
+        name: "Ivory Red",
+        value: "#faf0ed",
+        images: ["/images/photo (5).jpeg"],
+      },
+      {
+        name: "Ivory Black",
+        value: "#f5f0e6",
+        images: ["/images/photo (4).jpeg"],
+      },
+    ],
+    sizes: ["S", "M", "L", "XL"],
+  },
+  {
+    id: "graphic-print-tee-3",
+    name: "Racing Graphic Tee",
+    category: "T-Shirts",
+    price: 530,
+    description:
+      "Bold automotive-inspired graphic print on a soft-hand, heavyweight tee. Relaxed and effortless.",
+    badge: "HOT",
+    colors: [
+      {
+        name: "Ivory Red",
+        value: "#faf0ed",
+        images: ["/images/photo (5).jpeg"],
+      },
+      {
+        name: "Ivory Black",
+        value: "#f5f0e6",
+        images: ["/images/photo (4).jpeg"],
+      },
+    ],
+    sizes: ["S", "M", "L", "XL"],
+  },
+  {
+    id: "graphic-print-tee-4",
+    name: "Racing Graphic Tee",
+    category: "T-Shirts",
+    price: 530,
+    description:
+      "Bold automotive-inspired graphic print on a soft-hand, heavyweight tee. Relaxed and effortless.",
+    badge: "HOT",
+    colors: [
+      {
+        name: "Ivory Red",
+        value: "#faf0ed",
+        images: ["/images/photo (5).jpeg"],
+      },
+      {
+        name: "Ivory Black",
+        value: "#f5f0e6",
+        images: ["/images/photo (4).jpeg"],
+      },
+    ],
+    sizes: ["S", "M", "L", "XL"],
+  },
+  {
+    id: "graphic-print-tee-5",
+    name: "Racing Graphic Tee",
+    category: "T-Shirts",
+    price: 530,
+    description:
+      "Bold automotive-inspired graphic print on a soft-hand, heavyweight tee. Relaxed and effortless.",
+    badge: "HOT",
+    colors: [
+      {
+        name: "Ivory Red",
+        value: "#faf0ed",
+        images: ["/images/photo (5).jpeg"],
+      },
+      {
+        name: "Ivory Black",
+        value: "#f5f0e6",
+        images: ["/images/photo (4).jpeg"],
+      },
+    ],
+    sizes: ["S", "M", "L", "XL"],
+  },
 ];
 
 export const categories = ["All", "Sweatpants", "T-Shirts"];

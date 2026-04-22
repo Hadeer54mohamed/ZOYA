@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useSpring } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
@@ -8,13 +8,34 @@ import Skeleton from "./Skeleton";
 import Image from "next/image";
 import { useCart } from "../context/CartContext";
 
+const FALLBACK_COLOR = {
+  name: "Default",
+  value: "#0a0a0a",
+  images: ["/images/placeholder.jpg"],
+};
+
 export default function ProductCard({ product }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeColor, setActiveColor] = useState(product.colors[0]);
+  const colors =
+    Array.isArray(product?.colors) && product.colors.length > 0
+      ? product.colors
+      : [FALLBACK_COLOR];
+  const sizes =
+    Array.isArray(product?.sizes) && product.sizes.length > 0
+      ? product.sizes
+      : ["M"];
+  const [activeColor, setActiveColor] = useState(colors[0]);
   const [isLoaded, setIsLoaded] = useState(false);
   const imgWrapRef = useRef(null);
   const { addToCart } = useCart();
+  const [added, setAdded] = useState(false);
+
+  // 3D tilt — سلس باستخدام motion values + spring
+  const rotateX = useMotionValue(0);
+  const rotateY = useMotionValue(0);
+  const smoothX = useSpring(rotateX, { stiffness: 150, damping: 20 });
+  const smoothY = useSpring(rotateY, { stiffness: 150, damping: 20 });
 
   const originalPrice = Math.round(product.price * 1.25);
   const discount = Math.round(
@@ -22,9 +43,8 @@ export default function ProductCard({ product }) {
   );
 
   const stop = (e) => e.stopPropagation();
+  const openQuickView = () => setIsOpen(true);
 
-  // When color changes, reset then immediately check if the new image is
-  // already cached by the browser — avoids flashing the skeleton on refresh.
   useEffect(() => {
     setIsLoaded(false);
     const el = imgWrapRef.current?.querySelector("img");
@@ -39,13 +59,15 @@ export default function ProductCard({ product }) {
 
   const handleQuickAdd = (e) => {
     stop(e);
-    const defaultSize = product.sizes[0];
+    const defaultSize = sizes[0];
     const colorForCart = {
       name: activeColor.name,
       value: activeColor.value,
-      image: activeColor.images[0],
+      image: activeColor.images?.[0],
     };
     addToCart(product, colorForCart, defaultSize, 1);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 600);
   };
 
   const handleQuickView = (e) => {
@@ -56,37 +78,49 @@ export default function ProductCard({ product }) {
   return (
     <>
       <motion.div
-        whileHover={{ y: -8 }}
-        transition={{ type: "spring", stiffness: 220, damping: 20 }}
-        onClick={() => setIsOpen(true)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setIsOpen(true);
-          }
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          rotateX.set(-(y - rect.height / 2) / 35);
+          rotateY.set((x - rect.width / 2) / 35);
         }}
-        className="group relative rounded-2xl overflow-hidden bg-gradient-to-b from-black/[0.04] to-black/[0.01] dark:from-white/[0.06] dark:to-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 hover:shadow-[0_20px_60px_-15px_rgba(255,46,136,0.25)] transition-all duration-500 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3]"
+        onMouseLeave={() => {
+          rotateX.set(0);
+          rotateY.set(0);
+        }}
+        whileHover={{ y: -10 }}
+        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+        style={{
+          rotateX: smoothX,
+          rotateY: smoothY,
+          transformStyle: "preserve-3d",
+        }}
+        className="group relative rounded-2xl overflow-hidden bg-gradient-to-b from-black/[0.04] to-black/[0.01] dark:from-white/[0.06] dark:to-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 hover:shadow-[0_20px_60px_-15px_rgba(255,46,136,0.25)] transition-all duration-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3]"
       >
-        {/* Image Section */}
+        {/* Image Section — clickable to open QuickView */}
         <div
           ref={imgWrapRef}
-          className="relative aspect-[3/4] overflow-hidden bg-black/5 dark:bg-white/5"
+          onClick={openQuickView}
+          role="button"
+          tabIndex={0}
+          className="relative aspect-[3/4] overflow-hidden bg-black/5 dark:bg-white/5 cursor-pointer"
         >
           {!isLoaded && (
             <Skeleton className="absolute inset-0 z-10 h-full w-full" />
           )}
 
           <Image
-            src={activeColor.images[0]}
+            src={activeColor.images?.[0] || FALLBACK_COLOR.images[0]}
             alt={product.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             onLoad={() => setIsLoaded(true)}
-            className={`object-cover group-hover:scale-110 transition duration-700 ease-out ${
-              isLoaded ? "opacity-100" : "opacity-0"
-            }`}
+            className={`object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:rotate-[0.5deg] ${isLoaded ? "opacity-100" : "opacity-0"}`}
+            style={{
+              transform: `translateZ(40px) scale(1.05)`,
+            }}
           />
 
           {/* View Details pill on hover (top right) — navigates to full page */}
@@ -116,8 +150,7 @@ export default function ProductCard({ product }) {
           </button>
 
           {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 dark:from-black/80 via-black/10 to-transparent opacity-90 z-[2]" />
-
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition duration-500 z-[2]" />
           {/* Top badges */}
           <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex flex-col gap-1 sm:gap-1.5 z-[3]">
             <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-[#FF4DA3] text-black text-[9px] sm:text-[10px] font-bold tracking-widest uppercase shadow-lg">
@@ -155,25 +188,45 @@ export default function ProductCard({ product }) {
                 <path d="m12 5 7 7-7 7" />
               </svg>
             </button>
-            <button
+            <motion.button
               onClick={handleQuickAdd}
+              animate={added ? { scale: [1, 1.3, 1] } : { scale: 1 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               aria-label="Quick add"
-              className="h-9 w-9 grid place-items-center rounded-full bg-[#FF4DA3] text-black shadow-lg active:scale-90 transition"
+              className={`h-9 w-9 grid place-items-center rounded-full shadow-lg active:scale-90 transition-colors ${added
+                ? "bg-green-500 text-white"
+                : "bg-[#FF4DA3] text-black"
+                }`}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 5v14" />
-                <path d="M5 12h14" />
-              </svg>
-            </button>
+              {added ? (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              ) : (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+              )}
+            </motion.button>
           </div>
 
           {/* Desktop: hover actions */}
@@ -185,84 +238,115 @@ export default function ProductCard({ product }) {
               >
                 Quick View
               </button>
-              <button
+              <motion.button
                 onClick={handleQuickAdd}
+                animate={added ? { scale: [1, 1.3, 1] } : { scale: 1 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 aria-label="Add to cart"
-                className="h-10 w-10 grid place-items-center rounded-full bg-[#FF4DA3] text-black hover:scale-105 transition"
+                className={`h-10 w-10 grid place-items-center rounded-full hover:scale-105 transition-colors ${added
+                  ? "bg-green-500 text-white"
+                  : "bg-[#FF4DA3] text-black"
+                  }`}
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 5v14" />
-                  <path d="M5 12h14" />
-                </svg>
-              </button>
+                {added ? (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                )}
+              </motion.button>
             </div>
           </div>
         </div>
 
         {/* Info Section */}
         <div className="p-3 sm:p-4">
-          <p className="text-black/50 dark:text-white/40 text-[9px] sm:text-[10px] tracking-[0.2em] uppercase">
-            {product.category}
-          </p>
-          <h3 className="text-black dark:text-white text-sm sm:text-[15px] font-medium truncate mt-0.5 sm:mt-1">
-            {product.name}
-          </h3>
+          {/* Text area — clickable to open QuickView */}
+          <div
+            onClick={openQuickView}
+            role="button"
+            tabIndex={0}
+            className="cursor-pointer"
+          >
+            <p className="text-black/50 dark:text-white/40 text-[9px] sm:text-[10px] tracking-[0.2em] uppercase">
+              {product.category}
+            </p>
+            <h3 className="text-black dark:text-white text-sm sm:text-[15px] font-medium truncate mt-0.5 sm:mt-1 group-hover:text-[#FF4DA3] transition-colors duration-300">
+              {product.name}
+            </h3>
 
-          {/* Price row */}
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <span className="text-[#FF4DA3] text-sm sm:text-base font-bold">
-              EGP {product.price}
-            </span>
-            {originalPrice > product.price && (
-              <span className="text-black/40 dark:text-white/30 text-[11px] sm:text-xs line-through">
-                EGP {originalPrice}
-              </span>
-            )}
-            {originalPrice > product.price && (
-              <span className="ml-auto text-[9px] sm:text-[10px] font-bold text-[#FF4DA3] bg-[#FF4DA3]/10 border border-[#FF4DA3]/20 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
-                SAVE EGP {originalPrice - product.price}
-              </span>
-            )}
+            {/* Price row */}
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <motion.span
+                whileHover={{ scale: 1.05 }} className="text-[#FF4DA3] text-sm sm:text-base font-bold">
+                EGP {product.price}
+              </motion.span>
+              {originalPrice > product.price && (
+                <span className="text-black/40 dark:text-white/30 text-[11px] sm:text-xs line-through">
+                  EGP {originalPrice}
+                </span>
+              )}
+              {originalPrice > product.price && (
+                <span className="ml-auto text-[9px] sm:text-[10px] font-bold text-[#FF4DA3] bg-[#FF4DA3]/5 blur-3xl border border-[#FF4DA3]/20 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
+                  SAVE EGP {originalPrice - product.price}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Divider */}
           <div className="h-px bg-black/10 dark:bg-white/5 my-2.5 sm:my-3" />
 
-          {/* Color swatches */}
+          {/* Color swatches — NOT clickable to open; only changes color */}
           <div
-            className="flex items-center justify-between gap-2"
+            className="flex items-center justify-between gap-2 -mx-1 px-1 py-1"
             onClick={stop}
           >
-            <div className="flex items-center gap-1.5">
-              {product.colors.slice(0, 5).map((c) => (
+            <div className="flex items-center gap-2 sm:gap-1.5">
+              {colors.slice(0, 5).map((c) => (
                 <button
                   key={c.name}
+                  type="button"
+                  data-no-open
                   onMouseEnter={() => setActiveColor(c)}
                   onClick={(e) => {
                     stop(e);
                     setActiveColor(c);
                   }}
                   aria-label={c.name}
-                  className={`relative h-5 w-5 sm:h-4 sm:w-4 rounded-full border transition ${
-                    activeColor.name === c.name
-                      ? "border-black dark:border-white scale-110 ring-2 ring-black/20 dark:ring-white/20"
-                      : "border-black/20 dark:border-white/20 hover:border-black/50 dark:hover:border-white/50"
-                  }`}
+                  aria-pressed={activeColor.name === c.name}
+                  className={`relative h-6 w-6 sm:h-4 sm:w-4 rounded-full border transition active:scale-95 ${activeColor.name === c.name
+                    ? "border-black dark:border-white scale-110 ring-2 ring-black/20 dark:ring-white/20"
+                    : "border-black/20 dark:border-white/20 hover:border-black/50 dark:hover:border-white/50"
+                    }`}
                   style={{ backgroundColor: c.value }}
                 />
               ))}
-              {product.colors.length > 5 && (
+              {colors.length > 5 && (
                 <span className="text-black/50 dark:text-white/40 text-[10px] ml-1">
-                  +{product.colors.length - 5}
+                  +{colors.length - 5}
                 </span>
               )}
             </div>
@@ -272,11 +356,14 @@ export default function ProductCard({ product }) {
             </span>
           </div>
         </div>
+
       </motion.div>
+
 
       {isOpen && (
         <QuickView product={product} onClose={() => setIsOpen(false)} />
       )}
+
     </>
   );
 }

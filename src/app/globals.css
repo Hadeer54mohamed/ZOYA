@@ -119,3 +119,26 @@ html {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+@keyframes gradient {
+  0% {
+    background-position: 0% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+.animate-gradient {
+  animation: gradient 4s linear infinite;
+  background-size: 200% auto;
+}
+@keyframes gradient2 {
+  0% {
+    background-position: 0% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+.animate-gradient2 {
+  animation: gradient2 3s linear infinite;
+}

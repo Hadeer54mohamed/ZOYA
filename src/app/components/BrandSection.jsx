@@ -21,7 +21,7 @@ export default function BrandSection() {
   }, []);
 
   return (
-    <section className="relative py-16 bg-white dark:bg-[#050505] overflow-hidden transition-colors duration-500">
+    <section id="about" className="relative py-16 bg-white dark:bg-[#050505] overflow-hidden transition-colors duration-500">
       {/* Glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 w-[600px] h-[600px] bg-[#FF4DA3]/10 blur-[160px] rounded-full -translate-x-1/2 -translate-y-1/2" />

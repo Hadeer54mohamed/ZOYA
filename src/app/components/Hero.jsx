@@ -1,12 +1,26 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function Hero() {
+  const scrollTo = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const yOffset = -100; 
+    const y =
+      el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+    window.scrollTo({ top: y, behavior: "smooth" });
+  };
+  const scrollToProducts = () => scrollTo("products");
+  const handleLookbookClick = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  };
+
   return (
-    <section className="relative h-screen w-full overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500">
+    <section id="home" className="relative h-screen w-full overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500">
       {/* Dynamic Background Glows */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 pointer-events-none">
         <motion.div
           animate={{
             scale: [1, 1.2, 1],
@@ -33,7 +47,7 @@ export default function Hero() {
         <motion.div
           animate={{ opacity: [0.05, 0.1, 0.05] }}
           transition={{ duration: 6, repeat: Infinity }}
-          className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,77,163,0.15),transparent_60%)] z-[2]"
+          className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(255,77,163,0.15),transparent_60%)] z-[2] pointer-events-none"
         />
 
         <motion.div
@@ -46,7 +60,7 @@ export default function Hero() {
             animate={{ letterSpacing: "0.4em", opacity: 0.9 }}
             className="text-[#FF4DA3] font-black text-[10px] uppercase bg-[#FF4DA3]/10 px-3 py-1 rounded-full border border-[#FF4DA3]/20"
           >
-            Drop 01 // SS'26
+            Drop 01 // SS&apos;26
           </motion.span>
 
           <motion.h1 className="text-black dark:text-white text-6xl md:text-[120px] font-[1000] mt-8 leading-[0.85] tracking-tighter uppercase">
@@ -63,32 +77,51 @@ export default function Hero() {
 
           <motion.div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
             <motion.button
+              onClick={scrollToProducts}
               whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
-              className="group relative px-12 py-4 bg-[#FF4DA3] text-white text-[11px] font-black uppercase tracking-[0.2em] overflow-hidden rounded-sm"
+           
+              className="group relative px-12 py-4 bg-[#FF4DA3] text-white text-[11px] font-black uppercase tracking-[0.2em] overflow-hidden rounded-sm cursor-pointer shadow-[0_10px_30px_-10px_#FF4DA3]"
             >
-              <span className="relative z-10">Shop Collection</span>
+              <span className="relative z-10 flex items-center gap-2">
+                Shop Collection
+              </span>
+
+              {/* shine */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+
+              {/* glow */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-[#FF4DA3]/20 blur-xl transition duration-500" />
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.05, color: "#FF4DA3" }}
-              className="text-black/50 dark:text-white/40 text-[11px] font-black uppercase tracking-[0.2em] transition-colors"
+            <Link
+              href="/products"
+              scroll
+              prefetch
+              onClick={handleLookbookClick}
+              className="inline-block"
             >
-              [ View Lookbook ]
-            </motion.button>
+              <motion.span
+                whileHover={{ scale: 1.05, color: "#FF4DA3" }}
+                className="text-black/50 dark:text-white/40 text-[11px] font-black uppercase tracking-[0.2em] transition-colors cursor-pointer inline-block"
+              >
+                [ View Lookbook ]
+              </motion.span>
+            </Link>
+
           </motion.div>
         </motion.div>
       </div>
 
       {/* Animated Scroll Hint */}
-      <motion.div
+      <motion.button
+        onClick={scrollToProducts}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5, duration: 1 }}
-        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3"
+        aria-label="Scroll to products"
+        className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 cursor-pointer group"
       >
-        <span className="text-[9px] text-black/30 dark:text-white/20 uppercase tracking-[0.4em] font-bold">
+        <span className="text-[9px] text-black/30 dark:text-white/20 uppercase tracking-[0.4em] font-bold group-hover:text-[#FF4DA3] transition-colors">
           Scroll
         </span>
         <div className="w-[1px] h-12 bg-gradient-to-b from-[#FF4DA3] to-transparent relative overflow-hidden">
@@ -98,7 +131,7 @@ export default function Hero() {
             className="absolute top-0 left-0 w-full h-1/2 bg-black dark:bg-white"
           />
         </div>
-      </motion.div>
+      </motion.button>
 
       {/* CSS Animation for Gradient Text */}
       <style jsx>{`

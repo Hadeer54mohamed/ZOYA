@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import ProductCard from "./ProductCard";
 import { products, categories } from "../data/products";
 
@@ -14,12 +15,21 @@ export default function ProductSection() {
       : products.filter((p) => p.category === activeCategory);
 
   return (
-    <section className="relative bg-white dark:bg-black py-16 px-6 overflow-hidden transition-colors duration-500">
+    <section
+      id="products"
+      className="relative bg-white dark:bg-black py-16 px-6 overflow-hidden transition-colors duration-500 scroll-mt-24"
+    >
       {/* Background glow */}
       <div className="pointer-events-none absolute top-1/3 -left-40 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/10 blur-[140px]" />
       <div className="pointer-events-none absolute bottom-0 -right-40 h-[400px] w-[400px] rounded-full bg-purple-600/10 blur-[140px]" />
 
-      <div className="relative max-w-6xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 80 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        className="relative max-w-6xl mx-auto"
+      >
         {/* Heading */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
           <div>
@@ -120,7 +130,10 @@ export default function ProductSection() {
 
         {/* View all */}
         <div className="flex justify-center mt-14">
-          <button className="group flex items-center gap-2 px-6 py-3 rounded-full border border-black/15 dark:border-white/15 text-black/80 dark:text-white/80 text-sm hover:border-black/40 dark:hover:border-white/40 hover:text-black dark:hover:text-white transition">
+          <Link
+            href="/products"
+            className="group flex items-center gap-2 px-6 py-3 rounded-full border border-black/15 dark:border-white/15 text-black/80 dark:text-white/80 text-sm hover:border-black/40 dark:hover:border-white/40 hover:text-black dark:hover:text-white transition"
+          >
             View All Products
             <svg
               width="14"
@@ -136,9 +149,9 @@ export default function ProductSection() {
               <path d="M5 12h14" />
               <path d="m12 5 7 7-7 7" />
             </svg>
-          </button>
+          </Link>
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 }

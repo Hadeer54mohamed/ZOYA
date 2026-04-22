@@ -2,24 +2,50 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
 import { ShoppingBag, Sun, Moon } from "lucide-react";
+import SearchOverlay from "./SearchOverlay";
 
 const links = [
-  { label: "Home", href: "#" },
-  { label: "Shop", href: "#" },
-  { label: "Collections", href: "#" },
-  { label: "About", href: "#" },
+  { label: "Home", href: "home" },
+  { label: "Shop", href: "products" },
+  { label: "Collections", href: "collections" },
+  { label: "About", href: "about" },
 ];
+
+const NAV_OFFSET = -100;
+
+const scrollToSection = (id) => {
+  const el = document.getElementById(id);
+  if (!el) return false;
+  const y =
+    el.getBoundingClientRect().top + window.pageYOffset + NAV_OFFSET;
+  window.scrollTo({ top: y, behavior: "smooth" });
+  return true;
+};
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState("Home");
+  const [searchOpen, setSearchOpen] = useState(false);
   const { cartCount, setIsCartOpen, cartIconRef } = useCart();
   const { theme, toggleTheme, mounted } = useTheme();
   const [pulse, setPulse] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const isHome = pathname === "/";
+
+  // ينقل لسكشن على الهوم. لو مش على الهوم، يعمل navigate للهوم بالـ hash
+  const handleNavClick = (href) => {
+    if (isHome) {
+      scrollToSection(href);
+    } else {
+      router.push(`/#${href}`);
+    }
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -29,12 +55,54 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
     if (cartCount > 0) {
       setPulse(true);
       const t = setTimeout(() => setPulse(false), 400);
       return () => clearTimeout(t);
     }
   }, [cartCount]);
+
+  // Scroll-spy — يشتغل بس على صفحة الهوم
+  useEffect(() => {
+    if (!isHome) {
+      setActive(""); // مفيش active pill على الصفحات التانية
+      return;
+    }
+
+    const handleScroll = () => {
+      const sections = links.map((l) => l.href);
+      let current = "home";
+
+      sections.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= 120 && rect.bottom >= 120) {
+          current = id;
+        }
+      });
+
+      const activeLabel =
+        links.find((l) => l.href === current)?.label || "Home";
+      setActive(activeLabel);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isHome]);
 
   const isDark = theme === "dark";
 
@@ -69,7 +137,7 @@ export default function Navbar() {
           }`}
         >
           {/* Logo */}
-          <a href="#" className="group flex items-center gap-2 outline-none">
+          <a href="/" className="group flex items-center gap-2 outline-none">
             <motion.img
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -84,13 +152,13 @@ export default function Navbar() {
             {links.map((link) => (
               <button
                 key={link.label}
-                onClick={() => setActive(link.label)}
-                className="relative px-5 py-2 transition-all duration-300"
+                onClick={() => handleNavClick(link.href)}
+                className="group relative px-5 py-2 transition-all duration-300"
               >
                 <span
                   className={`relative z-10 tracking-[0.2em] uppercase transition-colors duration-300 ${
                     active === link.label
-                      ? "text-black dark:text-white"
+                      ? "text-black dark:text-white"  
                       : "group-hover:text-black dark:group-hover:text-white"
                   }`}
                 >
@@ -100,7 +168,7 @@ export default function Navbar() {
                 {active === link.label && (
                   <motion.span
                     layoutId="nav-pill"
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
                     className="absolute inset-0 rounded-full bg-black/[0.06] dark:bg-white/[0.08] border border-black/10 dark:border-white/10 shadow-[inset_0_0_10px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_0_10px_rgba(255,255,255,0.05)]"
                   />
                 )}
@@ -134,8 +202,9 @@ export default function Navbar() {
 
             {/* Search Icon */}
             <button
+              onClick={() => setSearchOpen(true)}
               aria-label="Search"
-              className="relative hidden sm:flex h-10 w-10 items-center justify-center rounded-full border border-black/10 dark:border-white/5 bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-300"
+              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-black/10 dark:border-white/5 bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-300"
             >
               <svg
                 width="16"
@@ -208,27 +277,28 @@ export default function Navbar() {
             >
               <div className="flex flex-col p-3">
                 {links.map((link) => (
-                  <a
+                  <button
                     key={link.label}
-                    href={link.href}
                     onClick={() => {
-                      setActive(link.label);
                       setOpen(false);
+                      setTimeout(() => handleNavClick(link.href), 50);
                     }}
-                    className={`px-6 py-4 rounded-2xl text-[10px] tracking-[0.3em] uppercase transition-all ${
+                    className={`text-left px-6 py-4 rounded-2xl text-[10px] tracking-[0.3em] uppercase transition-all ${
                       active === link.label
                         ? "bg-black/5 dark:bg-white/10 text-[#FF4DA3]"
                         : "text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 hover:text-black dark:hover:text-white"
                     }`}
                   >
                     {link.label}
-                  </a>
+                  </button>
                 ))}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
     </motion.nav>
   );
 }

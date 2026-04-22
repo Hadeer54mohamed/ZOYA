@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import Navbar from "../../components/Navbar";
 import ProductCard from "../../components/ProductCard";
 import { useCart } from "../../context/CartContext";
 import { getProductById, getRelatedProducts } from "../../data/products";
@@ -100,7 +99,6 @@ export default function ProductPage() {
   if (!product) {
     return (
       <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
-        <Navbar />
         <div className="min-h-[70vh] flex flex-col items-center justify-center px-6 text-center">
           <p className="text-[#FF4DA3] tracking-[0.4em] text-[10px] font-bold uppercase mb-4">
             ● 404
@@ -187,8 +185,6 @@ export default function ProductPage() {
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
-      <Navbar />
-
       {/* Floating fly-to-cart image */}
       <AnimatePresence>
         {fly && (

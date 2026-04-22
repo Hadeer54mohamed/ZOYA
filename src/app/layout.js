@@ -1,9 +1,12 @@
+import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./context/CartContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import CartDrawer from "./components/CartDrawer";
 import ScrollToTopOnLoad from "./components/ScrollToTopOnLoad";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer.jsx";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,34 +23,28 @@ export const metadata = {
   description: "ZØYA - Wear Your Identity",
 };
 
-const themeInitScript = `
-(function() {
-  try {
-    var t = localStorage.getItem('zoya-theme');
-    if (!t) t = 'dark';
-    if (t === 'dark') document.documentElement.classList.add('dark');
-    document.documentElement.style.colorScheme = t;
-  } catch (e) {
-    document.documentElement.classList.add('dark');
-  }
-})();
-`;
+export default async function RootLayout({ children }) {
+  const cookieStore = await cookies();
+  const themeCookie = cookieStore.get("zoya-theme")?.value;
+  const theme = themeCookie === "light" ? "light" : "dark";
+  const isDark = theme === "dark";
 
-export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased ${
+        isDark ? "dark" : ""
+      }`}
+      style={{ colorScheme: theme }}
       suppressHydrationWarning
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
-        <ThemeProvider>
+        <ThemeProvider initialTheme={theme}>
           <CartProvider>
+            <Navbar />
             <ScrollToTopOnLoad />
             {children}
+              <Footer />
             <CartDrawer />
           </CartProvider>
         </ThemeProvider>

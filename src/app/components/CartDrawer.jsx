@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "../context/CartContext";
 import { X, ShoppingBag, Trash2, ArrowRight, Minus, Plus } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export default function CartDrawer() {
     const {
@@ -23,7 +24,16 @@ export default function CartDrawer() {
             transition: { staggerChildren: 0.08, delayChildren: 0.15 },
         },
     };
-
+    const router = useRouter();
+  
+    const handleCheckout = () => {
+      if (!cart || cart.length === 0) {
+        alert("Your bag is empty");
+        return;
+      }
+  
+      router.push("/checkout");
+    };
     const itemVariants = {
         hidden: { opacity: 0, x: 30, scale: 0.96 },
         show: {
@@ -256,16 +266,20 @@ export default function CartDrawer() {
                                     </div>
                                 </div>
 
-                                <button className="relative group w-full bg-[#FF4DA3] overflow-hidden text-white py-4 rounded-xl font-bold transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_0_40px_rgba(255,77,163,0.5)]">
-                                    <span className="relative z-10 flex items-center justify-center gap-2">
-                                        Proceed to Checkout
-                                        <ArrowRight
-                                            size={18}
-                                            className="group-hover:translate-x-1 transition-transform"
-                                        />
-                                    </span>
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
-                                </button>
+                                <button
+      onClick={handleCheckout}
+      className="relative group w-full bg-[#FF4DA3] overflow-hidden text-white py-4 rounded-xl font-bold transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_0_40px_rgba(255,77,163,0.5)]"
+    >
+      <span className="relative z-10 flex items-center justify-center gap-2">
+        Proceed to Checkout
+        <ArrowRight
+          size={18}
+          className="group-hover:translate-x-1 transition-transform"
+        />
+      </span>
+
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
+    </button>
 
                                 <p className="text-[10px] text-center text-black/40 dark:text-white/20 uppercase tracking-[0.2em]">
                                     Secure encrypted checkout
