@@ -31,16 +31,20 @@ export default function ProductCard({ product }) {
   const { addToCart } = useCart();
   const [added, setAdded] = useState(false);
 
-  // 3D tilt — سلس باستخدام motion values + spring
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
   const smoothX = useSpring(rotateX, { stiffness: 150, damping: 20 });
   const smoothY = useSpring(rotateY, { stiffness: 150, damping: 20 });
 
-  const originalPrice = Math.round(product.price * 1.25);
-  const discount = Math.round(
-    ((originalPrice - product.price) / originalPrice) * 100
-  );
+  const originalPrice =
+    typeof product.originalPrice === "number" &&
+    product.originalPrice > product.price
+      ? product.originalPrice
+      : null;
+  const hasDiscount = originalPrice !== null;
+  const discount = hasDiscount
+    ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
+    : 0;
 
   const stop = (e) => e.stopPropagation();
   const openQuickView = () => setIsOpen(true);
@@ -303,12 +307,12 @@ export default function ProductCard({ product }) {
                 whileHover={{ scale: 1.05 }} className="text-[#FF4DA3] text-sm sm:text-base font-bold">
                 EGP {product.price}
               </motion.span>
-              {originalPrice > product.price && (
+              {hasDiscount && (
                 <span className="text-black/40 dark:text-white/30 text-[11px] sm:text-xs line-through">
                   EGP {originalPrice}
                 </span>
               )}
-              {originalPrice > product.price && (
+              {hasDiscount && (
                 <span className="ml-auto text-[9px] sm:text-[10px] font-bold text-[#FF4DA3] bg-[#FF4DA3]/5 blur-3xl border border-[#FF4DA3]/20 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
                   SAVE EGP {originalPrice - product.price}
                 </span>

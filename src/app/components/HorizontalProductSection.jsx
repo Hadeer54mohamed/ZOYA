@@ -5,12 +5,17 @@ import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
-import { products } from "../data/products";
 import Image from "next/image";
 
-export default function HorizontalProductSection() {
+export default function HorizontalProductSection({ products = [] }) {
   const router = useRouter();
   const scrollRef = useRef(null);
+
+  const limitedProducts = products.filter(
+    (p) => String(p?.badge || "").toUpperCase() === "LIMITED"
+  );
+
+  if (limitedProducts.length === 0) return null;
 
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -116,7 +121,7 @@ export default function HorizontalProductSection() {
           className="flex gap-5 md:gap-6 px-6 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory no-scrollbar"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          {products.map((p, i) => (
+          {limitedProducts.map((p, i) => (
             <motion.div
               key={p.id}
               initial={{ opacity: 0, y: 40 }}

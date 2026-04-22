@@ -26,7 +26,7 @@ const scrollToSection = (id) => {
   return true;
 };
 
-export default function Navbar() {
+export default function Navbar({ products = [] }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState("Home");
@@ -38,7 +38,6 @@ export default function Navbar() {
   const router = useRouter();
   const isHome = pathname === "/";
 
-  // ينقل لسكشن على الهوم. لو مش على الهوم، يعمل navigate للهوم بالـ hash
   const handleNavClick = (href) => {
     if (isHome) {
       scrollToSection(href);
@@ -298,7 +297,11 @@ export default function Navbar() {
         </AnimatePresence>
       </div>
 
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SearchOverlay
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        products={products}
+      />
     </motion.nav>
   );
 }

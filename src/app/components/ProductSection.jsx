@@ -4,9 +4,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import ProductCard from "./ProductCard";
-import { products, categories } from "../data/products";
 
-export default function ProductSection() {
+export default function ProductSection({ products = [], categories = ["All"] }) {
   const [activeCategory, setActiveCategory] = useState("All");
 
   const filteredProducts =

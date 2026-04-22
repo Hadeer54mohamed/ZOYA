@@ -27,11 +27,16 @@ export default function QuickView({ product, onClose }) {
   // Mount flag for SSR-safe portal rendering
   useEffect(() => setMounted(true), []);
 
-  const originalPrice = Math.round(product.price * 1.25);
-  const discount = Math.round(
-    ((originalPrice - product.price) / originalPrice) * 100
-  );
-  const saved = (originalPrice - product.price) * qty;
+  const originalPrice =
+    typeof product.originalPrice === "number" &&
+    product.originalPrice > product.price
+      ? product.originalPrice
+      : null;
+  const hasDiscount = originalPrice !== null;
+  const discount = hasDiscount
+    ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
+    : 0;
+  const saved = hasDiscount ? (originalPrice - product.price) * qty : 0;
 
   useEffect(() => {
     setImageLoaded(false);
@@ -192,7 +197,7 @@ export default function QuickView({ product, onClose }) {
                 <span className="text-2xl sm:text-4xl font-bold text-black dark:text-white">
                   EGP {product.price}
                 </span>
-                {originalPrice > product.price && (
+                {hasDiscount && (
                   <div className="flex flex-col">
                     <span className="text-black/30 dark:text-white/20 text-sm sm:text-lg line-through leading-none">
                       EGP {originalPrice}

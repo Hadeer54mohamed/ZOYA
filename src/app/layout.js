@@ -3,10 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./context/CartContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import CartDrawer from "./components/CartDrawer";
-import ScrollToTopOnLoad from "./components/ScrollToTopOnLoad";
-import Navbar from "./components/Navbar";
-import Footer from "./components/Footer.jsx";
+import LayoutShell from "./components/LayoutShell";
+import { getAllProducts } from "../sanity/lib/products";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,6 +27,8 @@ export default async function RootLayout({ children }) {
   const theme = themeCookie === "light" ? "light" : "dark";
   const isDark = theme === "dark";
 
+  const products = await getAllProducts();
+
   return (
     <html
       lang="en"
@@ -41,11 +41,7 @@ export default async function RootLayout({ children }) {
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
         <ThemeProvider initialTheme={theme}>
           <CartProvider>
-            <Navbar />
-            <ScrollToTopOnLoad />
-            {children}
-              <Footer />
-            <CartDrawer />
+            <LayoutShell products={products}>{children}</LayoutShell>
           </CartProvider>
         </ThemeProvider>
       </body>

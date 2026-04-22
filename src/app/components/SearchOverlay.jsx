@@ -4,9 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { products } from "../data/products";
 
-export default function SearchOverlay({ open, onClose }) {
+export default function SearchOverlay({ open, onClose, products = [] }) {
   const router = useRouter();
   const inputRef = useRef(null);
   const [query, setQuery] = useState("");
@@ -33,7 +32,7 @@ export default function SearchOverlay({ open, onClose }) {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return products
+    return (products || [])
       .filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
@@ -41,7 +40,7 @@ export default function SearchOverlay({ open, onClose }) {
           (p.description && p.description.toLowerCase().includes(q))
       )
       .slice(0, 6);
-  }, [query]);
+  }, [query, products]);
 
   const goToProduct = (id) => {
     onClose();

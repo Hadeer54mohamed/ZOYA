@@ -57,12 +57,16 @@ const ProductInfo = forwardRef(function ProductInfo(
           <p className="text-4xl font-extralight tracking-tight text-black dark:text-white/90">
             EGP {product.price.toLocaleString()}
           </p>
-          <p className="text-lg text-black/30 dark:text-white/20 line-through">
-            EGP {originalPrice.toLocaleString()}
-          </p>
-          <span className="text-[10px] font-bold text-[#FF4DA3] bg-[#FF4DA3]/10 border border-[#FF4DA3]/20 px-2 py-0.5 rounded-full uppercase tracking-widest">
-            Save {saved.toLocaleString()}
-          </span>
+          {originalPrice != null && (
+            <>
+              <p className="text-lg text-black/30 dark:text-white/20 line-through">
+                EGP {originalPrice.toLocaleString()}
+              </p>
+              <span className="text-[10px] font-bold text-[#FF4DA3] bg-[#FF4DA3]/10 border border-[#FF4DA3]/20 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                Save {saved.toLocaleString()}
+              </span>
+            </>
+          )}
         </div>
       </header>
 

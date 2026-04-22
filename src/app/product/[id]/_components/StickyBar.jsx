@@ -81,9 +81,11 @@ export default function StickyBar({
                 <p className="text-base font-bold text-black dark:text-white leading-none">
                   EGP {(product.price * quantity).toLocaleString()}
                 </p>
-                <p className="text-[10px] text-black/40 dark:text-white/30 line-through mt-1">
-                  EGP {(originalPrice * quantity).toLocaleString()}
-                </p>
+                {originalPrice != null && (
+                  <p className="text-[10px] text-black/40 dark:text-white/30 line-through mt-1">
+                    EGP {(originalPrice * quantity).toLocaleString()}
+                  </p>
+                )}
               </div>
 
               {/* Inline size picker (desktop only) */}
