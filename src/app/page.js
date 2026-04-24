@@ -3,14 +3,20 @@ import ProductSection from "./components/ProductSection";
 import BrandSection from "./components/BrandSection";
 import HorizontalProductSection from "./components/HorizontalProductSection";
 import FeaturedDropSection from "./components/FeaturedDropSection";
-import InteractiveSection from "./components/InteractiveSection";
+import SocialSection from "./components/SocialSection";
 import HashScroller from "./components/HashScroller";
 import { getAllProducts, getAllCategories } from "../sanity/lib/products";
+import { getAllTestimonials } from "../sanity/lib/testimonials";
+import { getAllReels } from "../sanity/lib/instagramReel";
+import Testimonials from "./components/Testimonials";
+import ReelsGallery from "./components/ReelsGallery";
 
 export default async function Home() {
-  const [products, categories] = await Promise.all([
+  const [products, categories, testimonials, reels] = await Promise.all([
     getAllProducts(),
     getAllCategories(),
+    getAllTestimonials(),
+    getAllReels(),
   ]);
 
   return (
@@ -21,7 +27,9 @@ export default async function Home() {
       <BrandSection />
       <ProductSection products={products} categories={categories} />
       <HorizontalProductSection products={products} />
-      <InteractiveSection />
+      <SocialSection />
+      <Testimonials testimonials={testimonials} />
+      <ReelsGallery reels={reels} />
     </main>
   );
 }
