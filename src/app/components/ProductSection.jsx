@@ -16,11 +16,11 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
   return (
     <section
       id="products"
-      className="relative bg-white dark:bg-black py-16 px-6 overflow-hidden transition-colors duration-500 scroll-mt-24"
+      className="relative bg-white dark:bg-black py-20 md:py-28 px-6 overflow-hidden transition-colors duration-500 scroll-mt-24"
     >
       {/* Background glow */}
       <div className="pointer-events-none absolute top-1/3 -left-40 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/10 blur-[140px]" />
-      <div className="pointer-events-none absolute bottom-0 -right-40 h-[400px] w-[400px] rounded-full bg-purple-600/10 blur-[140px]" />
+      <div className="pointer-events-none absolute bottom-0 -right-40 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/10 blur-[140px]" />
 
       <motion.div
         initial={{ opacity: 0, y: 80 }}
@@ -36,7 +36,7 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="text-[#FF4DA3] text-xs tracking-[0.3em]"
+              className="text-[#FF4DA3] text-[10px] tracking-[0.4em] uppercase font-bold"
             >
               ● FEATURED
             </motion.p>
@@ -45,7 +45,7 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1 }}
-              className="text-black dark:text-white text-3xl md:text-5xl font-bold mt-2"
+              className="text-black dark:text-white text-4xl md:text-6xl font-black mt-3 leading-none"
             >
               Latest Drops
             </motion.h2>

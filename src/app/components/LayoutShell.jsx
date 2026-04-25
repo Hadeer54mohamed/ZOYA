@@ -5,6 +5,7 @@ import Navbar from "./Navbar";
 import Footer from "./Footer.jsx";
 import ScrollToTopOnLoad from "./ScrollToTopOnLoad";
 import CartDrawer from "./CartDrawer";
+import Intro from "./Intro";
 
 export default function LayoutShell({ children, products = [] }) {
   const pathname = usePathname();
@@ -16,6 +17,7 @@ export default function LayoutShell({ children, products = [] }) {
 
   return (
     <>
+      <Intro />
       <Navbar products={products} />
       <ScrollToTopOnLoad />
       {children}

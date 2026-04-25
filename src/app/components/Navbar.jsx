@@ -9,10 +9,11 @@ import { ShoppingBag, Sun, Moon } from "lucide-react";
 import SearchOverlay from "./SearchOverlay";
 
 const links = [
-  { label: "Home", href: "home" },
+  { label: "Home", href: "/#home" },
   { label: "Shop", href: "/products" },
   { label: "Collections", href: "collections" },
   { label: "About", href: "about" },
+  { label: "Contact", href: "contact" },
 ];
 
 const NAV_OFFSET = -100;

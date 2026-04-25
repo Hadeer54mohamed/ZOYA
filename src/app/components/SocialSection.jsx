@@ -35,12 +35,12 @@ const socials = [
 
 export default function SocialSection() {
   return (
-    <section className="relative py-10 md:py-32 overflow-hidden bg-slate-50 dark:bg-[#080808] transition-colors duration-500">
+    <section id="contact" className="relative py-20 md:py-28 overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500">
       
       {/* Dynamic Background Blurs */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#FF4DA3]/10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#FF4DA3]/10 blur-[120px] rounded-full" />
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto px-6">
@@ -58,12 +58,12 @@ export default function SocialSection() {
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-7xl font-black text-slate-900 dark:text-white mb-6 leading-none"
+            className="text-4xl md:text-6xl font-black text-black dark:text-white mb-6 leading-none"
           >
-            The Zoya <span className="text-[#FF4DA3]">Circle</span>
+            The  <span className="text-[#FF4DA3]">Zoya </span>Circle
           </motion.h2>
           
-          <p className="text-slate-500 dark:text-slate-400 max-w-lg mx-auto text-sm md:text-base">
+          <p className="text-black/60 dark:text-white/50 max-w-lg mx-auto text-sm md:text-base">
             Be the first to see our latest drops and exclusive stories across our digital spaces.
           </p>
         </div>
@@ -81,7 +81,7 @@ export default function SocialSection() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
                 whileHover={{ y: -10 }}
-                className="group relative flex flex-col items-center text-center p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-[#FF4DA3]/10"
+                className="group relative flex flex-col items-center text-center p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] bg-white dark:bg-white/[0.03] border border-black/10 dark:border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-[#FF4DA3]/10"
               >
                 {/* Hover Glow Effect */}
                 <div 
@@ -102,10 +102,10 @@ export default function SocialSection() {
 
                 {/* Text Content */}
                 <div className="relative z-10">
-                  <h3 className="text-slate-900 dark:text-white font-black text-sm md:text-lg uppercase tracking-wider">
+                  <h3 className="text-black dark:text-white font-black text-sm md:text-lg uppercase tracking-wider">
                     {social.name}
                   </h3>
-                  <p className="hidden md:block text-slate-400 dark:text-slate-500 text-xs mt-2 font-medium">
+                  <p className="hidden md:block text-black/50 dark:text-white/40 text-xs mt-2 font-medium">
                     {social.desc}
                   </p>
                 </div>

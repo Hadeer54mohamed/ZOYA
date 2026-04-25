@@ -51,14 +51,15 @@ export default function Hero() {
         />
 
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ y: 30 }}
+          animate={{ y: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         >
           <motion.span
-            initial={{ letterSpacing: "0.5em", opacity: 0 }}
-            animate={{ letterSpacing: "0.4em", opacity: 0.9 }}
-            className="text-[#FF4DA3] font-black text-[10px] uppercase bg-[#FF4DA3]/10 px-3 py-1 rounded-full border border-[#FF4DA3]/20"
+            initial={{ letterSpacing: "0.5em" }}
+            animate={{ letterSpacing: "0.4em" }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="text-[#FF4DA3] font-black text-[10px] uppercase bg-[#FF4DA3]/10 px-3 py-1 rounded-full border border-[#FF4DA3]/20 opacity-90"
           >
             Drop 01 // SS&apos;26
           </motion.span>

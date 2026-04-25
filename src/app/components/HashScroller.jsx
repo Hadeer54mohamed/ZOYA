@@ -9,7 +9,6 @@ export default function HashScroller() {
     const hash = window.location.hash?.replace("#", "");
     if (!hash) return;
 
-    // ننتظر شوية عشان الـ sections تكون متحمّلة
     const timer = setTimeout(() => {
       const el = document.getElementById(hash);
       if (!el) return;

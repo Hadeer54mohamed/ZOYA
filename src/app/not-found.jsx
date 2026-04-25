@@ -7,6 +7,14 @@ import { useRouter } from "next/navigation";
 export default function NotFound() {
   const router = useRouter();
 
+  const handleGoBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  };
+
   return (
     <section className="relative min-h-screen w-full overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500 flex items-center justify-center px-6 pt-24 pb-16">
       {/* Dynamic Background Glows */}
@@ -25,7 +33,7 @@ export default function NotFound() {
             opacity: [0.15, 0.25, 0.15],
           }}
           transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-[-10%] right-[-10%] h-[600px] w-[600px] bg-purple-600 blur-[150px] rounded-full"
+          className="absolute bottom-[-10%] right-[-10%] h-[600px] w-[600px] bg-[#FF4DA3] blur-[150px] rounded-full"
         />
       </div>
 
@@ -130,7 +138,8 @@ export default function NotFound() {
           </Link>
 
           <motion.button
-            onClick={() => router.back()}
+            type="button"
+            onClick={handleGoBack}
             whileHover={{ scale: 1.05, color: "#FF4DA3" }}
             className="text-black/50 dark:text-white/40 text-[11px] font-black uppercase tracking-[0.2em] transition-colors cursor-pointer"
           >

@@ -21,7 +21,7 @@ export default function BrandSection() {
   }, []);
 
   return (
-    <section id="about" className="relative py-16 bg-white dark:bg-[#050505] overflow-hidden transition-colors duration-500">
+    <section id="about" className="relative py-20 md:py-28 bg-white dark:bg-black overflow-hidden transition-colors duration-500">
       {/* Glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 w-[600px] h-[600px] bg-[#FF4DA3]/10 blur-[160px] rounded-full -translate-x-1/2 -translate-y-1/2" />
@@ -31,10 +31,10 @@ export default function BrandSection() {
         {/* TEXT SIDE */}
         <div>
           <span className="text-[#FF4DA3] text-[10px] tracking-[0.4em] uppercase font-bold">
-          ●  Branding
+            ●  Branding
           </span>
 
-          <h2 className="text-black dark:text-white text-4xl md:text-5xl font-bold mt-4 leading-tight">
+          <h2 className="text-black dark:text-white text-4xl md:text-6xl font-black mt-4 leading-tight">
             Fashion is not about fitting in —
             <span className="text-[#FF4DA3]"> it&apos;s about presence.</span>
           </h2>

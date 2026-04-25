@@ -24,12 +24,12 @@ export default async function Home() {
       <HashScroller />
       <Hero />
       <FeaturedDropSection />
-      <BrandSection />
       <ProductSection products={products} categories={categories} />
       <HorizontalProductSection products={products} />
-      <SocialSection />
+      <BrandSection />
       <Testimonials testimonials={testimonials} />
       <ReelsGallery reels={reels} />
+      <SocialSection />
     </main>
   );
 }
