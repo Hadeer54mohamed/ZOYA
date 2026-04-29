@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const SESSION_KEY = "zoya-intro-played";
-
 export default function Intro() {
   const [show, setShow] = useState(false);
   const [phase, setPhase] = useState(0);
@@ -12,8 +10,6 @@ export default function Intro() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const played = sessionStorage.getItem(SESSION_KEY);
-    if (played) return;
     setShow(true);
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
@@ -49,7 +45,6 @@ export default function Intro() {
   }, [show]);
 
   const finish = () => {
-    sessionStorage.setItem(SESSION_KEY, "1");
     document.documentElement.style.overflow = "";
     document.body.style.overflow = "";
     setShow(false);
@@ -135,7 +130,7 @@ export default function Intro() {
             animate={{ opacity: phase >= 1 ? 1 : 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
             whileHover={{ color: "#FF4DA3" }}
-            className="absolute bottom-8 right-6 sm:bottom-12 sm:right-10 flex items-center gap-2 text-[10px] tracking-[0.4em] text-white/40 font-mono uppercase cursor-pointer"
+            className="absolute bottom-8 right-6 sm:bottom-12 sm:right-10 z-40 flex items-center gap-2 text-[10px] tracking-[0.4em] text-white/40 font-mono uppercase cursor-pointer"
           >
             <span>Skip</span>
             <span className="w-6 h-[1px] bg-white/30" />
@@ -152,7 +147,7 @@ export default function Intro() {
           </div>
 
           {/* === MAIN CENTER STAGE === */}
-          <div className="relative z-10 h-full w-full flex items-center justify-center px-6">
+          <div className="relative z-10 h-full w-full flex items-center justify-center px-6 pointer-events-none">
             <div className="relative flex flex-col items-center">
               {/* TAGLINE LINE 1 */}
               <AnimatePresence mode="wait">

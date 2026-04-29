@@ -16,7 +16,7 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
   return (
     <section
       id="products"
-      className="relative bg-white dark:bg-black py-20 md:py-28 px-6 overflow-hidden transition-colors duration-500 scroll-mt-24"
+      className="relative bg-white dark:bg-black py-8 md:py-12 px-6 overflow-hidden transition-colors duration-500 scroll-mt-24"
     >
       {/* Background glow */}
       <div className="pointer-events-none absolute top-1/3 -left-40 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/10 blur-[140px]" />

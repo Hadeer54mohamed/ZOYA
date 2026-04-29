@@ -35,7 +35,7 @@ const socials = [
 
 export default function SocialSection() {
   return (
-    <section id="contact" className="relative py-20 md:py-28 overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500">
+    <section id="contact" className="relative py-8 md:py-12 overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500">
       
       {/* Dynamic Background Blurs */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none">

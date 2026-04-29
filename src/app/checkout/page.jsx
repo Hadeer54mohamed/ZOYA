@@ -4,7 +4,7 @@ import { useCart } from "../context/CartContext";
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation"; 
-import { CheckCircle2, ArrowLeft, Loader2, ShoppingBag } from "lucide-react";
+import { CheckCircle2, ArrowLeft, Loader2, ShoppingBag, AlertCircle } from "lucide-react";
 
 export default function CheckoutPage() {
   const { cart, clearCart, cartTotal, setIsCartOpen } = useCart();
@@ -23,12 +23,38 @@ export default function CheckoutPage() {
     address: "",
   });
 
-  const isFormValid = useMemo(() => {
-    return form.name.length > 2 && form.phone.length >= 11 && form.address.length > 10;
-  }, [form]);
+  const [touched, setTouched] = useState({
+    name: false,
+    phone: false,
+    address: false,
+  });
+
+  const errors = useMemo(() => ({
+    name:
+      form.name.trim().split(/\s+/).filter(Boolean).length < 2
+        ? "Please enter your full name (at least two words)"
+        : "",
+    phone: !/^01[0125][0-9]{8}$/.test(form.phone)
+      ? "Please enter a valid Egyptian phone number (11 digits)"
+      : "",
+    address:
+      form.address.trim().length <= 15
+        ? "Address must be at least 16 characters"
+        : "",
+  }), [form]);
+
+  const isFormValid = !errors.name && !errors.phone && !errors.address;
 
   const handleNext = () => {
-    if (isFormValid) setStep(2);
+    if (isFormValid) {
+      setStep(2);
+      return;
+    }
+    setTouched({ name: true, phone: true, address: true });
+  };
+
+  const handleBlur = (field) => {
+    setTouched((t) => ({ ...t, [field]: true }));
   };
 
   const handleOrder = () => {
@@ -81,6 +107,8 @@ export default function CheckoutPage() {
     );
   }
 
+  const showSummaryError = !isFormValid && (touched.name || touched.phone || touched.address);
+
   return (
     <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
       {/* STEP INDICATOR */}
@@ -116,21 +144,59 @@ export default function CheckoutPage() {
                     <input
                       type="text"
                       placeholder="e.g. Hadeer Mohamed"
-                      className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3] outline-none transition-all"
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${
+                        touched.name && errors.name
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                          : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                      }`}
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      onBlur={() => handleBlur("name")}
                     />
+                    <AnimatePresence>
+                      {touched.name && errors.name && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
+                        >
+                          <AlertCircle size={13} strokeWidth={2.5} />
+                          {errors.name}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-xs uppercase tracking-widest ml-1">Phone Number</label>
                     <input
                       type="tel"
-                      placeholder="0123 456 7890"
-                      className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3] outline-none transition-all"
+                      inputMode="numeric"
+                      maxLength={11}
+                      placeholder="01234567890"
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${
+                        touched.phone && errors.phone
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                          : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                      }`}
                       value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })}
+                      onBlur={() => handleBlur("phone")}
                     />
+                    <AnimatePresence>
+                      {touched.phone && errors.phone && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
+                        >
+                          <AlertCircle size={13} strokeWidth={2.5} />
+                          {errors.phone}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   <div className="space-y-2">
@@ -138,20 +204,57 @@ export default function CheckoutPage() {
                     <textarea
                       rows={3}
                       placeholder="Street, Building, Apartment..."
-                      className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3] outline-none transition-all resize-none"
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all resize-none ${
+                        touched.address && errors.address
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                          : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                      }`}
                       value={form.address}
                       onChange={(e) => setForm({ ...form, address: e.target.value })}
+                      onBlur={() => handleBlur("address")}
                     />
+                    <AnimatePresence>
+                      {touched.address && errors.address && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
+                        >
+                          <AlertCircle size={13} strokeWidth={2.5} />
+                          {errors.address}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
-                <button
-                  onClick={handleNext}
-                  disabled={!isFormValid}
-                  className="w-full py-5 rounded-2xl bg-[#FF4DA3] text-white font-bold tracking-widest uppercase text-sm shadow-lg shadow-pink-500/20 hover:shadow-pink-500/40 disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed transition-all active:scale-95"
-                >
-                  Continue to Review
-                </button>
+                <div className="space-y-4">
+                  <AnimatePresence>
+                    {showSummaryError && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: "auto" }}
+                        exit={{ opacity: 0, y: -8, height: 0 }}
+                        className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400"
+                      >
+                        <AlertCircle size={18} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                        <div className="text-sm leading-relaxed">
+                          <p className="font-semibold mb-0.5">Please fix the highlighted fields</p>
+                          <p className="text-xs opacity-80">All shipping details are required to continue.</p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <button
+                    onClick={handleNext}
+                    disabled={!isFormValid}
+                    className="w-full py-5 rounded-2xl bg-[#FF4DA3] text-white font-bold tracking-widest uppercase text-sm shadow-lg shadow-pink-500/20 hover:shadow-pink-500/40 disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed transition-all active:scale-95"
+                  >
+                    Continue to Review
+                  </button>
+                </div>
               </motion.div>
             )}
 

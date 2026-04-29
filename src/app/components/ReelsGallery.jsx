@@ -177,7 +177,7 @@ export default function ReelsGallery({ reels = [] }) {
       : null;
 
   return (
-    <section className="relative py-16 sm:py-20 md:py-28 bg-white dark:bg-black overflow-hidden transition-colors duration-500">
+    <section className="relative py-8 md:py-12 bg-white dark:bg-black overflow-hidden transition-colors duration-500">
       {/* Background pink glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-[#FF4DA3]/[0.04] dark:bg-[#FF4DA3]/[0.06] blur-[120px] pointer-events-none" />
 

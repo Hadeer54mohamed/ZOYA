@@ -62,7 +62,7 @@ export default function HorizontalProductSection({ products = [] }) {
   };
 
   return (
-    <section id="collections" className="relative py-20 md:py-28 bg-[#fafafa] dark:bg-[#050505] overflow-hidden transition-colors duration-500">
+    <section id="collections" className="relative  bg-[#fafafa] dark:bg-[#050505] overflow-hidden transition-colors duration-500">
       {/* Background accents */}
       <div className="pointer-events-none absolute top-10 right-0 h-[300px] w-[300px] rounded-full bg-[#FF4DA3]/10 blur-[120px]" />
       <div className="pointer-events-none absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-purple-500/10 blur-[120px]" />

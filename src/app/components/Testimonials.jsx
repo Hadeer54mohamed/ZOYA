@@ -49,7 +49,7 @@ export default function Testimonials({ testimonials }) {
   };
 
   return (
-    <section className="py-20 md:py-28 bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500">
+    <section className="py-8 md:py-12 bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500">
       <div className="max-w-7xl mx-auto px-6">
         
         {/* Header */}

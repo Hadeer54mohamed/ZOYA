@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
-import { ShoppingBag, Sun, Moon } from "lucide-react";
+import { ShoppingBag, Sun, Moon, Search } from "lucide-react";
 import SearchOverlay from "./SearchOverlay";
 
 const links = [
-  { label: "Home", href: "/#home" },
+  { label: "Home", href: "home" },
   { label: "Shop", href: "/products" },
   { label: "Collections", href: "collections" },
   { label: "About", href: "about" },
@@ -21,8 +21,7 @@ const NAV_OFFSET = -100;
 const scrollToSection = (id) => {
   const el = document.getElementById(id);
   if (!el) return false;
-  const y =
-    el.getBoundingClientRect().top + window.pageYOffset + NAV_OFFSET;
+  const y = el.getBoundingClientRect().top + window.pageYOffset + NAV_OFFSET;
   window.scrollTo({ top: y, behavior: "smooth" });
   return true;
 };
@@ -39,56 +38,43 @@ export default function Navbar({ products = [] }) {
   const router = useRouter();
   const isHome = pathname === "/";
 
-  // 🔥 Admin system
+  // 🔥 Admin system Logic (Unchanged)
   const [tapCount, setTapCount] = useState(0);
   const [isUnlocking, setIsUnlocking] = useState(false);
-
   const tapTimeoutRef = useRef(null);
   const pressTimerRef = useRef(null);
 
   const triggerUnlock = () => {
     if (isUnlocking) return;
-
     setIsUnlocking(true);
-
     if (navigator.vibrate) navigator.vibrate(50);
-
-    setTimeout(() => {
-      router.push("/studio");
-    }, 1400);
+    setTimeout(() => { router.push("/studio"); }, 1400);
   };
 
   const handleLogoTap = () => {
     if (isUnlocking) return;
-
     const nextCount = tapCount + 1;
     setTapCount(nextCount);
-
     clearTimeout(tapTimeoutRef.current);
-
     if (nextCount >= 3) {
       setTapCount(0);
       triggerUnlock();
       return;
     }
-
     tapTimeoutRef.current = setTimeout(() => {
       if (nextCount === 1) {
-        window.location.reload();
+        if (isHome) window.location.reload();
+        else router.push("/");
       }
       setTapCount(0);
     }, 400);
   };
 
   const handlePressStart = () => {
-    pressTimerRef.current = setTimeout(() => {
-      triggerUnlock();
-    }, 800);
+    pressTimerRef.current = setTimeout(() => { triggerUnlock(); }, 800);
   };
 
-  const handlePressEnd = () => {
-    clearTimeout(pressTimerRef.current);
-  };
+  const handlePressEnd = () => { clearTimeout(pressTimerRef.current); };
 
   const handleNavClick = (href) => {
     if (href.startsWith("/")) {
@@ -125,36 +111,28 @@ export default function Navbar({ products = [] }) {
     }
   }, [cartCount]);
 
-
   useEffect(() => {
     if (!isHome) {
-      setActive("");
+      const matched = links.find((l) => l.href === pathname);
+      setActive(matched?.label || "");
       return;
     }
-
+    const sectionLinks = links.filter((l) => !l.href.startsWith("/"));
     const handleScroll = () => {
-      const sections = links.map((l) => l.href);
       let current = "home";
-
-      sections.forEach((id) => {
+      sectionLinks.forEach(({ href: id }) => {
         const el = document.getElementById(id);
         if (!el) return;
-
         const rect = el.getBoundingClientRect();
-        if (rect.top <= 120 && rect.bottom >= 120) {
-          current = id;
-        }
+        if (rect.top <= 120 && rect.bottom >= 120) current = id;
       });
-
-      const activeLabel =
-        links.find((l) => l.href === current)?.label || "Home";
+      const activeLabel = sectionLinks.find((l) => l.href === current)?.label || "Home";
       setActive(activeLabel);
     };
-
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isHome]);
+  }, [isHome, pathname]);
 
   const isDark = theme === "dark";
 
@@ -164,210 +142,133 @@ export default function Navbar({ products = [] }) {
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-0 left-0 w-full z-50 transition-all duration-500"
+        className="fixed top-0 left-0 w-full z-50 px-4 pt-6"
       >
-        <div
-          className={`mx-auto transition-all duration-500 ease-in-out ${scrolled ? "max-w-4xl" : "max-w-6xl"
-            } px-4 sm:px-6`}
-        >
+        <div className={`mx-auto transition-all duration-700 ease-in-out ${scrolled ? "max-w-[850px]" : "max-w-6xl"}`}>
           <motion.div
-            animate={{
-              paddingTop: scrolled ? 8 : 14,
-              paddingBottom: scrolled ? 8 : 14,
-              backgroundColor: isDark
-                ? scrolled
-                  ? "rgba(0, 0, 0, 0.7)"
-                  : "rgba(0, 0, 0, 0.3)"
-                : scrolled
-                  ? "rgba(255, 255, 255, 0.75)"
-                  : "rgba(255, 255, 255, 0.4)",
-            }}
-            className={`mt-4 flex items-center justify-between rounded-full px-5 sm:px-8 border border-black/10 dark:border-white/10 backdrop-blur-2xl transition-all duration-500 ${scrolled
-              ? "shadow-[0_10px_40px_-10px_rgba(255,46,136,0.2)]"
-              : "shadow-none"
-              }`}
+            className={`relative flex items-center justify-between rounded-full px-2 py-2 sm:px-4 sm:py-2 border border-white/10 dark:border-white/5 backdrop-blur-2xl backdrop-saturate-150 transition-all duration-500 ${
+              isDark 
+                ? "bg-[#0A0A0A]/80 shadow-[0_20px_50px_rgba(0,0,0,0.5)]" 
+                : "bg-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.1)]"
+            }`}
           >
-            {/* LOGO */}
-            <motion.a
+            {/* LOGO SECTION */}
+            <motion.div
               onClick={handleLogoTap}
               onTouchStart={handlePressStart}
               onTouchEnd={handlePressEnd}
-              className="group flex items-center gap-2 outline-none cursor-pointer"
-              animate={
-                isUnlocking
-                  ? {
-                    scale: [1, 1.2, 0.9, 1.1, 1],
-                    rotate: [0, 10, -10, 5, 0],
-                  }
-                  : {}
-              }
-              transition={{ duration: 0.8 }}
+              className="pl-3 sm:pl-4 z-50 cursor-pointer shrink-0"
+              animate={isUnlocking ? { scale: [1, 1.1, 0.9, 1], rotate: [0, 5, -5, 0] } : {}}
             >
-              <motion.img
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                src="/images/LOGO2.png"
-                alt="ZØYA"
-                className="h-9 sm:h-10 w-auto object-contain"
-              />
-            </motion.a>
+              <img src="/images/LOGO2.png" alt="ZØYA" className="h-6 sm:h-8 w-auto object-contain" />
+            </motion.div>
 
-            {/* Desktop Links */}
-            <div className="hidden md:flex items-center gap-2 text-[11px] font-medium text-black/50 dark:text-white/50">
+            {/* DESKTOP LINKS - Matches the Image Style */}
+            <div className="hidden md:flex items-center bg-black/5 dark:bg-white/5 rounded-full p-1 mx-4">
               {links.map((link) => (
                 <button
                   key={link.label}
                   onClick={() => handleNavClick(link.href)}
-                  className="group relative px-5 py-2 transition-all duration-300"
+                  className="relative px-6 py-2 text-[10px] tracking-[0.2em] uppercase font-bold transition-all"
                 >
-                  <span
-                    className={`relative z-10 tracking-[0.2em] uppercase transition-colors duration-300 ${active === link.label
-                      ? "text-black dark:text-white"
-                      : "group-hover:text-black dark:group-hover:text-white"
-                      }`}
-                  >
+                  <span className={`relative z-10 transition-colors duration-300 ${active === link.label ? "text-white dark:text-white" : "text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white"}`}>
                     {link.label}
                   </span>
-
                   {active === link.label && (
                     <motion.span
                       layoutId="nav-pill"
-                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                      className="absolute inset-0 rounded-full bg-black/[0.06] dark:bg-white/[0.08] border border-black/10 dark:border-white/10 shadow-[inset_0_0_10px_rgba(0,0,0,0.05)] dark:shadow-[inset_0_0_10px_rgba(255,255,255,0.05)]"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      className="absolute inset-0 rounded-full bg-[#1A1A1A] dark:bg-white/10 shadow-inner"
                     />
                   )}
                 </button>
               ))}
             </div>
 
-            {/* Right actions */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                aria-label="Toggle theme"
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-300 overflow-hidden"
-              >
-                <AnimatePresence mode="wait" initial={false}>
-                  {mounted && (
-                    <motion.span
-                      key={theme}
-                      initial={{ y: -20, opacity: 0, rotate: -90 }}
-                      animate={{ y: 0, opacity: 1, rotate: 0 }}
-                      exit={{ y: 20, opacity: 0, rotate: 90 }}
-                      transition={{ duration: 0.3 }}
-                      className="absolute"
-                    >
-                      {isDark ? <Sun size={16} /> : <Moon size={16} />}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
+            {/* ACTION BUTTONS */}
+            <div className="flex items-center gap-1 sm:gap-2 pr-1">
+              <button onClick={() => setSearchOpen(true)} className="p-2 text-black/50 dark:text-white/50 hover:text-[#FF4DA3] transition-colors">
+                <Search size={18} />
+              </button>
+              
+              <button onClick={toggleTheme} className="hidden sm:block p-2 text-black/50 dark:text-white/50 hover:text-[#FF4DA3] transition-colors">
+                {mounted && (isDark ? <Sun size={18} /> : <Moon size={18} />)}
               </button>
 
-              {/* Search Icon */}
-              <button
-                onClick={() => setSearchOpen(true)}
-                aria-label="Search"
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-black/10 dark:border-white/5 bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:border-black/20 dark:hover:border-white/20 hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-300"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-              </button>
-
-              {/* Cart Button */}
               <button
                 onClick={() => setIsCartOpen(true)}
                 ref={cartIconRef}
-                className={`group relative flex items-center gap-2.5 rounded-full bg-[#FF4DA3] pl-4 pr-2 py-1.5 text-[11px] font-bold text-white transition-all duration-300 hover:shadow-[0_0_25px_-5px_#FF4DA3] hover:scale-[1.03] active:scale-95 ${pulse ? "scale-110" : ""
-                  }`}
+                className={`group relative flex items-center gap-2 rounded-full bg-[#FF4DA3] pl-4 pr-1.5 py-1.5 transition-all duration-300 hover:bg-[#FF2E92] hover:shadow-[0_8px_25px_rgba(255,77,163,0.45)] hover:-translate-y-[1px] active:scale-95 ${pulse ? "scale-110" : ""}`}
               >
-                <span className="tracking-widest uppercase">
-                  <ShoppingBag className="h-4 w-4" />
-                </span>
-                <div className="flex h-7 min-w-7 items-center justify-center rounded-full bg-black px-2 text-[10px] text-white transition-transform group-hover:rotate-12">
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={cartCount}
-                      initial={{ y: 5, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: -5, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {cartCount ?? 0}
-                    </motion.span>
-                  </AnimatePresence>
+                <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
+                <div className="flex h-6 min-w-[30px] items-center justify-center rounded-full bg-black text-[10px] font-black text-white px-1">
+                  {cartCount ?? 0}
                 </div>
               </button>
 
-              {/* Mobile Burger Menu */}
+              {/* MOBILE TOGGLE */}
               <button
                 onClick={() => setOpen(!open)}
-                className="md:hidden flex h-10 w-10 items-center justify-center rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-black dark:text-white"
+                className="md:hidden ml-1 h-9 w-9 flex flex-col gap-1 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >
-                <div className="flex flex-col gap-1 items-center justify-center">
-                  <motion.span
-                    animate={open ? { rotate: 45, y: 2.5 } : { rotate: 0, y: 0 }}
-                    className="h-[1.5px] w-5 bg-black dark:bg-white rounded-full origin-center"
-                  />
-                  <motion.span
-                    animate={open ? { rotate: -45, y: -2.5 } : { rotate: 0, y: 0 }}
-                    className="h-[1.5px] w-5 bg-black dark:bg-white rounded-full origin-center"
-                  />
-                </div>
+                <motion.span animate={open ? { rotate: 45, y: 4 } : { rotate: 0, y: 0 }} className="h-[1.5px] w-4 bg-black dark:bg-white rounded-full" />
+                <motion.span animate={open ? { opacity: 0 } : { opacity: 1 }} className="h-[1.5px] w-4 bg-black dark:bg-white rounded-full" />
+                <motion.span animate={open ? { rotate: -45, y: -4 } : { rotate: 0, y: 0 }} className="h-[1.5px] w-4 bg-black dark:bg-white rounded-full" />
               </button>
             </div>
           </motion.div>
 
-          {/* Mobile Menu */}
+          {/* MOBILE MENU - Floating Style */}
           <AnimatePresence>
             {open && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                className="absolute left-4 right-4 mt-3 overflow-hidden rounded-3xl bg-white/90 dark:bg-black/90 backdrop-blur-3xl border border-black/10 dark:border-white/10 md:hidden shadow-2xl"
+                initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                className={`absolute top-full left-0 right-0 mt-3 overflow-hidden rounded-[2.5rem] backdrop-blur-3xl border md:hidden ${
+                  isDark
+                    ? "bg-[#0F0F0F]/95 border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.8)]"
+                    : "bg-white/95 border-black/5 shadow-[0_30px_60px_rgba(0,0,0,0.15)]"
+                }`}
               >
-                <div className="flex flex-col p-3">
-                  {links.map((link) => (
-                    <button
+                <div className="flex flex-col p-3 gap-1">
+                  {links.map((link, i) => (
+                    <motion.button
                       key={link.label}
-                      onClick={() => {
-                        setOpen(false);
-                        setTimeout(() => handleNavClick(link.href), 50);
-                      }}
-                      className={`text-left px-6 py-4 rounded-2xl text-[10px] tracking-[0.3em] uppercase transition-all ${active === link.label
-                        ? "bg-black/5 dark:bg-white/10 text-[#FF4DA3]"
-                        : "text-black/60 dark:text-white/60 hover:bg-black/5 dark:hover:bg-white/5 hover:text-black dark:hover:text-white"
-                        }`}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      onClick={() => { setOpen(false); setTimeout(() => handleNavClick(link.href), 300); }}
+                      className={`w-full text-left px-8 py-5 rounded-[1.8rem] text-[10px] tracking-[0.4em] uppercase font-bold transition-all ${
+                        active === link.label
+                          ? isDark
+                            ? "bg-white text-black"
+                            : "bg-black text-white"
+                          : isDark
+                            ? "text-white/40 hover:text-white hover:bg-white/5"
+                            : "text-black/40 hover:text-black hover:bg-black/5"
+                      }`}
                     >
                       {link.label}
-                    </button>
+                    </motion.button>
                   ))}
+                  {/* Theme toggle inside mobile menu for convenience */}
+                  <div className={`flex justify-between items-center px-8 py-5 mt-2 border-t ${isDark ? "border-white/5" : "border-black/5"}`}>
+                    <span className={`text-[9px] tracking-[0.3em] uppercase ${isDark ? "text-white/30" : "text-black/30"}`}>Switch Theme</span>
+                    <button onClick={toggleTheme} className={`p-2 rounded-full transition-colors ${isDark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}>
+                      {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
-        <SearchOverlay
-          open={searchOpen}
-          onClose={() => setSearchOpen(false)}
-          products={products}
-        />
+        <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} products={products} />
       </motion.nav>
 
-      {/* 🎬 LOADING */}
+      {/* Admin UI logic remains strictly untouched */}
       <AnimatePresence>
         {isUnlocking && (
           <motion.div
@@ -447,7 +348,6 @@ export default function Navbar({ products = [] }) {
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
-    </>
+      </AnimatePresence>    </>
   );
 }
