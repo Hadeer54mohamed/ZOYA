@@ -39,3 +39,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# env files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# sanity
+.env.sanity
+.env.sanity.local
+.env.sanity.development.local
+.env.sanity.test.local
+.env.sanity.production.local
+.env
+.env.js
+
+.env.sanity.development
+.env.sanity.test
+.env.sanity.production

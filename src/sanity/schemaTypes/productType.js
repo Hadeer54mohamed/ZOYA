@@ -48,6 +48,14 @@ export const productType = defineType({
         }),
     }),
     defineField({
+      name: "cost",
+      title: "Cost (EGP) — Internal",
+      type: "number",
+      description:
+        "Internal: how much YOU pay for this product. Used to calculate profit. Never shown to customers.",
+      validation: (Rule) => Rule.min(0),
+    }),
+    defineField({
       name: "description",
       title: "Description",
       type: "text",

@@ -14,6 +14,7 @@ const links = [
   { label: "Collections", href: "collections" },
   { label: "About", href: "about" },
   { label: "Contact", href: "contact" },
+  { label: "Track Order", href: "/track" },
 ];
 
 const NAV_OFFSET = -100;
@@ -31,7 +32,7 @@ export default function Navbar({ products = [] }) {
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState("Home");
   const [searchOpen, setSearchOpen] = useState(false);
-  const { cartCount, setIsCartOpen, cartIconRef } = useCart();
+  const { cartCount, setIsCartOpen, cartIconRef, isCartOpen } = useCart();
   const { theme, toggleTheme, mounted } = useTheme();
   const [pulse, setPulse] = useState(false);
   const pathname = usePathname();
@@ -48,7 +49,10 @@ export default function Navbar({ products = [] }) {
     if (isUnlocking) return;
     setIsUnlocking(true);
     if (navigator.vibrate) navigator.vibrate(50);
-    setTimeout(() => { router.push("/studio"); }, 1400);
+
+    setTimeout(() => {
+      router.push("/admin-gate");
+    }, 1000);
   };
 
   const handleLogoTap = () => {
@@ -56,7 +60,7 @@ export default function Navbar({ products = [] }) {
     const nextCount = tapCount + 1;
     setTapCount(nextCount);
     clearTimeout(tapTimeoutRef.current);
-    if (nextCount >= 3) {
+    if (nextCount >= 5) {
       setTapCount(0);
       triggerUnlock();
       return;
@@ -140,9 +144,15 @@ export default function Navbar({ products = [] }) {
     <>
       <motion.nav
         initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-0 left-0 w-full z-50 px-4 pt-6"
+        animate={
+          isCartOpen
+            ? { y: -120, opacity: 0 }
+            : { y: 0, opacity: 1 }
+        }
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className={`fixed top-0 left-0 w-full px-4 pt-6 ${
+          isCartOpen ? "z-30 pointer-events-none" : "z-50"
+        }`}
       >
         <div className={`mx-auto transition-all duration-700 ease-in-out ${scrolled ? "max-w-[850px]" : "max-w-6xl"}`}>
           <motion.div
@@ -268,86 +278,6 @@ export default function Navbar({ products = [] }) {
         <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} products={products} />
       </motion.nav>
 
-      {/* Admin UI logic remains strictly untouched */}
-      <AnimatePresence>
-        {isUnlocking && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[999] flex items-center justify-center overflow-hidden ${isDark ? "bg-black" : "bg-white"
-              }`}
-          >
-            {/* scan lines */}
-            <div className="absolute inset-0 opacity-10 pointer-events-none bg-[linear-gradient(to_bottom,transparent_0%,rgba(255,255,255,0.05)_50%,transparent_100%)] animate-pulse" />
-
-            <div className="flex flex-col items-center gap-6 relative z-10">
-
-              {/* LOGO glitch */}
-              <motion.img
-                src="/images/LOGO2.png"
-                className="h-14"
-                animate={{
-                  scale: [1, 1.15, 0.95, 1.1, 1],
-                  rotate: [0, 2, -2, 1, 0],
-                  filter: [
-                    "brightness(1)",
-                    "brightness(2)",
-                    "contrast(2)",
-                    "brightness(0.5)",
-                    "brightness(1)",
-                  ],
-                }}
-                transition={{ duration: 0.9 }}
-              />
-
-              {/* glitch text */}
-              <motion.div
-                className={`text-xs tracking-[0.4em] font-mono ${isDark ? "text-white/60" : "text-black/60"
-                  }`}
-                animate={{ opacity: [0.4, 1, 0.4] }}
-                transition={{ repeat: Infinity, duration: 1 }}
-              >
-                ACCESSING ADMIN NODE...
-              </motion.div>
-
-              {/* fake terminal line */}
-              <motion.div
-                className={`text-[10px] font-mono ${isDark ? "text-white/40" : "text-black/40"
-                  }`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
-                decrypting assets / verifying identity / unlocking studio
-              </motion.div>
-
-              {/* progress bar glitch */}
-              <div
-                className={`w-44 h-[2px] overflow-hidden rounded-full ${isDark ? "bg-white/10" : "bg-black/10"
-                  }`}
-              >
-                <motion.div
-                  className="h-full bg-[#FF4DA3]"
-                  initial={{ width: "0%" }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 1.4, ease: "easeInOut" }}
-                />
-              </div>
-
-              {/* fake percentage */}
-              <motion.div
-                className={`text-[10px] font-mono ${isDark ? "text-white/40" : "text-black/40"
-                  }`}
-                animate={{
-                  opacity: [0.3, 1, 0.3],
-                }}
-                transition={{ repeat: Infinity, duration: 1 }}
-              >
-                0xA9F3 → 0xFFZ7
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>    </>
+    </>
   );
 }

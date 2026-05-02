@@ -110,6 +110,43 @@ export async function getRelatedProducts(id, limit = 4) {
   return [...same, ...others].slice(0, limit);
 }
 
+/**
+ * Server-only. Returns a map { [productId]: { cost, price } } for the given ids.
+ * - cost is `null` when the product has no cost configured in Sanity yet.
+ * - returns `null` (instead of an object) if the Sanity request itself failed.
+ *
+ * Cost is sensitive — never call this from the client or include it in any
+ * response sent to the browser.
+ */
+export async function getProductCostsByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return {};
+  const unique = [...new Set(ids.map(String))];
+  try {
+    const data = await client.fetch(
+      /* groq */ `*[_type == "product" && slug.current in $ids]{
+        "id": slug.current,
+        price,
+        cost
+      }`,
+      { ids: unique },
+      { next: { revalidate: 0 } }
+    );
+    const map = {};
+    for (const row of data || []) {
+      if (!row?.id) continue;
+      const hasCost = typeof row.cost === "number" && Number.isFinite(row.cost);
+      map[row.id] = {
+        price: Number(row.price ?? 0),
+        cost: hasCost ? Number(row.cost) : null,
+      };
+    }
+    return map;
+  } catch (err) {
+    console.error("[sanity] getProductCostsByIds failed:", err?.message || err);
+    return null;
+  }
+}
+
 export function getPrimaryImage(product) {
   return product?.colors?.[0]?.images?.[0];
 }

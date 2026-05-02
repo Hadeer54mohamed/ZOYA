@@ -63,6 +63,8 @@ export function CartProvider({ children }) {
           color: selectedColor,
           size: selectedSize,
           quantity: qty,
+          availableColors: product.colors ?? [],
+          availableSizes: product.sizes ?? [],
         },
       ];
     });
@@ -81,6 +83,57 @@ export function CartProvider({ children }) {
           )
       )
     );
+  };
+
+  const updateVariant = (id, oldColorName, oldSize, { newColor, newSize }) => {
+    setCart((prev) => {
+      const target = prev.find(
+        (item) =>
+          item.id === id &&
+          item.color.name === oldColorName &&
+          item.size === oldSize
+      );
+      if (!target) return prev;
+
+      const finalColor = newColor ?? target.color;
+      const finalSize = newSize ?? target.size;
+
+      if (
+        finalColor.name === target.color.name &&
+        finalSize === target.size
+      ) {
+        return prev;
+      }
+
+      const duplicate = prev.find(
+        (item) =>
+          item !== target &&
+          item.id === id &&
+          item.color.name === finalColor.name &&
+          item.size === finalSize
+      );
+
+      if (duplicate) {
+        return prev
+          .filter((item) => item !== target)
+          .map((item) =>
+            item === duplicate
+              ? { ...item, quantity: item.quantity + target.quantity }
+              : item
+          );
+      }
+
+      return prev.map((item) =>
+        item === target
+          ? {
+              ...item,
+              color: finalColor,
+              size: finalSize,
+              image: finalColor?.image ?? item.image,
+            }
+          : item
+      );
+    });
   };
 
   const updateQuantity = (id, colorName, size, quantity) => {
@@ -111,6 +164,7 @@ export function CartProvider({ children }) {
     addToCart,
     removeFromCart,
     updateQuantity,
+    updateVariant,
     clearCart,
     cartCount,
     cartTotal,

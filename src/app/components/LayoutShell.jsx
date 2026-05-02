@@ -10,9 +10,11 @@ import Intro from "./Intro";
 export default function LayoutShell({ children, products = [] }) {
   const pathname = usePathname();
   const isStudio = pathname?.startsWith("/studio");
+  const isAdmin = pathname?.startsWith("/admin");
 
-  if (isStudio) {
-    return <>{children}</>;
+  if (isStudio || isAdmin) {
+    return <>{children}
+    </>;
   }
 
   return (

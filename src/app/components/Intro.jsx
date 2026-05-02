@@ -4,13 +4,12 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Intro() {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(true);
   const [phase, setPhase] = useState(0);
   const [counter, setCounter] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setShow(true);
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
   }, []);
