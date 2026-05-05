@@ -10,7 +10,11 @@ import ThemeToggle from "../../components/ThemeToggle";
 
 export default function StudioPage() {
   return (
-    <PasswordGate label="Sanity Studio" subtitle="Content Management">
+    <PasswordGate
+      label="Sanity Studio"
+      subtitle="Content Management"
+      scope="studio"
+    >
       <header className="sticky top-0 z-30 w-full border-b border-black/5 dark:border-white/5 bg-white/70 dark:bg-black/70 backdrop-blur-md transition-colors duration-500">
         <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.png')] opacity-[0.03] dark:opacity-[0.05]" />
 

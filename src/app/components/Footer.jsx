@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { ArrowUpRight, Mail, ArrowUp, Check, Heart } from "lucide-react";
+import { ArrowUpRight, Mail, ArrowUp, Check, Heart, Sparkles, Eye, AlertCircle, X } from "lucide-react";
 
 const shopLinks = [
   { label: "All Products", href: "/products" },
@@ -20,16 +20,56 @@ const helpLinks = [
   { label: "Contact", href: "/#contact" },
 ];
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [toast, setToast] = useState(null); 
+  const toastTimerRef = useRef(null);
 
-  const handleSubscribe = (e) => {
+  const showToast = (variant, message) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ variant, message });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  const handleSubscribe = async (e) => {
     e.preventDefault();
-    if (!email || !email.includes("@")) return;
-    setSubscribed(true);
-    setEmail("");
-    setTimeout(() => setSubscribed(false), 3500);
+
+    if (!EMAIL_REGEX.test(email.trim())) {
+      showToast("error", "Please enter a valid email.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        setSubscribed(true);
+        setEmail("");
+        showToast("success", "You\u2019re in \uD83D\uDD25");
+        setTimeout(() => setSubscribed(false), 3500);
+      } else if (res.status === 409) {
+        showToast("info", "You already joined \uD83D\uDC40");
+      } else {
+        showToast("error", data?.error || "Couldn\u2019t subscribe. Try again.");
+      }
+    } catch {
+      showToast("error", "Network error. Please try again.");
+    }
   };
 
   const scrollToTop = () => {
@@ -251,6 +291,67 @@ export default function Footer() {
           </div>
         </div>
       </div>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && <FooterToast toast={toast} onDismiss={() => setToast(null)} />}
+      </AnimatePresence>
     </footer>
+  );
+}
+
+function FooterToast({ toast, onDismiss }) {
+  const variants = {
+    success: {
+      icon: Sparkles,
+      iconClass: "text-[#FF4DA3]",
+      ring: "ring-[#FF4DA3]/30",
+      glow: "shadow-[0_20px_60px_-20px_rgba(255,77,163,0.5)]",
+    },
+    info: {
+      icon: Eye,
+      iconClass: "text-amber-500 dark:text-amber-400",
+      ring: "ring-amber-500/30 dark:ring-amber-400/30",
+      glow: "shadow-[0_20px_60px_-20px_rgba(245,158,11,0.45)]",
+    },
+    error: {
+      icon: AlertCircle,
+      iconClass: "text-red-500 dark:text-red-400",
+      ring: "ring-red-500/30 dark:ring-red-400/30",
+      glow: "shadow-[0_20px_60px_-20px_rgba(239,68,68,0.45)]",
+    },
+  };
+  const v = variants[toast.variant] ?? variants.success;
+  const Icon = v.icon;
+
+  return (
+    <motion.div
+      key="footer-toast"
+      initial={{ y: 80, opacity: 0, scale: 0.92 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      exit={{ y: 80, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+      role="status"
+      aria-live="polite"
+      className="fixed left-1/2 -translate-x-1/2 bottom-6 z-[80] w-[92%] max-w-sm pointer-events-auto"
+    >
+      <div
+        className={`flex items-center gap-3 p-3 pr-4 rounded-2xl bg-white/90 dark:bg-black/80 backdrop-blur-xl border border-black/10 dark:border-white/10 ring-1 ${v.ring} ${v.glow}`}
+      >
+        <div className="h-10 w-10 grid place-items-center rounded-xl bg-black/5 dark:bg-white/5 shrink-0">
+          <Icon size={18} className={v.iconClass} strokeWidth={2.4} />
+        </div>
+        <p className="flex-1 text-sm font-medium text-black dark:text-white leading-snug">
+          {toast.message}
+        </p>
+        <button
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="h-7 w-7 grid place-items-center rounded-full text-black/50 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    </motion.div>
   );
 }

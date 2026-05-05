@@ -27,6 +27,16 @@ import {
   TrendingUp,
   ChevronRight,
   Eye,
+  Tag,
+  BarChart3,
+  Calendar,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  Boxes,
+  Palette,
+  Ruler,
+  AlertTriangle,
 } from "lucide-react";
 
 const STATUS_META = {
@@ -126,13 +136,16 @@ function formatDateTime(iso) {
 }
 
 export default function AdminPage() {
+  const [password, setPassword] = useState("");
+
   return (
     <PasswordGate
       label="Admin Access"
       subtitle="Zoya Dashboard"
-      expectedPassword={process.env.NEXT_PUBLIC_ADMIN_PASS}
+      scope="admin"
+      onAuthorized={setPassword}
     >
-      <AdminDashboard password={process.env.NEXT_PUBLIC_ADMIN_PASS} />
+      <AdminDashboard password={password} />
     </PasswordGate>
   );
 }
@@ -145,6 +158,10 @@ function AdminDashboard({ password }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [profitModalOpen, setProfitModalOpen] = useState(false);
+  const [productsModalOpen, setProductsModalOpen] = useState(false);
+  const [stockSummary, setStockSummary] = useState(null);
+  const [stockBannerDismissed, setStockBannerDismissed] = useState(false);
 
   const adminFetch = async (url, init = {}) => {
     return fetch(url, {
@@ -198,6 +215,61 @@ function AdminDashboard({ password }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Poll stock health for the dashboard banner / Products button badge.
+  // Aggregates live Sanity stock with Supabase sales — refreshed every 60s
+  // and on tab focus so the owner sees new alerts within a minute of an
+  // order coming in.
+  useEffect(() => {
+    if (!password) return;
+    let cancelled = false;
+    const loadStock = async () => {
+      try {
+        const res = await adminFetch("/api/products/analytics");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data?.success) return;
+        setStockSummary((prev) => {
+          const nextUrgent =
+            (data.summary?.outOfStock || 0) + (data.summary?.oversold || 0);
+          const prevUrgent = prev
+            ? (prev.summary?.outOfStock || 0) + (prev.summary?.oversold || 0)
+            : 0;
+          // If a new urgent alert popped up since the last poll, un-dismiss
+          // the banner so the owner gets re-pinged instead of missing it.
+          if (nextUrgent > prevUrgent) {
+            setStockBannerDismissed(false);
+          }
+          return {
+            summary: data.summary,
+            alerts: Array.isArray(data.alerts) ? data.alerts : [],
+          };
+        });
+      } catch {
+        /* silent — banner is non-critical */
+      }
+    };
+    loadStock();
+    const interval = setInterval(loadStock, 60_000);
+    const onFocus = () => loadStock();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [password]);
+
+  const stockAlertCount = stockSummary
+    ? (stockSummary.summary?.outOfStock || 0) +
+      (stockSummary.summary?.oversold || 0) +
+      (stockSummary.summary?.lowStock || 0)
+    : 0;
+  const stockUrgentCount = stockSummary
+    ? (stockSummary.summary?.outOfStock || 0) +
+      (stockSummary.summary?.oversold || 0)
+    : 0;
+
   const updateStatus = async (orderId, newStatus) => {
     try {
       const res = await adminFetch("/api/orders", {
@@ -230,20 +302,35 @@ function AdminDashboard({ password }) {
       cancelled: 0,
       revenue: 0,
       profit: 0,
+      discountsTotal: 0,
       profitIncomplete: 0,
     };
     for (const o of orders) {
       if (counts[o.status] !== undefined) counts[o.status] += 1;
       if (o.status !== "cancelled") {
         counts.revenue += Number(o.total_price ?? 0);
+        counts.discountsTotal += Number(o.discount_amount ?? 0);
+
         if (o.cost_complete === false) {
           counts.profitIncomplete += 1;
         } else {
-          // Recompute profit excluding shipping (shipping isn't ours to keep).
-          const totalPrice = Number(o.total_price ?? 0);
-          const shippingFee = Number(o.shipping_fee ?? 0);
+          // Profit = (items subtotal − discount) − total cost.
+          // Shipping is excluded (it isn't ours to keep). We derive the items
+          // subtotal from the line items so the math stays correct even if a
+          // legacy order has a stale `total_price`.
+          const itemsSubtotal = Array.isArray(o.items)
+            ? o.items.reduce(
+                (s, it) =>
+                  s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
+                0
+              )
+            : Math.max(
+                0,
+                Number(o.total_price ?? 0) - Number(o.shipping_fee ?? 0)
+              );
+          const discount = Number(o.discount_amount ?? 0);
           const totalCost = Number(o.total_cost ?? 0);
-          counts.profit += totalPrice - shippingFee - totalCost;
+          counts.profit += itemsSubtotal - discount - totalCost;
         }
       }
     }
@@ -298,6 +385,44 @@ function AdminDashboard({ password }) {
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3">
             <button
+              onClick={() => setProductsModalOpen(true)}
+              className={`group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border transition-all active:scale-95 ${
+                stockUrgentCount > 0
+                  ? "border-red-500/40 hover:border-red-500/60"
+                  : stockAlertCount > 0
+                  ? "border-amber-500/40 hover:border-amber-500/60"
+                  : "border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30"
+              }`}
+            >
+              <Boxes
+                size={14}
+                className={`transition-colors ${
+                  stockUrgentCount > 0
+                    ? "text-red-500"
+                    : stockAlertCount > 0
+                    ? "text-amber-500"
+                    : "text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3]"
+                }`}
+              />
+              <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] font-semibold text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors">
+                Products
+              </span>
+              {stockAlertCount > 0 && (
+                <span
+                  className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-black flex items-center justify-center ring-2 ring-white dark:ring-black ${
+                    stockUrgentCount > 0
+                      ? "bg-red-500 text-white"
+                      : "bg-amber-500 text-white"
+                  }`}
+                  title={`${stockAlertCount} stock alert${stockAlertCount === 1 ? "" : "s"}`}
+                >
+                  {stockAlertCount > 99 ? "99+" : stockAlertCount}
+                </span>
+              )}
+              <div className="absolute inset-0 rounded-full bg-[#FF4DA3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+
+            <button
               onClick={() => fetchOrders({ silent: true })}
               disabled={refreshing}
               className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30 transition-all active:scale-95 disabled:opacity-50"
@@ -320,6 +445,74 @@ function AdminDashboard({ password }) {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Stock alert banner — shown when there are out-of-stock or
+            oversold variants the admin needs to refill. Dismissible per
+            session so the dashboard isn't loud after they've acknowledged. */}
+        <AnimatePresence>
+          {stockSummary && stockUrgentCount > 0 && !stockBannerDismissed && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden"
+            >
+              <div
+                className={`flex items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 rounded-2xl border ${
+                  (stockSummary.summary?.oversold || 0) > 0
+                    ? "bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
+                }`}
+              >
+                <AlertTriangle
+                  size={18}
+                  strokeWidth={2.5}
+                  className="shrink-0 mt-0.5 sm:mt-0"
+                />
+                <div className="flex-1 min-w-0 text-sm leading-relaxed">
+                  <p className="font-bold mb-0.5">
+                    {(stockSummary.summary?.oversold || 0) > 0
+                      ? `${stockSummary.summary.oversold} product${stockSummary.summary.oversold === 1 ? "" : "s"} oversold — restock needed`
+                      : `${stockSummary.summary.outOfStock} product${stockSummary.summary.outOfStock === 1 ? "" : "s"} out of stock`}
+                  </p>
+                  <p className="text-xs opacity-80">
+                    {stockSummary.alerts
+                      .slice(0, 3)
+                      .map((a) =>
+                        a.severity === "oversold"
+                          ? `${a.name} (${a.totalStock})`
+                          : `${a.name}${a.severity === "low" ? ` · ${a.totalStock} left` : ""}`
+                      )
+                      .join(" · ")}
+                    {stockSummary.alerts.length > 3
+                      ? ` · +${stockSummary.alerts.length - 3} more`
+                      : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setProductsModalOpen(true)}
+                    className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-2 rounded-lg transition ${
+                      (stockSummary.summary?.oversold || 0) > 0
+                        ? "bg-red-600 text-white hover:bg-red-700"
+                        : "bg-amber-600 text-white hover:bg-amber-700"
+                    }`}
+                  >
+                    Review
+                  </button>
+                  <button
+                    onClick={() => setStockBannerDismissed(true)}
+                    aria-label="Dismiss"
+                    className="h-8 w-8 grid place-items-center rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard label="Total" value={stats.total} icon={Package} accent="text-black dark:text-white" />
@@ -353,6 +546,8 @@ function AdminDashboard({ password }) {
                 : "text-red-600 dark:text-red-400"
             }
             small
+            onClick={() => setProfitModalOpen(true)}
+            hint="Click for breakdown"
           />
         </div>
 
@@ -425,14 +620,1089 @@ function AdminDashboard({ password }) {
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {profitModalOpen && (
+          <ProfitAnalyticsModal
+            orders={orders}
+            onClose={() => setProfitModalOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {productsModalOpen && (
+          <ProductAnalyticsModal
+            password={password}
+            onClose={() => setProductsModalOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <AdminFooter />
     </main>
   );
 }
 
-function StatCard({ label, value, icon: Icon, accent = "text-black dark:text-white", small = false }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Profit analytics helpers
+// All bucketing uses Africa/Cairo to match how orders are displayed elsewhere,
+// so "today" / "this week" line up with the operator's local clock.
+// ─────────────────────────────────────────────────────────────────────────────
+const CAIRO_TZ = "Africa/Cairo";
+
+// The brand opened on May 1, 2026. We never display weeks/months before this
+// date — they'd all be zero rows that just clutter the analytics view.
+// month is 0-indexed: 4 = May.
+const BRAND_START_DATE = new Date(2026, 4, 1);
+
+function fmtBrandStart() {
+  return BRAND_START_DATE.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function toCairoDate(iso) {
+  if (!iso) return null;
+  const normalized =
+    typeof iso === "string" &&
+    !/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) &&
+    /\d{2}:\d{2}/.test(iso)
+      ? `${iso}Z`
+      : iso;
+  const utc = new Date(normalized);
+  if (isNaN(utc)) return null;
+  // Re-construct a Date object whose y/m/d/h match Cairo wall-clock time.
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: CAIRO_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(utc);
+  const get = (t) => Number(parts.find((p) => p.type === t)?.value || 0);
+  return new Date(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second")
+  );
+}
+
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+// Week starts on Saturday — that's the standard week start in Egypt.
+function startOfWeek(d) {
+  const x = startOfDay(d);
+  const day = x.getDay(); // 0 = Sun, 6 = Sat
+  const diff = (day - 6 + 7) % 7;
+  x.setDate(x.getDate() - diff);
+  return x;
+}
+
+function startOfMonth(d) {
+  const x = new Date(d);
+  x.setDate(1);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function startOfYear(d) {
+  const x = new Date(d);
+  x.setMonth(0, 1);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function addDays(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
+function addMonths(d, n) {
+  const x = new Date(d);
+  x.setMonth(x.getMonth() + n);
+  return x;
+}
+
+function fmtShortDate(d) {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function fmtMonthYear(d) {
+  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+// Profit math kept in one place — matches the per-order Profit breakdown card.
+//   profit = (items subtotal − discount) − total cost  (shipping excluded)
+// Returns null when the order has no cost data so we can flag/skip it.
+function orderProfit(o) {
+  if (o?.status === "cancelled") return null;
+  if (o?.cost_complete === false) return null;
+  const itemsSubtotal = Array.isArray(o?.items)
+    ? o.items.reduce(
+        (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
+        0
+      )
+    : Math.max(0, Number(o?.total_price ?? 0) - Number(o?.shipping_fee ?? 0));
+  const discount = Number(o?.discount_amount ?? 0);
+  const totalCost = Number(o?.total_cost ?? 0);
+  return itemsSubtotal - discount - totalCost;
+}
+
+function aggregateInRange(orders, from, to) {
+  let revenue = 0;
+  let profit = 0;
+  let discounts = 0;
+  let count = 0;
+  let incomplete = 0;
+  for (const o of orders) {
+    if (o?.status === "cancelled") continue;
+    const d = toCairoDate(o?.created_at);
+    if (!d) continue;
+    if (d < from || d >= to) continue;
+    count += 1;
+    revenue += Number(o?.total_price ?? 0);
+    discounts += Number(o?.discount_amount ?? 0);
+    const p = orderProfit(o);
+    if (p === null) {
+      incomplete += 1;
+    } else {
+      profit += p;
+    }
+  }
+  return { revenue, profit, discounts, count, incomplete };
+}
+
+function ProfitAnalyticsModal({ orders, onClose }) {
+  const buckets = useMemo(() => {
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const yesterdayStart = addDays(todayStart, -1);
+    const weekStart = startOfWeek(now);
+    const lastWeekStart = addDays(weekStart, -7);
+    const monthStart = startOfMonth(now);
+    const lastMonthStart = addMonths(monthStart, -1);
+    const yearStart = startOfYear(now);
+
+    const today = aggregateInRange(orders, todayStart, addDays(todayStart, 1));
+    const yesterday = aggregateInRange(orders, yesterdayStart, todayStart);
+    const thisWeek = aggregateInRange(orders, weekStart, addDays(weekStart, 7));
+    const lastWeek = aggregateInRange(orders, lastWeekStart, weekStart);
+    const thisMonth = aggregateInRange(orders, monthStart, addMonths(monthStart, 1));
+    const lastMonth = aggregateInRange(orders, lastMonthStart, monthStart);
+    const thisYear = aggregateInRange(orders, yearStart, addMonths(yearStart, 12));
+
+    // Flag whether the "previous" period for each card pre-dates the brand,
+    // so the comparison card knows to hide the trend badge.
+    const yesterdayBeforeBrand = todayStart <= BRAND_START_DATE;
+    const lastWeekBeforeBrand = weekStart <= BRAND_START_DATE;
+    const lastMonthBeforeBrand = monthStart <= BRAND_START_DATE;
+
+    // Last 8 weeks (most recent first), labelled by Saturday → Friday range.
+    // Skip any week that ends before the brand opened.
+    const weeks = [];
+    for (let i = 0; i < 8; i++) {
+      const start = addDays(weekStart, -7 * i);
+      const end = addDays(start, 7);
+      if (end <= BRAND_START_DATE) break;
+      const stats = aggregateInRange(orders, start, end);
+      const label =
+        i === 0
+          ? "This week"
+          : i === 1
+          ? "Last week"
+          : `${fmtShortDate(start)} – ${fmtShortDate(addDays(end, -1))}`;
+      weeks.push({
+        key: `w-${i}`,
+        label,
+        range: `${fmtShortDate(start)} – ${fmtShortDate(addDays(end, -1))}`,
+        ...stats,
+      });
+    }
+
+    // Last 12 months (most recent first). Skip any month entirely before the
+    // brand opened.
+    const months = [];
+    for (let i = 0; i < 12; i++) {
+      const start = addMonths(monthStart, -i);
+      const end = addMonths(start, 1);
+      if (end <= BRAND_START_DATE) break;
+      const stats = aggregateInRange(orders, start, end);
+      months.push({ key: `m-${i}`, label: fmtMonthYear(start), ...stats });
+    }
+
+    return {
+      today,
+      yesterday,
+      thisWeek,
+      lastWeek,
+      thisMonth,
+      lastMonth,
+      thisYear,
+      weeks,
+      months,
+      yesterdayBeforeBrand,
+      lastWeekBeforeBrand,
+      lastMonthBeforeBrand,
+    };
+  }, [orders]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 50, scale: 0.97 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 50, scale: 0.97 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#0c0c0c]/95 backdrop-blur">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <TrendingUp size={18} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight">
+                Profit Analytics
+              </h2>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40 mt-0.5">
+                Cairo time · cancelled & incomplete excluded
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-6">
+          {/* Quick-glance comparison cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <ComparisonCard
+              label="Today"
+              current={buckets.today}
+              previous={buckets.yesterday}
+              previousLabel="vs yesterday"
+              previousStartsBeforeBrand={buckets.yesterdayBeforeBrand}
+            />
+            <ComparisonCard
+              label="This Week"
+              current={buckets.thisWeek}
+              previous={buckets.lastWeek}
+              previousLabel="vs last week"
+              previousStartsBeforeBrand={buckets.lastWeekBeforeBrand}
+            />
+            <ComparisonCard
+              label="This Month"
+              current={buckets.thisMonth}
+              previous={buckets.lastMonth}
+              previousLabel="vs last month"
+              previousStartsBeforeBrand={buckets.lastMonthBeforeBrand}
+            />
+            <ComparisonCard
+              label="This Year"
+              current={buckets.thisYear}
+              accent="text-[#FF4DA3]"
+            />
+          </div>
+
+          {/* Brand opening note */}
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40">
+            <Calendar size={10} />
+            <span>
+              Brand opened{" "}
+              <span className="text-[#FF4DA3] font-bold">{fmtBrandStart()}</span>
+            </span>
+          </div>
+
+          {/* Weekly breakdown */}
+          <BucketTable
+            title="Last 8 Weeks"
+            icon={Calendar}
+            rows={buckets.weeks}
+          />
+
+          {/* Monthly breakdown */}
+          <BucketTable
+            title="Last 12 Months"
+            icon={Calendar}
+            rows={buckets.months}
+          />
+
+          {/* Note */}
+          <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 text-[11px] leading-relaxed text-black/50 dark:text-white/50">
+            <p>
+              <b>Profit formula:</b>{" "}
+              <span className="font-mono">(items subtotal − discount) − total cost</span>.
+              Shipping fees are excluded since they aren&apos;t kept by the store.
+              Cancelled orders are ignored. Orders with incomplete cost data
+              (missing in Sanity) are counted in the order count but excluded
+              from the profit total — fix them in Sanity to make the analytics
+              fully accurate.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ComparisonCard({ label, current, previous, previousLabel, accent, previousStartsBeforeBrand }) {
+  // Decide whether we should compare to the previous period at all.
+  // We only show a trend badge when both sides have meaningful data — comparing
+  // a real week to an empty week (e.g. before the brand opened) would produce
+  // a misleading "+∞%" / "-100%" change.
+  const hasPrev =
+    previous !== undefined &&
+    !previousStartsBeforeBrand &&
+    previous.count > 0;
+
+  let trend = null;
+  let pct = null;
+  if (hasPrev) {
+    const diff = current.profit - previous.profit;
+    if (previous.profit !== 0) {
+      pct = Math.round((diff / Math.abs(previous.profit)) * 100);
+    }
+    trend = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
+  }
+
+  const profitClass =
+    current.profit > 0
+      ? accent || "text-emerald-600 dark:text-emerald-400"
+      : current.profit < 0
+      ? "text-red-600 dark:text-red-400"
+      : "text-black/50 dark:text-white/50";
+
+  const TrendIcon = trend === "up" ? ArrowUp : trend === "down" ? ArrowDown : Minus;
+  const trendCls =
+    trend === "up"
+      ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+      : trend === "down"
+      ? "text-red-600 dark:text-red-400 bg-red-500/10"
+      : "text-black/40 dark:text-white/40 bg-black/5 dark:bg-white/5";
+
+  // Cap absurd percentages so the badge stays readable when comparing tiny
+  // numbers (e.g. 1 EGP last week vs 200 EGP this week would otherwise show
+  // 19,900%).
+  const formatPct = (p) => {
+    if (p === null) return null;
+    const abs = Math.abs(p);
+    if (abs > 999) return "999+%";
+    return `${abs}%`;
+  };
+
   return (
     <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10">
+      <p className="text-[9px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40">
+        {label}
+      </p>
+      <p className={`text-xl sm:text-2xl font-bold mt-1.5 ${profitClass}`}>
+        {Math.round(current.profit).toLocaleString()}{" "}
+        <span className="text-[10px] tracking-widest opacity-60">EGP</span>
+      </p>
+      <p className="text-[10px] text-black/40 dark:text-white/40">
+        {previousLabel}
+      </p>
+      <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
+        <span className="text-black/40 dark:text-white/40">
+          {current.count} {current.count === 1 ? "order" : "orders"}
+        </span>
+        {hasPrev && trend && pct !== null && (
+          <span
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-bold ${trendCls}`}
+            title={previousLabel}
+          >
+            <TrendIcon size={9} strokeWidth={3} />
+            {formatPct(pct)}
+          </span>
+        )}
+        {hasPrev && trend && pct === null && (
+          // Previous had orders but 0 profit (e.g. all incomplete) — show the
+          // direction without a misleading percentage.
+          <span
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-bold ${trendCls}`}
+            title={previousLabel}
+          >
+            <TrendIcon size={9} strokeWidth={3} />
+            new
+          </span>
+        )}
+      </div>
+      {current.incomplete > 0 && (
+        <p className="mt-1.5 text-[10px] text-amber-600 dark:text-amber-400/70">
+          {current.incomplete} incomplete
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product analytics — sales + stock per product/color/size
+// ─────────────────────────────────────────────────────────────────────────────
+function ProductAnalyticsModal({ password, onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [tab, setTab] = useState("products"); // products | colors | sizes
+  const [productSearch, setProductSearch] = useState("");
+  const [expandedId, setExpandedId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/products/analytics", {
+          headers: { "x-admin-pass": password },
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        if (!res.ok || !json?.success) {
+          setErr(json?.error || "Failed to load product analytics.");
+        } else {
+          setData(json);
+        }
+      } catch {
+        if (!cancelled) setErr("Network error. Please try again.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [password]);
+
+  const filteredProducts = useMemo(() => {
+    if (!data?.products) return [];
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return data.products;
+    return data.products.filter((p) => p.name?.toLowerCase().includes(q));
+  }, [data, productSearch]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 50, scale: 0.97 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 50, scale: 0.97 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#0c0c0c]/95 backdrop-blur">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-[#FF4DA3]/10 text-[#FF4DA3]">
+              <Boxes size={18} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight">
+                Products & Inventory
+              </h2>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40 mt-0.5">
+                Sales + stock · cancelled excluded
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-6">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-16 text-black/50 dark:text-white/50">
+              <Loader2 className="animate-spin mb-3" size={26} />
+              <p className="text-xs">Loading analytics...</p>
+            </div>
+          ) : err ? (
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400">
+              <AlertCircle size={18} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+              <div className="text-sm">{err}</div>
+            </div>
+          ) : data ? (
+            <>
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <SummaryCard
+                  label="Units Sold"
+                  value={data.summary.totalUnitsSold.toLocaleString()}
+                  hint={`${data.summary.uniqueProducts} unique products`}
+                  icon={ShoppingBag}
+                  accent="text-[#FF4DA3]"
+                />
+                <SummaryCard
+                  label="Sales Revenue"
+                  value={`${Math.round(data.summary.totalRevenue).toLocaleString()} EGP`}
+                  hint={
+                    data.summary.totalUnitsSold > 0
+                      ? `Avg ${Math.round(
+                          data.summary.totalRevenue / data.summary.totalUnitsSold
+                        ).toLocaleString()} EGP / unit`
+                      : "—"
+                  }
+                  icon={CreditCard}
+                  accent="text-emerald-600 dark:text-emerald-400"
+                />
+                <SummaryCard
+                  label="In Stock"
+                  value={data.summary.totalStock.toLocaleString()}
+                  hint={
+                    data.summary.totalInitial > 0
+                      ? `of ${data.summary.totalInitial.toLocaleString()} initial`
+                      : `${data.summary.trackedProducts} tracked products`
+                  }
+                  icon={Boxes}
+                  accent="text-blue-600 dark:text-blue-400"
+                />
+                <SummaryCard
+                  label="Stock Alerts"
+                  value={`${data.summary.outOfStock} out · ${data.summary.lowStock} low`}
+                  hint={`Low ≤ ${data.summary.lowStockThreshold} units`}
+                  icon={AlertTriangle}
+                  accent={
+                    data.summary.outOfStock > 0
+                      ? "text-red-600 dark:text-red-400"
+                      : data.summary.lowStock > 0
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }
+                />
+              </div>
+
+              {data.stockUnavailable && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-[11px] leading-relaxed">
+                  <AlertCircle size={13} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                  <p>
+                    Stock data couldn&apos;t be loaded from Sanity. Sales numbers
+                    below are still accurate, but inventory totals will be
+                    missing until Sanity is reachable again.
+                  </p>
+                </div>
+              )}
+
+              {data.summary.untrackedProducts > 0 && (
+                <p className="text-[11px] text-black/50 dark:text-white/50">
+                  <span className="font-bold text-amber-600 dark:text-amber-400">
+                    {data.summary.untrackedProducts}
+                  </span>{" "}
+                  product{data.summary.untrackedProducts === 1 ? "" : "s"} aren&apos;t
+                  tracking stock yet — open them in Sanity and add a Stock-by-Size
+                  row for each color to enable inventory tracking.
+                </p>
+              )}
+
+              {/* Tabs */}
+              <div className="flex gap-2 border-b border-black/10 dark:border-white/10">
+                {[
+                  { id: "products", label: "By Product", icon: Boxes },
+                  { id: "colors", label: "By Color", icon: Palette },
+                  { id: "sizes", label: "By Size", icon: Ruler },
+                ].map((t) => {
+                  const TI = t.icon;
+                  const active = tab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setTab(t.id)}
+                      className={`flex items-center gap-1.5 px-3.5 py-2.5 text-[11px] uppercase tracking-widest font-bold transition-colors border-b-2 -mb-px ${
+                        active
+                          ? "text-[#FF4DA3] border-[#FF4DA3]"
+                          : "text-black/50 dark:text-white/50 border-transparent hover:text-black dark:hover:text-white"
+                      }`}
+                    >
+                      <TI size={12} />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {tab === "products" && (
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40" />
+                    <input
+                      type="text"
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      placeholder="Search products..."
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40 text-sm placeholder:text-black/40 dark:placeholder:text-white/30"
+                    />
+                  </div>
+
+                  {filteredProducts.length === 0 ? (
+                    <div className="text-center py-12 text-black/40 dark:text-white/40 text-xs">
+                      No products match.
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 overflow-hidden divide-y divide-black/5 dark:divide-white/5">
+                      {filteredProducts.map((p) => (
+                        <ProductRow
+                          key={p.id}
+                          product={p}
+                          expanded={expandedId === p.id}
+                          onToggle={() =>
+                            setExpandedId((cur) => (cur === p.id ? null : p.id))
+                          }
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab === "colors" && (
+                <DistributionTable
+                  rows={data.colorTotals.map((c) => ({
+                    key: c.name,
+                    label: c.name,
+                    units: c.units,
+                  }))}
+                  emptyMessage="No color data yet — sell something to see this fill up."
+                  icon={Palette}
+                />
+              )}
+
+              {tab === "sizes" && (
+                <DistributionTable
+                  rows={data.sizeTotals.map((s) => ({
+                    key: s.size,
+                    label: `Size ${s.size}`,
+                    units: s.units,
+                  }))}
+                  emptyMessage="No size data yet."
+                  icon={Ruler}
+                />
+              )}
+            </>
+          ) : null}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function SummaryCard({ label, value, hint, icon: Icon, accent }) {
+  return (
+    <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10">
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[9px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40">
+          {label}
+        </p>
+        <Icon size={14} className={accent} />
+      </div>
+      <p className={`text-lg sm:text-xl font-bold ${accent} truncate`}>{value}</p>
+      {hint && (
+        <p className="text-[10px] text-black/40 dark:text-white/40 mt-1 truncate">
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ProductRow({ product, expanded, onToggle }) {
+  const tracked = product.tracked;
+  const stock = product.totalStock;
+  const initial = product.totalInitial;
+  const sold = product.unitsSold;
+  // Sell-through is what % of the initial stock has been sold. Only meaningful
+  // when initialStock is set in Sanity.
+  const sellThrough =
+    initial > 0 ? Math.round((Math.min(sold, initial) / initial) * 100) : null;
+
+  let stockBadge;
+  if (!tracked) {
+    stockBadge = (
+      <span className="px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-[10px] uppercase tracking-widest text-black/50 dark:text-white/50">
+        Untracked
+      </span>
+    );
+  } else if (stock === 0) {
+    stockBadge = (
+      <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] uppercase tracking-widest font-bold">
+        Out of stock
+      </span>
+    );
+  } else if (stock <= 5) {
+    stockBadge = (
+      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] uppercase tracking-widest font-bold">
+        Low · {stock}
+      </span>
+    );
+  } else {
+    stockBadge = (
+      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] uppercase tracking-widest font-bold">
+        In stock · {stock}
+      </span>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 sm:gap-4 px-4 py-3 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+      >
+        <div className="w-12 h-14 sm:w-14 sm:h-16 shrink-0 rounded-lg overflow-hidden bg-black/5 dark:bg-white/10">
+          {product.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.image}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+          ) : null}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate">{product.name}</p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <span className="text-[10px] text-black/50 dark:text-white/50">
+              <b className="text-black dark:text-white">{sold.toLocaleString()}</b> sold
+            </span>
+            {product.revenue > 0 && (
+              <span className="text-[10px] text-black/40 dark:text-white/40">
+                · {Math.round(product.revenue).toLocaleString()} EGP
+              </span>
+            )}
+            {sellThrough !== null && (
+              <span className="text-[10px] text-black/40 dark:text-white/40">
+                · {sellThrough}% sell-through
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
+          {stockBadge}
+          {tracked && initial > 0 && (
+            <span className="text-[10px] text-black/40 dark:text-white/40">
+              {stock} / {initial}
+            </span>
+          )}
+        </div>
+        <ChevronRight
+          size={16}
+          className={`text-black/30 dark:text-white/30 shrink-0 transition-transform ${
+            expanded ? "rotate-90" : ""
+          }`}
+        />
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4 bg-black/[0.02] dark:bg-white/[0.02]">
+          {/* Mobile-only stock badge (above the breakdown) */}
+          <div className="sm:hidden pt-3 flex items-center gap-2">
+            {stockBadge}
+            {tracked && initial > 0 && (
+              <span className="text-[10px] text-black/40 dark:text-white/40">
+                {stock} / {initial}
+              </span>
+            )}
+          </div>
+
+          {/* Stock breakdown */}
+          {tracked && product.byColor.length > 0 && (
+            <div className="space-y-2 pt-3">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 dark:text-white/50 flex items-center gap-1.5">
+                <Boxes size={11} />
+                Stock by color × size
+              </p>
+              <div className="space-y-2">
+                {product.byColor.map((c) => (
+                  <div
+                    key={c.name}
+                    className="rounded-lg bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <span className="text-xs font-medium">{c.name}</span>
+                      <span className="text-[10px] text-black/50 dark:text-white/50">
+                        Total: <b>{c.totalStock}</b>
+                        {c.totalInitial > 0 && (
+                          <span className="opacity-60"> / {c.totalInitial}</span>
+                        )}
+                      </span>
+                    </div>
+                    {c.sizes.length === 0 ? (
+                      <p className="text-[10px] text-black/40 dark:text-white/40">
+                        No sizes set.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {c.sizes.map((s) => {
+                          const isOut = s.stock === 0;
+                          const isLow = !isOut && s.stock <= 5;
+                          return (
+                            <div
+                              key={s.size}
+                              className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-[11px] ${
+                                isOut
+                                  ? "bg-red-500/5 border-red-500/30 text-red-600 dark:text-red-400"
+                                  : isLow
+                                  ? "bg-amber-500/5 border-amber-500/30 text-amber-700 dark:text-amber-400"
+                                  : "bg-black/[0.03] dark:bg-white/5 border-black/10 dark:border-white/10"
+                              }`}
+                            >
+                              <span className="font-bold uppercase">
+                                {s.size}
+                              </span>
+                              <span>
+                                {s.stock}
+                                {s.initialStock != null && (
+                                  <span className="opacity-50">
+                                    {" "}
+                                    / {s.initialStock}
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sales breakdown */}
+          {product.salesByColor.length > 0 ? (
+            <div className="space-y-2 pt-1">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-black/50 dark:text-white/50 flex items-center gap-1.5">
+                <ShoppingBag size={11} />
+                Sales breakdown
+              </p>
+              <div className="space-y-2">
+                {product.salesByColor.map((c) => (
+                  <div
+                    key={c.name}
+                    className="rounded-lg bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <span className="text-xs font-medium">{c.name}</span>
+                      <span className="text-[10px] text-black/50 dark:text-white/50">
+                        <b>{c.units}</b> sold
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {c.sizes.map((s) => (
+                        <span
+                          key={s.size}
+                          className="px-2 py-0.5 rounded-full bg-[#FF4DA3]/10 text-[10px] text-[#FF4DA3] font-bold uppercase tracking-wider"
+                        >
+                          {s.size === "—" ? "no size" : s.size} × {s.units}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-[11px] text-black/40 dark:text-white/40 italic">
+              No sales for this product yet.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DistributionTable({ rows, emptyMessage, icon: Icon }) {
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="text-center py-12 text-black/40 dark:text-white/40 text-xs">
+        {emptyMessage}
+      </div>
+    );
+  }
+  const max = Math.max(1, ...rows.map((r) => r.units));
+  const total = rows.reduce((s, r) => s + r.units, 0);
+  return (
+    <div className="rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 overflow-hidden">
+      <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon size={13} className="text-[#FF4DA3]" />
+          <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-black/60 dark:text-white/60">
+            Distribution
+          </h3>
+        </div>
+        <span className="text-[10px] text-black/40 dark:text-white/40">
+          Total: <b className="text-black dark:text-white">{total}</b> units
+        </span>
+      </div>
+      <div className="divide-y divide-black/5 dark:divide-white/5">
+        {rows.map((r) => {
+          const pct = (r.units / max) * 100;
+          const sharePct = total > 0 ? Math.round((r.units / total) * 100) : 0;
+          return (
+            <div key={r.key} className="px-4 py-3 grid grid-cols-12 gap-3 items-center text-xs">
+              <div className="col-span-4 sm:col-span-3 min-w-0">
+                <p className="font-medium truncate">{r.label}</p>
+              </div>
+              <div className="col-span-6 sm:col-span-7">
+                <div className="h-2 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full bg-[#FF4DA3] rounded-full"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+              <div className="col-span-2 text-right">
+                <p className="font-bold">{r.units}</p>
+                <p className="text-[9px] text-black/40 dark:text-white/40">
+                  {sharePct}%
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BucketTable({ title, icon: Icon, rows }) {
+  // Bar lengths are scaled to the largest positive profit in the visible set
+  // so the chart stays readable regardless of absolute amounts.
+  const maxProfit = Math.max(1, ...rows.map((r) => Math.max(0, r.profit)));
+
+  if (!rows || rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 overflow-hidden">
+      <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center gap-2">
+        <Icon size={13} className="text-[#FF4DA3]" />
+        <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-black/60 dark:text-white/60">
+          {title}
+        </h3>
+      </div>
+      <div className="divide-y divide-black/5 dark:divide-white/5">
+        {rows.map((r) => {
+          const isEmpty = r.count === 0;
+          const profitPct = (Math.max(0, r.profit) / maxProfit) * 100;
+          const profitCls = isEmpty
+            ? "text-black/30 dark:text-white/25"
+            : r.profit > 0
+            ? "text-emerald-600 dark:text-emerald-400"
+            : r.profit < 0
+            ? "text-red-600 dark:text-red-400"
+            : "text-black/40 dark:text-white/40";
+
+          return (
+            <div
+              key={r.key}
+              className={`px-4 py-3 grid grid-cols-12 gap-3 items-center text-xs ${
+                isEmpty ? "opacity-50" : ""
+              }`}
+            >
+              <div className="col-span-5 sm:col-span-4 min-w-0">
+                <p className="font-medium truncate">{r.label}</p>
+                {r.range && r.label !== r.range && (
+                  <p className="text-[10px] text-black/40 dark:text-white/40 truncate">
+                    {r.range}
+                  </p>
+                )}
+              </div>
+              <div className="col-span-3 sm:col-span-2 text-right">
+                <p className="text-black/50 dark:text-white/50">
+                  {isEmpty ? "—" : `${r.count} ord`}
+                </p>
+              </div>
+              <div className="col-span-4 sm:col-span-3 text-right hidden sm:block">
+                <p className="text-black/50 dark:text-white/50">
+                  {isEmpty ? (
+                    "—"
+                  ) : (
+                    <>
+                      {Math.round(r.revenue).toLocaleString()}{" "}
+                      <span className="opacity-60">rev</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="col-span-4 sm:col-span-3 text-right">
+                <p className={`font-bold ${profitCls}`}>
+                  {isEmpty ? "—" : `${Math.round(r.profit).toLocaleString()} EGP`}
+                </p>
+                {r.incomplete > 0 && (
+                  <p className="text-[9px] text-amber-600 dark:text-amber-400/70">
+                    +{r.incomplete} incomplete
+                  </p>
+                )}
+                {r.profit > 0 && (
+                  <div className="mt-1 h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500/60 dark:bg-emerald-400/60 rounded-full"
+                      style={{ width: `${profitPct}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  accent = "text-black dark:text-white",
+  small = false,
+  onClick,
+  hint,
+}) {
+  const baseCls = `p-4 rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 transition-all w-full text-left ${
+    onClick
+      ? "cursor-pointer hover:border-[#FF4DA3]/40 hover:bg-[#FF4DA3]/[0.04] dark:hover:bg-white/[0.07] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#FF4DA3]/5"
+      : ""
+  }`;
+  const Wrapper = onClick ? "button" : "div";
+  return (
+    <Wrapper onClick={onClick} className={baseCls}>
       <div className="flex items-center justify-between mb-1.5">
         <p className="text-[9px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40">
           {label}
@@ -442,7 +1712,13 @@ function StatCard({ label, value, icon: Icon, accent = "text-black dark:text-whi
       <p className={`${small ? "text-base sm:text-lg" : "text-2xl"} font-bold ${accent} truncate`}>
         {value}
       </p>
-    </div>
+      {hint && (
+        <p className="text-[10px] text-black/40 dark:text-white/40 mt-1 flex items-center gap-1">
+          <BarChart3 size={9} />
+          {hint}
+        </p>
+      )}
+    </Wrapper>
   );
 }
 
@@ -688,30 +1964,47 @@ function OrderModal({ order, onClose, onUpdateStatus, customerOrderInfo }) {
           </div>
 
           {/* Totals */}
-          <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 space-y-2">
-            <div className="flex justify-between text-xs text-black/50 dark:text-white/50">
-              <span>Items subtotal</span>
-              <span>
-                {items.reduce(
-                  (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
-                  0
-                ).toLocaleString()}{" "}
-                EGP
-              </span>
-            </div>
-            {order.shipping_fee !== null && order.shipping_fee !== undefined && (
-              <div className="flex justify-between text-xs text-black/50 dark:text-white/50">
-                <span>Shipping</span>
-                <span>{Number(order.shipping_fee).toLocaleString()} EGP</span>
+          {(() => {
+            const itemsSubtotal = items.reduce(
+              (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
+              0
+            );
+            const discountAmount = Number(order.discount_amount ?? 0);
+            const hasDiscount = discountAmount > 0 || !!order.discount_code;
+
+            return (
+              <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 space-y-2">
+                <div className="flex justify-between text-xs text-black/50 dark:text-white/50">
+                  <span>Items subtotal</span>
+                  <span>{itemsSubtotal.toLocaleString()} EGP</span>
+                </div>
+                {order.shipping_fee !== null && order.shipping_fee !== undefined && (
+                  <div className="flex justify-between text-xs text-black/50 dark:text-white/50">
+                    <span>Shipping</span>
+                    <span>{Number(order.shipping_fee).toLocaleString()} EGP</span>
+                  </div>
+                )}
+                {hasDiscount && (
+                  <div className="flex justify-between text-xs text-[#FF4DA3]">
+                    <span className="flex items-center gap-1.5">
+                      <Tag size={11} />
+                      Discount
+                      {order.discount_code && (
+                        <span className="font-mono font-bold">({order.discount_code})</span>
+                      )}
+                    </span>
+                    <span>− {discountAmount.toLocaleString()} EGP</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-end pt-2 border-t border-black/10 dark:border-white/10">
+                  <span className="text-sm font-serif italic">Total</span>
+                  <span className="text-xl font-bold text-[#FF4DA3]">
+                    {Number(order.total_price ?? 0).toLocaleString()} EGP
+                  </span>
+                </div>
               </div>
-            )}
-            <div className="flex justify-between items-end pt-2 border-t border-black/10 dark:border-white/10">
-              <span className="text-sm font-serif italic">Total</span>
-              <span className="text-xl font-bold text-[#FF4DA3]">
-                {Number(order.total_price ?? 0).toLocaleString()} EGP
-              </span>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Profit breakdown (admin only) */}
           {(() => {
@@ -721,60 +2014,100 @@ function OrderModal({ order, onClose, onUpdateStatus, customerOrderInfo }) {
               order.profit !== null && order.profit !== undefined;
             if (!hasCost && !hasProfit) return null;
 
-            // Recompute profit on the fly to ignore shipping fees and any
-            // legacy/incorrect stored values. Profit is the net of items
-            // (after discount) minus the product cost — shipping is not
-            // ours to keep.
-            const totalPrice = Number(order.total_price ?? 0);
-            const shippingFee = Number(order.shipping_fee ?? 0);
+            // Profit math, broken out so it's auditable at a glance:
+            //   itemsSubtotal − discount = netRevenue (what we actually keep on items)
+            //   netRevenue − totalCost   = profit
+            // Shipping is intentionally excluded — it isn't ours to keep.
+            const itemsSubtotal = items.reduce(
+              (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
+              0
+            );
+            const discountAmount = Number(order.discount_amount ?? 0);
             const totalCost = Number(order.total_cost ?? 0);
-            const computedProfit = totalPrice - shippingFee - totalCost;
+            const netRevenue = Math.max(0, itemsSubtotal - discountAmount);
+            const computedProfit = netRevenue - totalCost;
+            const margin =
+              netRevenue > 0
+                ? Math.round((computedProfit / netRevenue) * 100)
+                : null;
+            const hasDiscount = discountAmount > 0 || !!order.discount_code;
 
             return (
-            <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/30 dark:border-amber-500/20 space-y-2">
-              <p className="text-[10px] uppercase tracking-[0.25em] text-amber-600 dark:text-amber-400/70 mb-1 flex items-center gap-1.5">
-                <TrendingUp size={11} />
-                Profit breakdown
-              </p>
-              {order.cost_complete === false && (
-                <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-[11px] leading-relaxed">
-                  <AlertCircle size={14} strokeWidth={2.5} className="shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold mb-0.5">Cost data is incomplete</p>
-                    <p className="text-black/60 dark:text-white/60">
-                      One or more items don&apos;t have a cost set in Sanity (or Sanity was unreachable). The profit shown is unreliable. Set the cost in Sanity and re-check.
-                    </p>
-                    {Array.isArray(items) && items.some((it) => it.cost_known === false) && (
-                      <ul className="mt-1.5 space-y-0.5 text-black/50 dark:text-white/50">
-                        {items
-                          .filter((it) => it.cost_known === false)
-                          .map((it, i) => (
-                            <li key={`missing-${i}`}>• {it.name}</li>
-                          ))}
-                      </ul>
+              <div className="p-4 rounded-2xl bg-amber-500/[0.04] border border-amber-500/30 dark:border-amber-500/20 space-y-2">
+                <p className="text-[10px] uppercase tracking-[0.25em] text-amber-600 dark:text-amber-400/70 mb-1 flex items-center gap-1.5">
+                  <TrendingUp size={11} />
+                  Profit breakdown
+                </p>
+
+                {order.cost_complete === false && (
+                  <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-[11px] leading-relaxed">
+                    <AlertCircle size={14} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold mb-0.5">Cost data is incomplete</p>
+                      <p className="text-black/60 dark:text-white/60">
+                        One or more items don&apos;t have a cost set in Sanity (or Sanity was unreachable). The profit shown is unreliable. Set the cost in Sanity and re-check.
+                      </p>
+                      {Array.isArray(items) && items.some((it) => it.cost_known === false) && (
+                        <ul className="mt-1.5 space-y-0.5 text-black/50 dark:text-white/50">
+                          {items
+                            .filter((it) => it.cost_known === false)
+                            .map((it, i) => (
+                              <li key={`missing-${i}`}>• {it.name}</li>
+                            ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-xs text-black/60 dark:text-white/60">
+                  <span>Items subtotal</span>
+                  <span>{itemsSubtotal.toLocaleString()} EGP</span>
+                </div>
+                {hasDiscount && (
+                  <div className="flex justify-between text-xs text-[#FF4DA3]">
+                    <span className="flex items-center gap-1.5">
+                      <Tag size={10} />
+                      Discount{order.discount_code ? ` (${order.discount_code})` : ""}
+                    </span>
+                    <span>− {discountAmount.toLocaleString()} EGP</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs font-medium text-black/70 dark:text-white/70 pt-1 border-t border-dashed border-amber-500/20">
+                  <span>Net revenue (after discount)</span>
+                  <span>{netRevenue.toLocaleString()} EGP</span>
+                </div>
+                <div className="flex justify-between text-xs text-black/60 dark:text-white/60">
+                  <span>Total cost</span>
+                  <span>− {totalCost.toLocaleString()} EGP</span>
+                </div>
+
+                <div className="flex justify-between items-end pt-2 border-t border-amber-500/20 dark:border-amber-500/10">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-serif italic">Profit</span>
+                    {margin !== null && order.cost_complete !== false && (
+                      <span className="text-[10px] uppercase tracking-widest text-black/40 dark:text-white/40">
+                        ({margin}% margin)
+                      </span>
                     )}
                   </div>
+                  <span
+                    className={`text-lg font-bold ${
+                      order.cost_complete === false
+                        ? "text-black/40 dark:text-white/40 line-through"
+                        : computedProfit >= 0
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {computedProfit.toLocaleString()} EGP
+                  </span>
                 </div>
-              )}
-              <div className="flex justify-between text-xs text-black/60 dark:text-white/60">
-                <span>Total cost</span>
-                <span>{totalCost.toLocaleString()} EGP</span>
+
+                <p className="text-[10px] text-black/40 dark:text-white/40 italic pt-1">
+                  Shipping is excluded — it isn&apos;t kept by the store.
+                </p>
               </div>
-              <div className="flex justify-between items-end pt-2 border-t border-amber-500/20 dark:border-amber-500/10">
-                <span className="text-sm font-serif italic">Profit</span>
-                <span
-                  className={`text-lg font-bold ${
-                    order.cost_complete === false
-                      ? "text-black/40 dark:text-white/40 line-through"
-                      : computedProfit >= 0
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {computedProfit.toLocaleString()} EGP
-                </span>
-              </div>
-            </div>
             );
           })()}
 

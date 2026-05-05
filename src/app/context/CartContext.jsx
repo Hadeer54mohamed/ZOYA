@@ -36,7 +36,7 @@ export function CartProvider({ children }) {
 
   const addToCart = (product, selectedColor, selectedSize, quantity = 1) => {
     const qty = Math.max(1, Number(quantity) || 1);
-  
+
     setCart((prev) => {
       const existing = prev.find(
         (item) =>
@@ -44,7 +44,7 @@ export function CartProvider({ children }) {
           item.color.name === selectedColor.name &&
           item.size === selectedSize
       );
-  
+
       if (existing) {
         return prev.map((item) =>
           item === existing
@@ -52,7 +52,7 @@ export function CartProvider({ children }) {
             : item
         );
       }
-  
+
       return [
         ...prev,
         {
@@ -68,7 +68,7 @@ export function CartProvider({ children }) {
         },
       ];
     });
-      setIsCartOpen(true);
+    setIsCartOpen(true);
   };
   const clearCart = () => setCart([]);
 

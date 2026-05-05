@@ -71,6 +71,7 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     name: "",
     phone: "",
+    email: "",
     address: "",
     governorate: "",
     paymentMethod: "cash", // cash | online
@@ -90,13 +91,31 @@ export default function CheckoutPage() {
 
   const discountAmount = useMemo(() => {
     if (!discount) return 0;
-    if (discount.discount_type === "percent") {
-      return Math.round((cartTotal * Number(discount.value)) / 100);
+    const value = Number(discount.value) || 0;
+    if (value <= 0) return 0;
+
+    // Be lenient about how the type is spelled in the DB — accept percent /
+    // percentage / % and fixed / flat / amount in any case.
+    const rawType = (discount.discount_type ?? "").toString().toLowerCase().trim();
+    const isPercent = ["percent", "percentage", "%"].includes(rawType);
+    const isFixed = ["fixed", "flat", "amount"].includes(rawType);
+
+    let amount = 0;
+    if (isPercent) {
+      amount = Math.round((cartTotal * value) / 100);
+    } else if (isFixed) {
+      amount = value;
+    } else {
+      console.warn(
+        "[checkout] Unknown discount_type from API:",
+        discount.discount_type,
+        "— full discount object:",
+        discount
+      );
     }
-    if (discount.discount_type === "fixed") {
-      return Math.min(cartTotal, Number(discount.value));
-    }
-    return 0;
+    // Clamp between 0 and the subtotal — the discount can never exceed the items
+    // total or go negative, and shipping is never discounted by the code itself.
+    return Math.max(0, Math.min(cartTotal, amount));
   }, [discount, cartTotal]);
 
   const finalTotal = Math.max(0, cartTotal + shippingFee - discountAmount);
@@ -165,6 +184,8 @@ export default function CheckoutPage() {
         return;
       }
 
+      console.log("[checkout] Discount validated:", result.discount);
+
       // Cache the validated discount so re-typing / re-applying skips the network.
       discountCache.current[cacheKey] = result.discount;
 
@@ -208,6 +229,7 @@ export default function CheckoutPage() {
   const [touched, setTouched] = useState({
     name: false,
     phone: false,
+    email: false,
     address: false,
     governorate: false,
   });
@@ -222,7 +244,7 @@ export default function CheckoutPage() {
       setStep(2);
       return;
     }
-    setTouched({ name: true, phone: true, address: true, governorate: true });
+    setTouched({ name: true, phone: true, email: true, address: true, governorate: true });
   };
 
   const handleBlur = (field) => {
@@ -277,6 +299,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           name: form.name.trim(),
           phone: form.phone.trim(),
+          email: form.email.trim().toLowerCase(),
           address: form.address.trim(),
           governorate: form.governorate,
           payment_method: form.paymentMethod,
@@ -391,7 +414,7 @@ export default function CheckoutPage() {
 
   const showSummaryError =
     !isFormValid &&
-    (touched.name || touched.phone || touched.address || touched.governorate);
+    (touched.name || touched.phone || touched.email || touched.address || touched.governorate);
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
@@ -476,6 +499,38 @@ export default function CheckoutPage() {
                         >
                           <AlertCircle size={13} strokeWidth={2.5} />
                           {errors.phone}
+                        </motion.p>
+                      )}
+                      
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase tracking-widest ml-1">Email</label>
+                    <input
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      placeholder="you@example.com (for order updates)"
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${touched.email && errors.email
+                        ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                        : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                        }`}
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      onBlur={() => handleBlur("email")}
+                      required
+                    />
+                    <AnimatePresence>
+                      {touched.email && errors.email && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
+                        >
+                          <AlertCircle size={13} strokeWidth={2.5} />
+                          {errors.email}
                         </motion.p>
                       )}
                     </AnimatePresence>
@@ -763,6 +818,10 @@ export default function CheckoutPage() {
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4">
                     <span className="text-sm opacity-50 font-light">Contact</span>
                     <span className="text-sm font-medium">{form.phone}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4 gap-3">
+                    <span className="text-sm opacity-50 font-light shrink-0">Email</span>
+                    <span className="text-sm font-medium truncate">{form.email}</span>
                   </div>
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4">
                     <span className="text-sm opacity-50 font-light">Governorate</span>
@@ -1065,7 +1124,7 @@ export default function CheckoutPage() {
                   <span>Shipping</span>
                   <span>
                     {form.governorate
-                      ? `EGP ${shippingFee}`
+                      ? `EGP ${shippingFee.toLocaleString()}`
                       : "Select governorate"}
                   </span>
                 </div>
@@ -1078,18 +1137,22 @@ export default function CheckoutPage() {
                     <span>− EGP {discountAmount.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10 space-y-3 sm:space-y-4">
-                  <div className="flex justify-between items-end gap-2">
-                    <span className="text-base sm:text-lg font-serif italic">Total</span>
-                    <div className="text-right">
-                      <motion.span
-                        key={finalTotal}
-                        initial={{ opacity: 0.5, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                      >
-                        EGP {finalTotal.toLocaleString()}
-                      </motion.span>
-                      <span className="text-[9px] px-5 sm:text-[10px] opacity-30 uppercase tracking-widest">Including VAT</span>
+              </div>
+
+              <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10">
+                <div className="flex justify-between items-end gap-2">
+                  <span className="text-base sm:text-lg font-serif italic">Total</span>
+                  <div className="text-right">
+                    <motion.span
+                      key={finalTotal}
+                      initial={{ opacity: 0.5, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-base sm:text-lg font-semibold"
+                    >
+                      EGP {finalTotal.toLocaleString()}
+                    </motion.span>
+                    <div className="text-[9px] sm:text-[10px] opacity-30 uppercase tracking-widest mt-1">
+                      Including VAT
                     </div>
                   </div>
                 </div>

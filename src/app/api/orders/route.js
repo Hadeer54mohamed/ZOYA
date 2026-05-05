@@ -1,13 +1,28 @@
 import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
 import { getShippingFee, isValidGovernorate } from "../../lib/shipping";
-import { getProductCostsByIds } from "../../../sanity/lib/products";
+import {
+  getProductCostsByIds,
+  reserveStock,
+  restoreStock,
+} from "../../../sanity/lib/products";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY // مهم جدًا (server only)
 );
 
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+const FROM_ADDRESS =
+  process.env.RESEND_FROM || "Zoya <hello@zoya-store.com>";
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://zoya-store.com")
+  .replace(/\/$/, "");
+const LOGO_URL = process.env.NEXT_PUBLIC_EMAIL_LOGO_URL || "";
+
 const PHONE_RE = /^01[0125][0-9]{8}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALLOWED_PAYMENT_METHODS = new Set(["cash", "online"]);
 const ALLOWED_STATUSES = new Set([
   "pending",
@@ -17,9 +32,311 @@ const ALLOWED_STATUSES = new Set([
   "cancelled",
 ]);
 
+// Fire-and-forget email helper. Email failures must NEVER break the order flow.
+function sendEmailSafe(payload) {
+  if (!resend) {
+    console.warn("[orders] RESEND_API_KEY missing — skipping email.");
+    return;
+  }
+  resend.emails
+    .send({ from: FROM_ADDRESS, ...payload })
+    .then((result) => {
+      if (result?.error) {
+        console.error("[orders] Resend send failed:", result.error);
+      } else {
+        console.log("[orders] Email queued:", result?.data?.id);
+      }
+    })
+    .catch((err) => {
+      console.error("[orders] Resend threw:", err);
+    });
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatMoney(n) {
+  const num = Number(n) || 0;
+  return num.toLocaleString("en-US");
+}
+
+function formatDate(d) {
+  const date = d ? new Date(d) : new Date();
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function buildOrderConfirmedHtml({
+  orderId,
+  customerName,
+  items,
+  subtotal,
+  shippingFee,
+  discountAmount,
+  discountCode,
+  total,
+  paymentMethod,
+  createdAt,
+}) {
+  const safeName = (customerName || "").toString().split(/\s+/)[0] || "there";
+  const safeItems = Array.isArray(items) ? items : [];
+  const paymentLabel =
+    paymentMethod === "online" ? "InstaPay / Wallet" : "Cash on Delivery";
+  const trackUrl = `${SITE_URL}/track?id=${encodeURIComponent(orderId)}`;
+
+  const itemsHtml = safeItems
+    .map((item) => {
+      const qty = Number(item?.quantity) || 1;
+      const price = Number(item?.price) || 0;
+      const lineTotal = price * qty;
+      const variant = [item?.color?.name, item?.size]
+        .filter(Boolean)
+        .map(escapeHtml)
+        .join(" / ");
+      return `
+        <tr>
+          <td style="padding:14px 8px; color:#222; border-bottom:1px solid #f0f0f0; vertical-align:top;">
+            <div style="font-weight:600;">${escapeHtml(item?.name)}</div>
+            ${variant ? `<div style="font-size:11px; color:#888; margin-top:2px;">${variant}</div>` : ""}
+          </td>
+          <td style="padding:14px 8px; text-align:center; color:#444; border-bottom:1px solid #f0f0f0; vertical-align:top;">${qty}</td>
+          <td style="padding:14px 8px; text-align:right; color:#444; border-bottom:1px solid #f0f0f0; vertical-align:top;">${formatMoney(price)} EGP</td>
+          <td style="padding:14px 8px; text-align:right; color:#222; font-weight:600; border-bottom:1px solid #f0f0f0; vertical-align:top;">${formatMoney(lineTotal)} EGP</td>
+        </tr>`;
+    })
+    .join("");
+
+  const brandHeader = LOGO_URL
+    ? `<img src="${LOGO_URL}" alt="ZOYA" style="height:36px; display:block; margin:0 auto;" />`
+    : `<div style="font-size:24px; font-weight:900; letter-spacing:6px; color:#fff;">ZØYA</div>`;
+
+  const discountRow =
+    Number(discountAmount) > 0
+      ? `
+                  <tr>
+                    <td style="padding:6px 0; color:#FF4DA3; font-size:14px;">Discount${discountCode ? ` (${escapeHtml(discountCode)})` : ""}</td>
+                    <td style="padding:6px 0; text-align:right; color:#FF4DA3; font-size:14px;">− ${formatMoney(discountAmount)} EGP</td>
+                  </tr>`
+      : "";
+
+  return `
+  <div style="margin:0; padding:0; background:#f5f5f5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5; padding:40px 0; font-family:Arial, Helvetica, sans-serif;">
+      <tr>
+        <td align="center">
+
+          <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background:#ffffff; border-radius:18px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.06);">
+
+            <!-- Brand header -->
+            <tr>
+              <td style="background:#000; padding:28px; text-align:center;">
+                ${brandHeader}
+              </td>
+            </tr>
+
+            <!-- Title -->
+            <tr>
+              <td style="padding:36px 36px 8px;">
+                <h1 style="color:#FF4DA3; margin:0 0 6px; font-size:26px;">Order Confirmed 🎉</h1>
+                <p style="color:#444; line-height:1.6; margin:0; font-size:15px;">
+                  Hi ${escapeHtml(safeName)}, thanks for shopping with ZOYA. Your order is confirmed and is being prepared with care.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Order info box -->
+            <tr>
+              <td style="padding:24px 36px 0;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa; border:1px solid #eee; border-radius:12px;">
+                  <tr>
+                    <td style="padding:16px 20px;">
+                      <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px; color:#555;">
+                        <tr>
+                          <td style="padding:4px 0; color:#888;">Order ID</td>
+                          <td style="padding:4px 0; text-align:right; color:#222; font-weight:600; font-family:monospace;">#${escapeHtml(orderId)}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:4px 0; color:#888;">Date</td>
+                          <td style="padding:4px 0; text-align:right; color:#222;">${escapeHtml(formatDate(createdAt))}</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:4px 0; color:#888;">Payment</td>
+                          <td style="padding:4px 0; text-align:right; color:#222;">${paymentLabel}</td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Items table -->
+            <tr>
+              <td style="padding:24px 36px 0;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px; border-collapse:collapse;">
+                  <thead>
+                    <tr style="border-bottom:2px solid #222;">
+                      <th align="left" style="padding:10px 8px; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#888;">Item</th>
+                      <th align="center" style="padding:10px 8px; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#888;">Qty</th>
+                      <th align="right" style="padding:10px 8px; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#888;">Price</th>
+                      <th align="right" style="padding:10px 8px; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#888;">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemsHtml}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Totals breakdown -->
+            <tr>
+              <td style="padding:8px 36px 0;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">
+                  <tr>
+                    <td style="padding:6px 0; color:#666;">Subtotal</td>
+                    <td style="padding:6px 0; text-align:right; color:#222;">${formatMoney(subtotal)} EGP</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 0; color:#666;">Shipping</td>
+                    <td style="padding:6px 0; text-align:right; color:#222;">${formatMoney(shippingFee)} EGP</td>
+                  </tr>${discountRow}
+                  <tr>
+                    <td colspan="2" style="padding:6px 0;"><div style="border-top:1px dashed #ddd;"></div></td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0; font-weight:700; font-size:16px; color:#000;">Total</td>
+                    <td style="padding:8px 0; text-align:right; font-weight:700; font-size:16px; color:#000;">${formatMoney(total)} EGP</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- CTA -->
+            <tr>
+              <td style="padding:30px 36px 8px; text-align:center;">
+                <a href="${trackUrl}"
+                   style="display:inline-block; padding:14px 36px; background:#FF4DA3; color:#fff; text-decoration:none; border-radius:999px; font-size:13px; letter-spacing:1.5px; font-weight:bold; text-transform:uppercase;">
+                  Track your order
+                </a>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="padding:24px 36px 32px; text-align:center; color:#999; font-size:11px; line-height:1.6;">
+                We'll notify you again once your order is on the way.<br/>
+                © ${new Date().getFullYear()} ZOYA — All rights reserved.
+              </td>
+            </tr>
+
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </div>`;
+}
+
+function buildStatusUpdateEmail(status, { orderId, customerName }) {
+  const safeName = (customerName || "").toString().split(/\s+/)[0] || "there";
+  const trackUrl = `${SITE_URL}/track?id=${encodeURIComponent(orderId)}`;
+  const brandHeader = LOGO_URL
+    ? `<img src="${LOGO_URL}" alt="ZOYA" style="height:32px; display:block; margin:0 auto;" />`
+    : `<div style="font-size:22px; font-weight:900; letter-spacing:6px; color:#fff;">ZØYA</div>`;
+
+  const wrap = (title, body) => `
+  <div style="margin:0; padding:0; background:#f5f5f5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5; padding:40px 0; font-family:Arial, Helvetica, sans-serif;">
+      <tr>
+        <td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background:#fff; border-radius:18px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.06);">
+            <tr>
+              <td style="background:#000; padding:24px; text-align:center;">${brandHeader}</td>
+            </tr>
+            <tr>
+              <td style="padding:36px 36px 8px;">
+                <h1 style="color:#FF4DA3; margin:0 0 10px; font-size:24px;">${title}</h1>
+                <p style="color:#333; line-height:1.6; margin:0; font-size:15px;">Hi ${escapeHtml(safeName)},</p>
+                <div style="margin-top:14px; color:#444; line-height:1.6; font-size:14px;">${body}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 36px 0;">
+                <div style="background:#fafafa; border:1px solid #eee; border-radius:10px; padding:14px 18px; font-size:13px; color:#555;">
+                  <span style="color:#888;">Order ID:</span>
+                  <b style="color:#222; font-family:monospace;">#${escapeHtml(orderId)}</b>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 36px 8px; text-align:center;">
+                <a href="${trackUrl}"
+                   style="display:inline-block; padding:14px 36px; background:#FF4DA3; color:#fff; text-decoration:none; border-radius:999px; font-size:13px; letter-spacing:1.5px; font-weight:bold; text-transform:uppercase;">
+                  Track your order
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 36px 32px; text-align:center; color:#999; font-size:11px; line-height:1.6;">
+                © ${new Date().getFullYear()} ZOYA — All rights reserved.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+
+  switch (status) {
+    case "confirmed":
+      return {
+        subject: "Your Order is Confirmed 🖤",
+        html: wrap(
+          "Order Confirmed 🎉",
+          `<p style="color:#333; line-height:1.6;">Your order has been confirmed and is being prepared.</p>`
+        ),
+      };
+    case "shipped":
+      return {
+        subject: "Your Order is on the way 🚚",
+        html: wrap(
+          "On the way 🚚",
+          `<p style="color:#333; line-height:1.6;">Your order has been shipped! It should arrive soon.</p>`
+        ),
+      };
+    case "delivered":
+      return {
+        subject: "Your Order has been Delivered 📦",
+        html: wrap(
+          "Delivered 📦",
+          `<p style="color:#333; line-height:1.6;">Your order was delivered. We hope you love it!</p>`
+        ),
+      };
+    case "cancelled":
+      return {
+        subject: "Your Order has been Cancelled",
+        html: wrap(
+          "Order Cancelled",
+          `<p style="color:#333; line-height:1.6;">Your order was cancelled. If this wasn't expected, please contact us.</p>`
+        ),
+      };
+    default:
+      return null;
+  }
+}
+
 function isAuthorizedAdmin(req) {
-  const adminPass =
-    process.env.ADMIN_PASS || process.env.NEXT_PUBLIC_ADMIN_PASS;
+  const adminPass = process.env.ADMIN_PASS;
   if (!adminPass) return false;
   const provided = req.headers.get("x-admin-pass");
   return provided === adminPass;
@@ -37,6 +354,7 @@ export async function POST(req) {
     const {
       name,
       phone,
+      email,
       address,
       governorate,
       payment_method,
@@ -44,7 +362,7 @@ export async function POST(req) {
       discount_code,
     } = body;
 
-    if (!name || !phone || !address || !items?.length) {
+    if (!name || !phone || !email || !address || !items?.length) {
       return Response.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -63,6 +381,14 @@ export async function POST(req) {
     if (!PHONE_RE.test(trimmedPhone)) {
       return Response.json(
         { error: "Please enter a valid Egyptian phone number." },
+        { status: 400 }
+      );
+    }
+
+    const trimmedEmail = email.toString().trim().toLowerCase();
+    if (!EMAIL_RE.test(trimmedEmail)) {
+      return Response.json(
+        { error: "Please enter a valid email address." },
         { status: 400 }
       );
     }
@@ -143,11 +469,8 @@ export async function POST(req) {
 
     const costComplete = sanitizedItems.every((it) => it.cost_known);
 
-    // Recalculate shipping server-side based on governorate + payment method.
-    let shippingFee = getShippingFee(governorate);
-    if (paymentMethod === "online") {
-      shippingFee = Math.max(0, shippingFee - 10);
-    }
+    // Recalculate shipping server-side based on governorate.
+    const shippingFee = getShippingFee(governorate);
 
     // Recalculate subtotal/cost from the server-trusted prices above.
     const itemsSubtotal = sanitizedItems.reduce(
@@ -210,10 +533,23 @@ export async function POST(req) {
 
       appliedCode = discount.code;
       const value = Number(discount.value) || 0;
-      if (discount.discount_type === "percent") {
+
+      // Tolerate variations in how `discount_type` is stored in the DB.
+      const rawType = (discount.discount_type ?? "").toString().toLowerCase().trim();
+      const isPercent = ["percent", "percentage", "%"].includes(rawType);
+      const isFixed = ["fixed", "flat", "amount"].includes(rawType);
+
+      if (isPercent) {
         discountAmount = Math.round((itemsSubtotal * value) / 100);
-      } else if (discount.discount_type === "fixed") {
+      } else if (isFixed) {
         discountAmount = Math.min(itemsSubtotal, value);
+      } else {
+        console.warn(
+          "[orders] Unknown discount_type in DB:",
+          discount.discount_type,
+          "for code:",
+          discount.code
+        );
       }
       discountAmount = Math.max(0, Math.min(itemsSubtotal, discountAmount));
     }
@@ -222,12 +558,50 @@ export async function POST(req) {
     const totalPrice = Math.max(0, itemsSubtotal + shippingFee - discountAmount);
     const profit = itemsSubtotal - discountAmount - totalCost;
 
+    // Reserve (decrement) stock for tracked products. We intentionally do NOT
+    // refuse the order if a variant goes out of stock — the customer always
+    // gets confirmed. Any depleted/oversold/missing variants come back as
+    // `alerts` so we can flag the order for the admin dashboard.
+    const stockResult = await reserveStock(
+      sanitizedItems.map((it) => ({
+        id: it.id,
+        name: it.name,
+        color: it.color,
+        size: it.size,
+        quantity: it.quantity,
+      }))
+    );
+    if (!stockResult.ok) {
+      // Only infrastructure failures (Sanity fetch/commit error) end up here.
+      // Log loudly but still let the order go through so the customer isn't
+      // blocked by our backend hiccup; the admin will reconcile stock by hand.
+      console.error(
+        "[orders] reserveStock infrastructure failure — proceeding with order without decrementing stock:",
+        stockResult.code,
+        stockResult.error
+      );
+    }
+    const stockAlerts = Array.isArray(stockResult.alerts)
+      ? stockResult.alerts
+      : [];
+    if (stockAlerts.length > 0) {
+      // The admin dashboard reads live stock from Sanity, so we don't persist
+      // these alerts on the order. A console line gives us a paper trail in
+      // server logs in case anyone needs to trace which order tipped a
+      // variant negative.
+      console.warn(
+        "[orders] stock alerts triggered by this order:",
+        stockAlerts
+      );
+    }
+
     const { data, error } = await supabase
       .from("orders")
       .insert([
         {
           customer_name: trimmedName,
           phone: trimmedPhone,
+          email: trimmedEmail,
           address: trimmedAddress,
           governorate,
           payment_method: paymentMethod,
@@ -248,6 +622,16 @@ export async function POST(req) {
 
     if (error) {
       console.error("Order insert error:", error);
+      // Stock was already decremented in Sanity but the order didn't land in
+      // Supabase. Loud log so the admin can manually reconcile the affected
+      // products — restoring stock automatically would need a second mutation
+      // that could itself fail and is risky to chain here.
+      if (stockResult.applied?.length) {
+        console.error(
+          "[orders] STOCK MISMATCH: stock was decremented but the order was not saved. Affected applies:",
+          stockResult.applied
+        );
+      }
       return Response.json(
         { error: error.message },
         { status: 500 }
@@ -300,6 +684,24 @@ export async function POST(req) {
         console.error("increment_discount_usage RPC error:", rpcError);
       }
     }
+
+    // Fire-and-forget confirmation email — must not block or fail the order.
+    sendEmailSafe({
+      to: trimmedEmail,
+      subject: "Your Order is Confirmed 🖤",
+      html: buildOrderConfirmedHtml({
+        orderId: data.order_id || data.id,
+        customerName: trimmedName,
+        items: sanitizedItems,
+        subtotal: itemsSubtotal,
+        shippingFee,
+        discountAmount,
+        discountCode: appliedCode,
+        total: totalPrice,
+        paymentMethod,
+        createdAt: data.created_at,
+      }),
+    });
 
     return Response.json({
       success: true,
@@ -383,6 +785,19 @@ export async function PATCH(req) {
       );
     }
 
+    // Read the current status & items first so we know whether stock needs
+    // to be restored (cancelled) or re-reserved (un-cancelled), and so we
+    // only email when the status actually changes.
+    const { data: existing } = await supabase
+      .from("orders")
+      .select("status, items")
+      .eq("id", id)
+      .maybeSingle();
+
+    const previousStatus = existing?.status || null;
+    const wasCancelled = previousStatus === "cancelled";
+    const willBeCancelled = status === "cancelled";
+
     const { data, error } = await supabase
       .from("orders")
       .update({ status })
@@ -396,6 +811,52 @@ export async function PATCH(req) {
         { success: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // Stock reconciliation when crossing the cancelled boundary.
+    // Going INTO cancelled: restore the units we'd previously reserved.
+    // Coming OUT of cancelled (e.g. reopen as pending): re-reserve them, but
+    // don't fail the status change if stock is gone now — log instead so the
+    // admin can fix manually.
+    const orderItems = Array.isArray(data?.items)
+      ? data.items
+      : Array.isArray(existing?.items)
+      ? existing.items
+      : [];
+
+    if (!wasCancelled && willBeCancelled && orderItems.length > 0) {
+      const result = await restoreStock(orderItems);
+      if (!result.ok) {
+        console.error(
+          "[orders PATCH] restoreStock failed for order",
+          data.order_id || data.id,
+          result
+        );
+      }
+    } else if (wasCancelled && !willBeCancelled && orderItems.length > 0) {
+      const result = await reserveStock(orderItems);
+      if (!result.ok) {
+        console.warn(
+          "[orders PATCH] could not re-reserve stock when re-opening order",
+          data.order_id || data.id,
+          result
+        );
+      }
+    }
+
+    const statusChanged = previousStatus !== status;
+    if (statusChanged && data?.email) {
+      const tpl = buildStatusUpdateEmail(status, {
+        orderId: data.order_id || data.id,
+        customerName: data.customer_name,
+      });
+      if (tpl) {
+        sendEmailSafe({
+          to: data.email,
+          subject: tpl.subject,
+          html: tpl.html,
+        });
+      }
     }
 
     return Response.json({ success: true, order: data });

@@ -3,6 +3,7 @@
 // that needs to enforce the same rules (single source of truth).
 
 export const PHONE_RE = /^01[0125][0-9]{8}$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const MIN_ADDRESS_LENGTH = 16;
 export const MIN_NAME_WORDS = 2;
 export const DISCOUNT_CODE_MIN = 2;
@@ -23,6 +24,13 @@ export function validatePhone(value) {
   if (!PHONE_RE.test(v)) {
     return "Please enter a valid Egyptian phone number (11 digits)";
   }
+  return "";
+}
+
+export function validateEmail(value) {
+  const v = (value ?? "").toString().trim();
+  if (!v) return "Email is required";
+  if (!EMAIL_RE.test(v)) return "Please enter a valid email address";
   return "";
 }
 
@@ -61,6 +69,7 @@ export function validateCheckoutForm(form, governorates) {
   const errors = {
     name: validateName(form?.name),
     phone: validatePhone(form?.phone),
+    email: validateEmail(form?.email),
     address: validateAddress(form?.address),
     governorate: validateGovernorate(form?.governorate, governorates),
   };

@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@react-email/components": "^1.0.12",
     "@sanity/color-input": "^6.0.4",
     "@sanity/image-url": "^2.1.1",
     "@sanity/vision": "^5.22.0",
@@ -19,6 +20,7 @@
     "next-sanity": "^12.3.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "resend": "^6.12.2",
     "sanity": "^5.22.0",
     "swiper": "^12.1.3"
   },

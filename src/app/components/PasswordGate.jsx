@@ -9,7 +9,8 @@ export default function PasswordGate({
   children,
   label = "Authorization",
   subtitle = "Zoya Secured Terminal",
-  expectedPassword = process.env.NEXT_PUBLIC_STUDIO_PASS,
+  scope = "studio",
+  onAuthorized,
 }) {
   const [authorized, setAuthorized] = useState(false);
   const [password, setPassword] = useState("");
@@ -20,22 +21,26 @@ export default function PasswordGate({
     setIsChecking(true);
     setError("");
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    if (!expectedPassword) {
-      setError("System config missing.");
-      setIsChecking(false);
-      return;
-    }
-
-    if (password === expectedPassword) {
-      setAuthorized(true);
-    } else {
-      setError("Invalid Access Key");
-      setIsChecking(false);
-      if (typeof navigator !== "undefined" && navigator.vibrate) {
-        navigator.vibrate([50, 100, 50]);
+    try {
+      const res = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, scope }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        setError(data?.error || "Invalid Access Key");
+        setIsChecking(false);
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          navigator.vibrate([50, 100, 50]);
+        }
+        return;
       }
+      setAuthorized(true);
+      onAuthorized?.(password);
+    } catch {
+      setError("Network error. Please try again.");
+      setIsChecking(false);
     }
   };
 

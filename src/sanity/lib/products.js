@@ -1,5 +1,6 @@
 import { client } from "./client";
 import { urlFor } from "./image";
+import { writeClient, hasWriteToken } from "./writeClient";
 
 const PRODUCTS_QUERY = /* groq */ `
   *[_type == "product"] | order(coalesce(order, 100) asc, _createdAt asc) {
@@ -19,6 +20,11 @@ const PRODUCTS_QUERY = /* groq */ `
         asset,
         hotspot,
         crop
+      },
+      "stockEntries": stockEntries[]{
+        size,
+        stock,
+        initialStock
       }
     }
   }
@@ -59,6 +65,16 @@ function mapProduct(raw) {
           }
         })
         .filter(Boolean),
+      stockEntries: Array.isArray(c?.stockEntries)
+        ? c.stockEntries
+            .filter((s) => s && typeof s.size === "string")
+            .map((s) => ({
+              size: s.size,
+              stock: Number(s.stock) || 0,
+              initialStock:
+                typeof s.initialStock === "number" ? s.initialStock : null,
+            }))
+        : [],
     })),
   };
 }
@@ -150,3 +166,404 @@ export async function getProductCostsByIds(ids) {
 export function getPrimaryImage(product) {
   return product?.colors?.[0]?.images?.[0];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STOCK
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Stock model: each `color` has an optional `stockEntries` array; each entry is
+// { _key, size, stock, initialStock? }. Stock is opt-in per product:
+//   • product without stockEntries → unlimited (no enforcement, no analytics).
+//   • product with stockEntries    → strictly enforced. A combo not listed, or
+//     listed with stock 0, blocks the order.
+//
+// Decrement runs as a Sanity transaction so multiple items either all succeed
+// or all fail — no half-decremented stock when an order goes through.
+
+const STOCK_LOOKUP_QUERY = /* groq */ `
+  *[_type == "product" && slug.current in $ids]{
+    _id,
+    "id": slug.current,
+    name,
+    "colors": colors[]{
+      _key,
+      name,
+      "stockEntries": stockEntries[]{
+        _key,
+        size,
+        stock,
+        initialStock
+      }
+    }
+  }
+`;
+
+function colorNameOf(raw) {
+  if (!raw) return "";
+  if (typeof raw === "string") return raw.trim();
+  return (raw.name || "").toString().trim();
+}
+
+/**
+ * Server-only. Returns a structured map for the admin analytics view:
+ *   { [productId]: {
+ *       name,
+ *       tracked: boolean,            // false = product not using stock yet
+ *       totalStock, totalInitial,
+ *       byColor: [{ name, totalStock, totalInitial, sizes: [{size, stock, initialStock}] }]
+ *   } }
+ * Returns `null` if the request itself failed.
+ */
+export async function getProductStockMap() {
+  try {
+    const data = await client.fetch(
+      /* groq */ `*[_type == "product"]{
+        "id": slug.current,
+        name,
+        "colors": colors[]{
+          name,
+          "stockEntries": stockEntries[]{ size, stock, initialStock }
+        }
+      }`,
+      {},
+      { next: { revalidate: 0 } }
+    );
+    const map = {};
+    for (const row of data || []) {
+      if (!row?.id) continue;
+      let totalStock = 0;
+      let totalInitial = 0;
+      let tracked = false;
+      const byColor = (row.colors || []).map((c) => {
+        const sizes = (c?.stockEntries || [])
+          .filter((s) => s && typeof s.size === "string")
+          .map((s) => ({
+            size: s.size,
+            stock: Number(s.stock) || 0,
+            initialStock:
+              typeof s.initialStock === "number" ? s.initialStock : null,
+          }));
+        const colorTotalStock = sizes.reduce((sum, s) => sum + s.stock, 0);
+        const colorTotalInitial = sizes.reduce(
+          (sum, s) => sum + (s.initialStock ?? 0),
+          0
+        );
+        if (sizes.length > 0) tracked = true;
+        totalStock += colorTotalStock;
+        totalInitial += colorTotalInitial;
+        return {
+          name: c?.name || "Default",
+          totalStock: colorTotalStock,
+          totalInitial: colorTotalInitial,
+          sizes,
+        };
+      });
+      map[row.id] = {
+        name: row.name || row.id,
+        tracked,
+        totalStock,
+        totalInitial,
+        byColor,
+      };
+    }
+    return map;
+  } catch (err) {
+    console.error("[sanity] getProductStockMap failed:", err?.message || err);
+    return null;
+  }
+}
+
+/**
+ * Server-only. Atomically decrements stock for every line item.
+ *
+ * Behavior (intentionally permissive):
+ *   • Orders are NEVER rejected for stock reasons. We always commit the
+ *     decrement so the dashboard reflects what was actually sold.
+ *   • Stock is allowed to go negative — that's our signal that the admin
+ *     oversold and needs to restock urgently.
+ *   • Untracked products and unknown variants are skipped silently (we just
+ *     don't decrement them).
+ *
+ * The returned `alerts` array surfaces any variant whose post-order stock is
+ * ≤ 0 so the API layer can flag the order/notify the admin.
+ *
+ * `items` shape: [{ id, name, color, size, quantity }]
+ *
+ * Returns:
+ *   { ok: true, applied: [...], alerts: [...] }
+ *   { ok: false, code, error } only on infrastructure failure
+ *     code = "fetch_failed" | "patch_failed"
+ */
+export async function reserveStock(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { ok: true, applied: [], alerts: [] };
+  }
+
+  if (!hasWriteToken) {
+    // Without a write token we can't mutate stock at all (e.g. dev without
+    // a Sanity write token). Carry on as if no tracking exists.
+    return { ok: true, applied: [], alerts: [], skipped: "no_token" };
+  }
+
+  const ids = [...new Set(items.map((it) => String(it.id)))];
+
+  let products;
+  try {
+    products = await client.fetch(STOCK_LOOKUP_QUERY, { ids });
+  } catch (err) {
+    console.error("[sanity] reserveStock fetch failed:", err?.message || err);
+    return { ok: false, code: "fetch_failed", error: "Could not verify stock." };
+  }
+
+  const productById = new Map(
+    (products || []).map((p) => [String(p.id), p])
+  );
+
+  // Group desired qty by (productId, colorKey, stockKey) so a cart with
+  // duplicate lines (e.g. two of the same variant added separately) is
+  // decremented in one patch.
+  const decByEntry = new Map(); // key = `${_id}|${colorKey}|${stockKey}` → { qty, before, meta }
+  const alerts = [];
+
+  for (const it of items) {
+    const qty = Math.max(1, Math.floor(Number(it.quantity) || 0));
+    const product = productById.get(String(it.id));
+    if (!product) {
+      // Product no longer exists in Sanity (deleted between cart and order).
+      // Don't reject — just flag so the admin can investigate.
+      alerts.push({
+        id: it.id,
+        name: it.name,
+        color: colorNameOf(it.color),
+        size: it.size || "",
+        before: null,
+        after: null,
+        ordered: qty,
+        reason: "product_missing",
+      });
+      continue;
+    }
+
+    const colors = Array.isArray(product.colors) ? product.colors : [];
+    const productHasStock = colors.some(
+      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0
+    );
+    if (!productHasStock) {
+      // Product opted out of stock tracking — skip silently.
+      continue;
+    }
+
+    const wantedColor = colorNameOf(it.color);
+    const wantedSize = (it.size || "").toString().trim();
+
+    const colorMatch =
+      colors.find((c) => (c?.name || "").trim() === wantedColor) ||
+      (wantedColor === "" ? colors[0] : null);
+
+    if (!colorMatch) {
+      alerts.push({
+        id: product.id,
+        name: product.name,
+        color: wantedColor,
+        size: wantedSize,
+        before: null,
+        after: null,
+        ordered: qty,
+        reason: "color_not_found",
+      });
+      continue;
+    }
+
+    const entries = Array.isArray(colorMatch.stockEntries)
+      ? colorMatch.stockEntries
+      : [];
+    const entryMatch = entries.find(
+      (e) => (e?.size || "").toString().trim() === wantedSize
+    );
+    if (!entryMatch) {
+      alerts.push({
+        id: product.id,
+        name: product.name,
+        color: wantedColor,
+        size: wantedSize,
+        before: null,
+        after: null,
+        ordered: qty,
+        reason: "size_not_listed",
+      });
+      continue;
+    }
+
+    const key = `${product._id}|${colorMatch._key}|${entryMatch._key}`;
+    const existing = decByEntry.get(key);
+    const before = existing ? existing.before : Number(entryMatch.stock) || 0;
+    const totalQty = (existing?.qty || 0) + qty;
+    decByEntry.set(key, {
+      qty: totalQty,
+      before,
+      meta: {
+        id: product.id,
+        name: product.name,
+        color: wantedColor,
+        size: wantedSize,
+      },
+    });
+  }
+
+  if (decByEntry.size === 0) {
+    return { ok: true, applied: [], alerts };
+  }
+
+  // Build a single transaction: one patch per (product, color, stockEntry).
+  const tx = writeClient.transaction();
+  const applied = [];
+  for (const [key, info] of decByEntry.entries()) {
+    const [productId, colorKey, stockKey] = key.split("|");
+    tx.patch(productId, (p) =>
+      p.dec({
+        [`colors[_key=="${colorKey}"].stockEntries[_key=="${stockKey}"].stock`]:
+          info.qty,
+      })
+    );
+    applied.push({ productId, colorKey, stockKey, qty: info.qty });
+
+    // Compute the post-order stock and surface any variant that hit / went
+    // below zero so the admin gets an alert.
+    const after = info.before - info.qty;
+    if (after <= 0) {
+      alerts.push({
+        ...info.meta,
+        before: info.before,
+        after,
+        ordered: info.qty,
+        reason: after < 0 ? "oversold" : "depleted",
+      });
+    }
+  }
+
+  try {
+    await tx.commit({ visibility: "async" });
+    return { ok: true, applied, alerts };
+  } catch (err) {
+    console.error("[sanity] reserveStock commit failed:", err?.message || err);
+    return {
+      ok: false,
+      code: "patch_failed",
+      error: "Could not update stock. Please try again.",
+    };
+  }
+}
+
+/**
+ * Server-only. The inverse of `reserveStock` — used when an order is
+ * cancelled, so the units that were debited from inventory get restored.
+ *
+ * Same shape & behaviour as `reserveStock`:
+ *   • Untracked products are skipped silently.
+ *   • Missing colors/sizes (e.g. the variant was removed in Sanity since the
+ *     order was placed) are skipped with a warn log instead of failing —
+ *     refusing a cancellation rollback because of a deleted variant would be
+ *     worse than the rollback being slightly incomplete.
+ */
+export async function restoreStock(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { ok: true, applied: [] };
+  }
+
+  if (!hasWriteToken) {
+    return { ok: true, applied: [], skipped: "no_token" };
+  }
+
+  const ids = [...new Set(items.map((it) => String(it.id)))];
+
+  let products;
+  try {
+    products = await client.fetch(STOCK_LOOKUP_QUERY, { ids });
+  } catch (err) {
+    console.error("[sanity] restoreStock fetch failed:", err?.message || err);
+    return { ok: false, code: "fetch_failed", error: "Could not restore stock." };
+  }
+
+  const productById = new Map((products || []).map((p) => [String(p.id), p]));
+  const incByEntry = new Map();
+
+  for (const it of items) {
+    const qty = Math.max(0, Math.floor(Number(it.quantity) || 0));
+    if (qty === 0) continue;
+    const product = productById.get(String(it.id));
+    if (!product) {
+      console.warn(
+        "[sanity] restoreStock: product no longer exists, skipping:",
+        it.id
+      );
+      continue;
+    }
+
+    const colors = Array.isArray(product.colors) ? product.colors : [];
+    const productHasStock = colors.some(
+      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0
+    );
+    if (!productHasStock) continue;
+
+    const wantedColor = colorNameOf(it.color);
+    const wantedSize = (it.size || "").toString().trim();
+    const colorMatch =
+      colors.find((c) => (c?.name || "").trim() === wantedColor) ||
+      (wantedColor === "" ? colors[0] : null);
+    if (!colorMatch) {
+      console.warn(
+        "[sanity] restoreStock: color not found, skipping:",
+        product.name,
+        wantedColor
+      );
+      continue;
+    }
+    const entries = Array.isArray(colorMatch.stockEntries)
+      ? colorMatch.stockEntries
+      : [];
+    const entryMatch = entries.find(
+      (e) => (e?.size || "").toString().trim() === wantedSize
+    );
+    if (!entryMatch) {
+      console.warn(
+        "[sanity] restoreStock: size not found, skipping:",
+        product.name,
+        wantedColor,
+        wantedSize
+      );
+      continue;
+    }
+    const key = `${product._id}|${colorMatch._key}|${entryMatch._key}`;
+    incByEntry.set(key, (incByEntry.get(key) || 0) + qty);
+  }
+
+  if (incByEntry.size === 0) {
+    return { ok: true, applied: [] };
+  }
+
+  const tx = writeClient.transaction();
+  const applied = [];
+  for (const [key, qty] of incByEntry.entries()) {
+    const [productId, colorKey, stockKey] = key.split("|");
+    tx.patch(productId, (p) =>
+      p.inc({
+        [`colors[_key=="${colorKey}"].stockEntries[_key=="${stockKey}"].stock`]:
+          qty,
+      })
+    );
+    applied.push({ productId, colorKey, stockKey, qty });
+  }
+
+  try {
+    await tx.commit({ visibility: "async" });
+    return { ok: true, applied };
+  } catch (err) {
+    console.error("[sanity] restoreStock commit failed:", err?.message || err);
+    return {
+      ok: false,
+      code: "patch_failed",
+      error: "Could not restore stock.",
+    };
+  }
+}
+
