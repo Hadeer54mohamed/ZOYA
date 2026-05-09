@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -162,7 +162,8 @@ function AdminDashboard({ password }) {
   const [productsModalOpen, setProductsModalOpen] = useState(false);
   const [stockSummary, setStockSummary] = useState(null);
   const [stockBannerDismissed, setStockBannerDismissed] = useState(false);
-
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 9;
   const adminFetch = async (url, init = {}) => {
     return fetch(url, {
       ...init,
@@ -194,6 +195,9 @@ function AdminDashboard({ password }) {
       setRefreshing(false);
     }
   };
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
 
   useEffect(() => {
     fetchOrders();
@@ -349,6 +353,22 @@ function AdminDashboard({ password }) {
       );
     });
   }, [orders, search, statusFilter]);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * ordersPerPage;
+    return filteredOrders.slice(startIndex, startIndex + ordersPerPage);
+  }, [filteredOrders, currentPage, ordersPerPage]);
+
+  const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+
+  const ordersFilterKey = `${search}::${statusFilter}`;
+  const ordersFilterKeyRef = useRef(ordersFilterKey);
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredOrders.length / ordersPerPage));
+    const filtersChanged = ordersFilterKeyRef.current !== ordersFilterKey;
+    ordersFilterKeyRef.current = ordersFilterKey;
+    setCurrentPage((prev) => (filtersChanged ? 1 : Math.min(prev, maxPage)));
+  }, [ordersFilterKey, filteredOrders.length, ordersPerPage]);
 
   return (
     <main className="min-h-screen bg-white dark:bg-black text-black dark:text-white transition-colors duration-500">
@@ -597,16 +617,54 @@ function AdminDashboard({ password }) {
             <p className="text-sm">No orders match your filters.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filteredOrders.map((o) => (
-              <OrderCard
-                key={o.id}
-                order={o}
-                onClick={() => setSelectedOrder(o)}
-                customerOrderInfo={getCustomerOrderInfo(orders, o)}
-              />
-            ))}
-          </div>
+          <>
+            {/* Orders Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {paginatedOrders.map((o) => (
+                <OrderCard
+                  key={o.id}
+                  order={o}
+                  onClick={() => setSelectedOrder(o)}
+                  customerOrderInfo={getCustomerOrderInfo(orders, o)}
+                />
+              ))}
+            </div>
+
+            {/* Pagination Controls - تظهر فقط إذا كان هناك أكثر من صفحة */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-4 mt-10 pb-10">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FF4DA3]/10 hover:border-[#FF4DA3]/30 transition-all font-medium text-sm"
+                >
+                  <ChevronRight className="rotate-180" size={16} />
+                  
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold tracking-widest text-[#FF4DA3]">
+                    {currentPage}
+                  </span>
+                  <span className="text-xs text-black/40 dark:text-white/40">/</span>
+                  <span className="text-xs text-black/60 dark:text-white/60">
+                    {totalPages}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FF4DA3]/10 hover:border-[#FF4DA3]/30 transition-all font-medium text-sm"
+                >
+                  
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -1340,6 +1398,8 @@ function ProductRow({ product, expanded, onToggle }) {
   const stock = product.totalStock;
   const initial = product.totalInitial;
   const sold = product.unitsSold;
+  const needsRestock = tracked && stock <= 5;
+  const isOutOfStock = tracked && stock <= 0;
   // Sell-through is what % of the initial stock has been sold. Only meaningful
   // when initialStock is set in Sanity.
   const sellThrough =
@@ -1352,7 +1412,7 @@ function ProductRow({ product, expanded, onToggle }) {
         Untracked
       </span>
     );
-  } else if (stock === 0) {
+  } else if (isOutOfStock) {
     stockBadge = (
       <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] uppercase tracking-widest font-bold">
         Out of stock
@@ -1390,7 +1450,22 @@ function ProductRow({ product, expanded, onToggle }) {
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate">{product.name}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="text-sm font-semibold truncate">{product.name}</p>
+            {needsRestock && (
+              <span
+                className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] uppercase tracking-[0.18em] font-black ${
+                  isOutOfStock
+                    ? "bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30"
+                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30"
+                }`}
+                title={isOutOfStock ? "Out of stock - restock needed" : "Low stock - restock soon"}
+              >
+                <AlertTriangle size={10} />
+                Restock
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className="text-[10px] text-black/50 dark:text-white/50">
               <b className="text-black dark:text-white">{sold.toLocaleString()}</b> sold

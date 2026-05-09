@@ -1,6 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
-import { getShippingFee, isValidGovernorate } from "../../../lib/shipping";
+import {
+  getShippingFeeFromMap,
+  isValidGovernorateInMap,
+} from "../../../lib/shipping";
+import { getShippingFeesMapCached } from "../../../../sanity/lib/shippingFees";
 import { getProductCostsByIds } from "../../../../sanity/lib/products";
+import { postOrderSheetsWebhook } from "../../../../lib/ordersSheetsWebhook";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -29,6 +34,17 @@ function shapeOrder(row) {
 }
 
 const PHONE_RE = /^01[0125][0-9]{8}$/;
+
+function buildOrderIdCandidates(rawId) {
+  const id = (rawId ?? "").toString().trim();
+  if (!id) return [];
+  const set = new Set([id]);
+  set.add(id.toUpperCase());
+  set.add(id.toLowerCase());
+  if (/^Z0YA-/i.test(id)) set.add(id.replace(/^Z0YA-/i, "ZOYA-"));
+  if (/^ZOYA-/i.test(id)) set.add(id.replace(/^ZOYA-/i, "Z0YA-"));
+  return Array.from(set).filter(Boolean);
+}
 
 export async function GET(req) {
   try {
@@ -117,6 +133,41 @@ export async function GET(req) {
       error = retry.error;
     }
 
+    // Some databases normalize order ids differently (case changes or O/0
+    // prefix swaps). If the strict lookup misses, retry with safe variants.
+    if (!error && !data) {
+      const idCandidates = buildOrderIdCandidates(id);
+      if (idCandidates.length > 1) {
+        const fallbackByCandidates = await supabase
+          .from("orders")
+          .select(baseCols)
+          .in("order_id", idCandidates)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (
+          fallbackByCandidates.error &&
+          /(updated_at|shipping_fee|governorate|payment_method)/i.test(
+            fallbackByCandidates.error.message ?? ""
+          )
+        ) {
+          const retry = await supabase
+            .from("orders")
+            .select(fallbackCols)
+            .in("order_id", idCandidates)
+            .order("created_at", { ascending: false })
+            .limit(1);
+          data = Array.isArray(retry.data) ? retry.data[0] ?? null : null;
+          error = retry.error;
+        } else {
+          data = Array.isArray(fallbackByCandidates.data)
+            ? fallbackByCandidates.data[0] ?? null
+            : null;
+          error = fallbackByCandidates.error;
+        }
+      }
+    }
+
     if (error) {
       console.error("Track order error:", error);
       return Response.json(
@@ -164,13 +215,16 @@ export async function PATCH(req) {
       return Response.json({ error: "Invalid order id format" }, { status: 400 });
     }
 
-    const { data: existing, error: fetchErr } = await supabase
+    const idCandidates = buildOrderIdCandidates(id);
+    const { data: existingRows, error: fetchErr } = await supabase
       .from("orders")
       .select(
-        "id, status, phone, items, governorate, shipping_fee, total_price, total_cost, profit, cost_complete, discount_code, discount_amount, payment_method"
+        "id, order_id, customer_name, status, phone, address, items, governorate, shipping_fee, total_price, total_cost, profit, cost_complete, discount_code, discount_amount, payment_method"
       )
-      .eq("order_id", id)
-      .maybeSingle();
+      .in("order_id", idCandidates)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const existing = Array.isArray(existingRows) ? existingRows[0] ?? null : null;
 
     if (fetchErr) {
       console.error("Track patch lookup error:", fetchErr);
@@ -206,7 +260,7 @@ export async function PATCH(req) {
       const { error: cancelErr } = await supabase
         .from("orders")
         .update({ status: "cancelled" })
-        .eq("order_id", id);
+        .eq("id", existing.id);
 
       if (cancelErr) {
         console.error("Track cancel error:", cancelErr);
@@ -216,10 +270,13 @@ export async function PATCH(req) {
         );
       }
 
+      postOrderSheetsWebhook("update", { ...existing, status: "cancelled" });
+
       return Response.json({ success: true, cancelled: true });
     }
 
     const updates = {};
+    const shippingFeesMap = await getShippingFeesMapCached();
 
     if (body.customer_name !== undefined) {
       const name = body.customer_name.toString().trim();
@@ -257,14 +314,14 @@ export async function PATCH(req) {
 
     if (body.governorate !== undefined) {
       const newGov = body.governorate.toString().trim();
-      if (!isValidGovernorate(newGov)) {
+      if (!isValidGovernorateInMap(shippingFeesMap, newGov)) {
         return Response.json(
           { error: "Please select a valid governorate." },
           { status: 400 }
         );
       }
       updates.governorate = newGov;
-      let newShipping = getShippingFee(newGov);
+      let newShipping = getShippingFeeFromMap(shippingFeesMap, newGov);
       // Online payments get a -10 EGP shipping discount, mirroring the
       // order creation logic so totals stay consistent.
       if ((existing.payment_method ?? "").toLowerCase() === "online") {
@@ -418,7 +475,7 @@ export async function PATCH(req) {
     const { error: updateErr } = await supabase
       .from("orders")
       .update(updates)
-      .eq("order_id", id);
+      .eq("id", existing.id);
 
     if (updateErr) {
       console.error("Track patch update error:", updateErr);
@@ -427,6 +484,16 @@ export async function PATCH(req) {
         { status: 500 }
       );
     }
+
+    const { data: updated } = await supabase
+      .from("orders")
+      .select(
+        "id, order_id, customer_name, phone, address, items, total_price, payment_method, status, created_at"
+      )
+      .eq("id", existing.id)
+      .maybeSingle();
+
+    if (updated) postOrderSheetsWebhook("update", updated);
 
     return Response.json({ success: true });
   } catch (err) {

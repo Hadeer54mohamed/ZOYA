@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ArrowLeft, Loader2, ShoppingBag, AlertCircle, Copy, Check, PackageSearch, Wallet, ChevronDown, Tag, X, Search } from "lucide-react";
 import Link from "next/link";
-import { SHIPPING_FEES } from "../lib/shipping";
 import { validateCheckoutForm } from "../lib/validation";
 
 const INSTAPAY_NUMBER =  process.env.NEXT_PUBLIC_INSTAPAY_NUMBER;
@@ -35,12 +34,33 @@ export default function CheckoutPage() {
   const govRef = useRef(null);
   const govSearchRef = useRef(null);
 
+  const [shippingFees, setShippingFees] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/shipping");
+        const data = await res.json().catch(() => ({}));
+        const fees =
+          data?.fees && typeof data.fees === "object" ? data.fees : null;
+        if (!cancelled) setShippingFees(fees ?? {});
+      } catch {
+        if (!cancelled) setShippingFees({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const filteredGovernorates = useMemo(() => {
-    const all = Object.keys(SHIPPING_FEES);
+    if (!shippingFees) return [];
+    const all = Object.keys(shippingFees);
     const q = govQuery.trim().toLowerCase();
     if (!q) return all;
     return all.filter((g) => g.toLowerCase().includes(q));
-  }, [govQuery]);
+  }, [govQuery, shippingFees]);
 
   useEffect(() => {
     if (!govOpen) {
@@ -87,7 +107,9 @@ export default function CheckoutPage() {
   const codeAbortRef = useRef(null);
   const discountInputRef = useRef(null);
 
-  const shippingFee = SHIPPING_FEES[form.governorate] || 0;
+  const shippingFee = shippingFees
+    ? shippingFees[form.governorate] || 0
+    : 0;
 
   const discountAmount = useMemo(() => {
     if (!discount) return 0;
@@ -235,8 +257,8 @@ export default function CheckoutPage() {
   });
 
   const { errors, isValid: isFormValid } = useMemo(
-    () => validateCheckoutForm(form, SHIPPING_FEES),
-    [form]
+    () => validateCheckoutForm(form, shippingFees ?? {}),
+    [form, shippingFees]
   );
 
   const handleNext = () => {
@@ -569,6 +591,16 @@ export default function CheckoutPage() {
                   <label className="text-xs uppercase tracking-widest ml-1">
                     Governorate
                   </label>
+                  {shippingFees === null && (
+                    <p className="text-[11px] text-black/45 dark:text-white/45 ml-1">
+                      Loading delivery areas…
+                    </p>
+                  )}
+                  {shippingFees && Object.keys(shippingFees).length === 0 && (
+                    <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90 ml-1">
+                      No shipping regions configured. Check Sanity or contact support.
+                    </p>
+                  )}
 
                   <div className="relative" ref={govRef}>
                     <button
@@ -667,7 +699,7 @@ export default function CheckoutPage() {
                                     >
                                       <span>{gov}</span>
                                       <span className="text-[10px] uppercase tracking-widest text-black/40 dark:text-white/40">
-                                        EGP {SHIPPING_FEES[gov]}
+                                        EGP {shippingFees?.[gov] ?? "—"}
                                       </span>
                                     </button>
                                   </li>
