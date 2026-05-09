@@ -1,15 +1,20 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
-import { getShippingFee, isValidGovernorate } from "../../lib/shipping";
+import {
+  getShippingFeeFromMap,
+  isValidGovernorateInMap,
+} from "../../lib/shipping";
+import { getShippingFeesMapCached } from "../../../sanity/lib/shippingFees";
 import {
   getProductCostsByIds,
   reserveStock,
   restoreStock,
 } from "../../../sanity/lib/products";
+import { postOrderSheetsWebhook } from "../../../lib/ordersSheetsWebhook";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY // مهم جدًا (server only)
+  process.env.SUPABASE_SERVICE_ROLE_KEY 
 );
 
 const resend = process.env.RESEND_API_KEY
@@ -20,7 +25,6 @@ const FROM_ADDRESS =
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://zoya-store.com")
   .replace(/\/$/, "");
 const LOGO_URL = process.env.NEXT_PUBLIC_EMAIL_LOGO_URL || "";
-
 const PHONE_RE = /^01[0125][0-9]{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALLOWED_PAYMENT_METHODS = new Set(["cash", "online"]);
@@ -401,7 +405,13 @@ export async function POST(req) {
       );
     }
 
-    if (!isValidGovernorate(governorate)) {
+    const trimmedGovernorate =
+      typeof governorate === "string"
+        ? governorate.trim()
+        : String(governorate ?? "").trim();
+
+    const shippingFeesMap = await getShippingFeesMapCached();
+    if (!isValidGovernorateInMap(shippingFeesMap, trimmedGovernorate)) {
       return Response.json(
         { error: "Please select a valid governorate." },
         { status: 400 }
@@ -470,7 +480,10 @@ export async function POST(req) {
     const costComplete = sanitizedItems.every((it) => it.cost_known);
 
     // Recalculate shipping server-side based on governorate.
-    const shippingFee = getShippingFee(governorate);
+    const shippingFee = getShippingFeeFromMap(
+      shippingFeesMap,
+      trimmedGovernorate
+    );
 
     // Recalculate subtotal/cost from the server-trusted prices above.
     const itemsSubtotal = sanitizedItems.reduce(
@@ -603,7 +616,7 @@ export async function POST(req) {
           phone: trimmedPhone,
           email: trimmedEmail,
           address: trimmedAddress,
-          governorate,
+          governorate: trimmedGovernorate,
           payment_method: paymentMethod,
           shipping_fee: shippingFee,
           items: sanitizedItems,
@@ -702,6 +715,7 @@ export async function POST(req) {
         createdAt: data.created_at,
       }),
     });
+    postOrderSheetsWebhook("create", data);
 
     return Response.json({
       success: true,
@@ -790,7 +804,7 @@ export async function PATCH(req) {
     // only email when the status actually changes.
     const { data: existing } = await supabase
       .from("orders")
-      .select("status, items")
+      .select("*")
       .eq("id", id)
       .maybeSingle();
 
@@ -858,10 +872,87 @@ export async function PATCH(req) {
         });
       }
     }
+    postOrderSheetsWebhook("update", data);
 
     return Response.json({ success: true, order: data });
   } catch (err) {
     console.error("Order PATCH unexpected:", err);
+    return Response.json(
+      { success: false, error: "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req) {
+  try {
+    if (!isAuthorizedAdmin(req)) {
+      return Response.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const id = body?.id;
+    const orderId = body?.order_id?.toString?.().trim();
+
+    if (!id && !orderId) {
+      return Response.json(
+        { success: false, error: "Missing order id." },
+        { status: 400 }
+      );
+    }
+
+    let query = supabase
+      .from("orders")
+      .select(
+        "id, order_id, customer_name, phone, address, items, total_price, payment_method, status"
+      );
+
+    if (id) {
+      query = query.eq("id", id);
+    } else {
+      query = query.eq("order_id", orderId);
+    }
+
+    const { data: existing, error: fetchErr } = await query.maybeSingle();
+
+    if (fetchErr) {
+      console.error("Order DELETE lookup error:", fetchErr);
+      return Response.json(
+        { success: false, error: fetchErr.message },
+        { status: 500 }
+      );
+    }
+
+    if (!existing) {
+      return Response.json(
+        { success: false, error: "Order not found." },
+        { status: 404 }
+      );
+    }
+
+    let delQuery = supabase.from("orders").delete();
+    if (id) {
+      delQuery = delQuery.eq("id", id);
+    } else {
+      delQuery = delQuery.eq("order_id", orderId);
+    }
+
+    const { error: deleteErr } = await delQuery;
+    if (deleteErr) {
+      console.error("Order DELETE error:", deleteErr);
+      return Response.json(
+        { success: false, error: deleteErr.message },
+        { status: 500 }
+      );
+    }
+    postOrderSheetsWebhook("delete", existing);
+
+    return Response.json({ success: true });
+  } catch (err) {
+    console.error("Order DELETE unexpected:", err);
     return Response.json(
       { success: false, error: "Server error" },
       { status: 500 }

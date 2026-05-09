@@ -240,6 +240,7 @@ export default function HorizontalProductSection({ products = [] }) {
       {/* Quick View Modal */}
       {selectedProduct && (
         <QuickView
+          key={selectedProduct.id}
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
         />

@@ -11,11 +11,21 @@ import { Lock, Truck, RotateCcw, ShieldCheck } from "lucide-react";
 // Normalize color to support both legacy `image` and new `images[]`
 const colorImage = (c) => c?.images?.[0] || c?.image;
 
-export default function QuickView({ product, onClose }) {
+export default function QuickView({ product, onClose, initialColor = null }) {
   const { addToCart, cartIconRef, setIsCartOpen } = useCart();
 
-  const [selectedColor, setSelectedColor] = useState(product.colors[0]);
-  const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
+  const defaultColor =
+    initialColor ??
+    (Array.isArray(product?.colors) && product.colors.length > 0
+      ? product.colors[0]
+      : {
+          name: "Default",
+          value: "#0a0a0a",
+          images: ["/images/placeholder.jpg"],
+        });
+
+  const [selectedColor, setSelectedColor] = useState(defaultColor);
+  const [selectedSize, setSelectedSize] = useState(null);
   const [qty, setQty] = useState(1);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [flying, setFlying] = useState(false);
@@ -37,6 +47,7 @@ export default function QuickView({ product, onClose }) {
     ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
     : 0;
   const saved = hasDiscount ? (originalPrice - product.price) * qty : 0;
+  const sizesList = Array.isArray(product?.sizes) ? product.sizes : [];
 
   useEffect(() => {
     setImageLoaded(false);
@@ -60,6 +71,8 @@ export default function QuickView({ product, onClose }) {
   };
 
   const handleAddToCart = () => {
+    if (!selectedSize || flying) return;
+
     if (!modalImageRef.current || !cartIconRef?.current) {
       addToCart(product, colorForCart, selectedSize, qty);
       onClose();
@@ -223,7 +236,7 @@ export default function QuickView({ product, onClose }) {
                   </span>
                 </p>
                 <div className="flex gap-3 flex-wrap">
-                  {product.colors.map((c) => (
+                  {(product.colors ?? []).map((c) => (
                     <button
                       key={c.name}
                       onClick={() => setSelectedColor(c)}
@@ -245,7 +258,7 @@ export default function QuickView({ product, onClose }) {
                   Select Size
                 </p>
                 <div className="flex gap-2 flex-wrap">
-                  {product.sizes.map((s) => (
+                  {sizesList.map((s) => (
                     <button
                       key={s}
                       onClick={() => setSelectedSize(s)}
@@ -305,12 +318,18 @@ export default function QuickView({ product, onClose }) {
 
                 <button
                   onClick={handleAddToCart}
-                  disabled={flying}
+                  disabled={
+                    flying || !selectedSize || sizesList.length === 0
+                  }
                   className="flex-1 min-w-0 h-11 sm:h-12 rounded-xl sm:rounded-2xl bg-[#FF4DA3] text-white text-[11px] sm:text-xs font-black tracking-[0.08em] sm:tracking-[0.1em] uppercase hover:shadow-[0_0_30px_-5px_#FF4DA3] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 px-2 truncate"
                 >
                   {flying
                     ? "Processing..."
-                    : `Add To Bag • EGP ${(product.price * qty).toFixed(0)}`}
+                    : sizesList.length === 0
+                      ? "Not available"
+                      : !selectedSize
+                        ? "Choose your size"
+                        : `Add To Bag • EGP ${(product.price * qty).toFixed(0)}`}
                 </button>
               </div>
 

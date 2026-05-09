@@ -35,6 +35,15 @@ export function CartProvider({ children }) {
   }, [cart, hydrated]);
 
   const addToCart = (product, selectedColor, selectedSize, quantity = 1) => {
+    if (
+      !product?.id ||
+      selectedSize == null ||
+      String(selectedSize).trim() === "" ||
+      !selectedColor?.name
+    ) {
+      return;
+    }
+
     const qty = Math.max(1, Number(quantity) || 1);
 
     setCart((prev) => {

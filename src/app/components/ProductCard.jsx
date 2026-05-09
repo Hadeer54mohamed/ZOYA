@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
 import Skeleton from "./Skeleton";
 import Image from "next/image";
-import { useCart } from "../context/CartContext";
-
 const FALLBACK_COLOR = {
   name: "Default",
   value: "#0a0a0a",
@@ -21,15 +19,9 @@ export default function ProductCard({ product }) {
     Array.isArray(product?.colors) && product.colors.length > 0
       ? product.colors
       : [FALLBACK_COLOR];
-  const sizes =
-    Array.isArray(product?.sizes) && product.sizes.length > 0
-      ? product.sizes
-      : ["M"];
   const [activeColor, setActiveColor] = useState(colors[0]);
   const [isLoaded, setIsLoaded] = useState(false);
   const imgWrapRef = useRef(null);
-  const { addToCart } = useCart();
-  const [added, setAdded] = useState(false);
 
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
@@ -48,6 +40,10 @@ export default function ProductCard({ product }) {
 
   const stop = (e) => e.stopPropagation();
   const openQuickView = () => setIsOpen(true);
+  const stopAndOpenQuickView = (e) => {
+    stop(e);
+    setIsOpen(true);
+  };
 
   useEffect(() => {
     setIsLoaded(false);
@@ -59,24 +55,6 @@ export default function ProductCard({ product }) {
 
   const goToProduct = () => {
     router.push(`/product/${product.id}`);
-  };
-
-  const handleQuickAdd = (e) => {
-    stop(e);
-    const defaultSize = sizes[0];
-    const colorForCart = {
-      name: activeColor.name,
-      value: activeColor.value,
-      image: activeColor.images?.[0],
-    };
-    addToCart(product, colorForCart, defaultSize, 1);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 600);
-  };
-
-  const handleQuickView = (e) => {
-    stop(e);
-    setIsOpen(true);
   };
 
   return (
@@ -193,43 +171,25 @@ export default function ProductCard({ product }) {
               </svg>
             </button>
             <motion.button
-              onClick={handleQuickAdd}
-              animate={added ? { scale: [1, 1.3, 1] } : { scale: 1 }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              aria-label="Quick add"
-              className={`h-9 w-9 grid place-items-center rounded-full shadow-lg active:scale-90 transition-colors ${added
-                ? "bg-green-500 text-white"
-                : "bg-[#FF4DA3] text-black"
-                }`}
+              type="button"
+              onClick={stopAndOpenQuickView}
+              whileTap={{ scale: 0.92 }}
+              aria-label="Quick view — choose color and size"
+              className="h-9 w-9 grid place-items-center rounded-full shadow-lg bg-[#FF4DA3] text-black"
             >
-              {added ? (
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              ) : (
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 5v14" />
-                  <path d="M5 12h14" />
-                </svg>
-              )}
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
             </motion.button>
           </div>
 
@@ -237,49 +197,32 @@ export default function ProductCard({ product }) {
           <div className="hidden md:block absolute bottom-0 left-0 right-0 p-3 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition duration-300 z-[3]">
             <div className="flex gap-2">
               <button
-                onClick={handleQuickView}
+                type="button"
+                onClick={stopAndOpenQuickView}
                 className="flex-1 px-4 py-2.5 text-xs font-semibold rounded-full bg-white text-black hover:bg-white/90 transition"
               >
                 Quick View
               </button>
               <motion.button
-                onClick={handleQuickAdd}
-                animate={added ? { scale: [1, 1.3, 1] } : { scale: 1 }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                aria-label="Add to cart"
-                className={`h-10 w-10 grid place-items-center rounded-full hover:scale-105 transition-colors ${added
-                  ? "bg-green-500 text-white"
-                  : "bg-[#FF4DA3] text-black"
-                  }`}
+                type="button"
+                onClick={stopAndOpenQuickView}
+                whileTap={{ scale: 0.92 }}
+                aria-label="Quick view — choose color and size"
+                className="h-10 w-10 grid place-items-center rounded-full hover:scale-105 bg-[#FF4DA3] text-black"
               >
-                {added ? (
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 5v14" />
-                    <path d="M5 12h14" />
-                  </svg>
-                )}
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
               </motion.button>
             </div>
           </div>
@@ -365,7 +308,11 @@ export default function ProductCard({ product }) {
 
 
       {isOpen && (
-        <QuickView product={product} onClose={() => setIsOpen(false)} />
+        <QuickView
+          product={product}
+          initialColor={activeColor}
+          onClose={() => setIsOpen(false)}
+        />
       )}
 
     </>

@@ -26,7 +26,6 @@ import {
   Search,
   PackagePlus,
 } from "lucide-react";
-import { SHIPPING_FEES } from "../lib/shipping";
 
 const SUPPORT = {
   whatsapp: "201095894883",
@@ -104,6 +103,26 @@ function TrackContent() {
   const [editSuccess, setEditSuccess] = useState(false);
   const [govOpen, setGovOpen] = useState(false);
   const govRef = useRef(null);
+
+  const [shippingFees, setShippingFees] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/shipping");
+        const data = await res.json().catch(() => ({}));
+        const fees =
+          data?.fees && typeof data.fees === "object" ? data.fees : null;
+        if (!cancelled) setShippingFees(fees ?? {});
+      } catch {
+        if (!cancelled) setShippingFees({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Catalog for "add a product" UI in the editor.
   const [catalog, setCatalog] = useState([]);
@@ -1053,7 +1072,7 @@ function TrackContent() {
                               role="listbox"
                               className="max-h-60 overflow-y-auto py-1 custom-scrollbar"
                             >
-                              {Object.keys(SHIPPING_FEES).map((gov) => {
+                              {(shippingFees ? Object.keys(shippingFees) : []).map((gov) => {
                                 const isSelected = editForm.governorate === gov;
                                 return (
                                   <li key={gov} role="option" aria-selected={isSelected}>
@@ -1070,7 +1089,7 @@ function TrackContent() {
                                     >
                                       <span>{gov}</span>
                                       <span className="text-[10px] uppercase tracking-widest text-black/40 dark:text-white/40">
-                                        EGP {SHIPPING_FEES[gov]}
+                                        EGP {shippingFees?.[gov] ?? "—"}
                                       </span>
                                     </button>
                                   </li>
