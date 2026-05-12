@@ -34,6 +34,14 @@ export function validateEmail(value) {
   return "";
 }
 
+/** Empty is OK; if the user types something it must look like an email. */
+export function validateEmailOptional(value) {
+  const v = (value ?? "").toString().trim();
+  if (!v) return "";
+  if (!EMAIL_RE.test(v)) return "Please enter a valid email address";
+  return "";
+}
+
 export function validateAddress(value) {
   const v = (value ?? "").toString().trim();
   if (v.length < MIN_ADDRESS_LENGTH) {
@@ -69,7 +77,7 @@ export function validateCheckoutForm(form, governorates) {
   const errors = {
     name: validateName(form?.name),
     phone: validatePhone(form?.phone),
-    email: validateEmail(form?.email),
+    email: validateEmailOptional(form?.email),
     address: validateAddress(form?.address),
     governorate: validateGovernorate(form?.governorate, governorates),
   };

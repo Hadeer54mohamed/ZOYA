@@ -28,8 +28,8 @@ export default async function Home() {
       <HorizontalProductSection products={products} />
       <BrandSection />
       <Testimonials testimonials={testimonials} />
-      <ReelsGallery reels={reels} />
-      <SocialSection />
+{/*       <ReelsGallery reels={reels} />
+ */}      <SocialSection />
     </main>
   );
 }

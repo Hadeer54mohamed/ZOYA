@@ -2,75 +2,74 @@ import LegalPage from "../components/LegalPage";
 
 export const metadata = {
   title: "Terms of Service · ZØYA",
-  description: "The rules of the road for using ZØYA.",
+  description: "The rules and policies for shopping with ZØYA.",
 };
 
 const sections = [
   {
+    anchor: "acceptance-of-terms",
     title: "Acceptance of Terms",
     content: [
-      "By accessing or placing an order on ZØYA, you agree to these Terms of Service. If you don't agree, please don't use the site — it's that simple.",
+      "By accessing or placing an order on ZØYA, you agree to these Terms of Service. If you do not agree with any part of these terms, please do not use the website.",
     ],
   },
   {
-    title: "Your Account",
+    anchor: "orders-payment",
+    title: "Orders & Payment",
     content: [
-      "You're responsible for keeping your login credentials safe. Any activity under your account is your responsibility. Notify us immediately if you suspect unauthorized access.",
+      "All prices are listed in EGP unless otherwise stated. We reserve the right to refuse or cancel orders in cases including stock availability issues, pricing mistakes, or suspected fraudulent activity.",
+      "Orders are confirmed only after successful payment verification or order confirmation for Cash on Delivery orders.",
       [
-        "Provide accurate info when signing up.",
-        "One account per person.",
-        "Don't share your password with anyone.",
-        "Accounts inactive for 24+ months may be archived.",
+        "ZØYA currently sells clothing products including t-shirts and pants.",
+        "Product availability may change without notice.",
+        "We accept online payment methods and Cash on Delivery where available.",
       ],
     ],
   },
   {
-    title: "Orders & Payment",
-    content: [
-      "All prices are in EGP unless otherwise stated. We reserve the right to refuse or cancel orders at our discretion — usually only for stock issues, pricing errors, or suspected fraud.",
-      "Payment is due at checkout. We accept credit/debit cards and cash on delivery (where available). Orders aren't confirmed until payment is verified.",
-    ],
-  },
-  {
+    anchor: "shipping-delivery",
     title: "Shipping & Delivery",
     content: [
-      "We ship across Egypt within 2–5 business days. International shipping timelines vary by region. Delays caused by shipping partners or customs are outside our control — but we'll always keep you updated.",
+      "We currently ship to governorates across Egypt only.",
+      "Orders are usually delivered within 2–5 business days depending on the shipping location and courier service.",
+      "While we always aim for timely delivery, delays caused by shipping companies or unexpected circumstances may occur.",
     ],
   },
   {
+    anchor: "returns-refunds",
     title: "Returns & Refunds",
     content: [
-      "Not vibing with your order? You have 14 days from delivery to request a return.",
+      "You may request a return within 14 days of receiving your order.",
       [
-        "Items must be unworn, unwashed, and in original packaging.",
-        "Sale items and underwear are final sale.",
-        "Refunds are processed within 7 business days of receiving the return.",
-        "Return shipping costs are covered by the customer unless the item arrived defective.",
+        "Products must be unused, unwashed, and in their original condition.",
+        "Items must include original packaging and tags where applicable.",
+        "Returns may be rejected if products show signs of use, washing, damage, or alteration.",
+        "Refunds are processed after the returned items are inspected and approved.",
       ],
     ],
   },
   {
     title: "Intellectual Property",
     content: [
-      "Everything you see — logos, designs, graphics, product photos, and copy — belongs to ZØYA. You're welcome to share our content on social media (we love that!), but commercial use requires explicit permission.",
+      "All content on ZØYA — including logos, designs, graphics, product images, and written content — is owned by ZØYA and protected under applicable intellectual property laws.",
     ],
   },
   {
     title: "Limitation of Liability",
     content: [
-      "ZØYA provides this site and products 'as is'. While we strive for flawless service, we aren't liable for indirect damages, lost profits, or issues outside our reasonable control.",
+      "ZØYA is not responsible for indirect damages, delays outside our control, or losses resulting from misuse of the website or products.",
     ],
   },
   {
     title: "Changes to Terms",
     content: [
-      "We may update these terms occasionally. Material changes will be announced via email or a banner on the site. Continued use of ZØYA means you accept the updated terms.",
+      "We may update these Terms of Service from time to time. Continued use of the website after updates means you accept the revised terms.",
     ],
   },
   {
     title: "Governing Law",
     content: [
-      "These terms are governed by the laws of the Arab Republic of Egypt. Any disputes will be resolved in Egyptian courts.",
+      "These terms are governed by the laws of the Arab Republic of Egypt. Any disputes will be handled through the Egyptian courts.",
     ],
   },
 ];
@@ -79,8 +78,8 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms of Service"
-      tagline="The agreement between you and ZØYA — written to be read, not skipped."
-      updatedAt="April 2026"
+      tagline="Clear, simple terms for shopping with ZØYA."
+      updatedAt="May 2026"
       sections={sections}
     />
   );

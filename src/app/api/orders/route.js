@@ -36,24 +36,82 @@ const ALLOWED_STATUSES = new Set([
   "cancelled",
 ]);
 
+function safeJson(value) {
+  try {
+    return JSON.stringify(value, (k, v) => {
+      if (v instanceof Error) {
+        return {
+          name: v.name,
+          message: v.message,
+          statusCode: v.statusCode,
+        };
+      }
+      return v;
+    });
+  } catch {
+    try {
+      return String(value);
+    } catch {
+      return "[unserializable]";
+    }
+  }
+}
+
 // Fire-and-forget email helper. Email failures must NEVER break the order flow.
-function sendEmailSafe(payload) {
+async function sendEmailSafe(payload, { timeoutMs = 8000 } = {}) {
   if (!resend) {
     console.warn("[orders] RESEND_API_KEY missing — skipping email.");
     return;
   }
-  resend.emails
-    .send({ from: FROM_ADDRESS, ...payload })
-    .then((result) => {
-      if (result?.error) {
-        console.error("[orders] Resend send failed:", result.error);
-      } else {
-        console.log("[orders] Email queued:", result?.data?.id);
-      }
-    })
-    .catch((err) => {
-      console.error("[orders] Resend threw:", err);
-    });
+
+  const meta = {
+    to: payload?.to,
+    subject: payload?.subject,
+  };
+
+  try {
+    const sendPromise = resend.emails.send({ from: FROM_ADDRESS, ...payload });
+    const result = await Promise.race([
+      sendPromise,
+      new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              data: null,
+              error: new Error(
+                `Timed out after ${timeoutMs}ms while sending email`
+              ),
+            }),
+          timeoutMs
+        )
+      ),
+    ]);
+
+    if (result?.error) {
+      const errInfo = {
+        name: result.error?.name,
+        message: result.error?.message,
+        statusCode: result.error?.statusCode ?? null,
+        cause: result.error?.cause ? String(result.error.cause) : null,
+      };
+      console.error(
+        `[orders] Resend send failed meta=${safeJson(meta)} err=${safeJson(errInfo)}`
+      );
+    } else {
+      console.log("[orders] Email queued:", meta, result?.data?.id);
+    }
+    return result;
+  } catch (err) {
+    const errInfo = {
+      name: err?.name,
+      message: err?.message,
+      statusCode: err?.statusCode ?? null,
+      cause: err?.cause ? String(err.cause) : null,
+    };
+    console.error(
+      `[orders] Resend threw meta=${safeJson(meta)} err=${safeJson(errInfo)}`
+    );
+  }
 }
 
 function escapeHtml(str) {
@@ -366,7 +424,7 @@ export async function POST(req) {
       discount_code,
     } = body;
 
-    if (!name || !phone || !email || !address || !items?.length) {
+    if (!name || !phone || !address || !items?.length) {
       return Response.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -389,8 +447,11 @@ export async function POST(req) {
       );
     }
 
-    const trimmedEmail = email.toString().trim().toLowerCase();
-    if (!EMAIL_RE.test(trimmedEmail)) {
+    const emailRaw =
+      email === null || email === undefined ? "" : email.toString().trim();
+    const trimmedEmail =
+      emailRaw === "" ? null : emailRaw.toLowerCase();
+    if (trimmedEmail !== null && !EMAIL_RE.test(trimmedEmail)) {
       return Response.json(
         { error: "Please enter a valid email address." },
         { status: 400 }
@@ -698,28 +759,53 @@ export async function POST(req) {
       }
     }
 
-    // Fire-and-forget confirmation email — must not block or fail the order.
-    sendEmailSafe({
-      to: trimmedEmail,
-      subject: "Your Order is Confirmed 🖤",
-      html: buildOrderConfirmedHtml({
-        orderId: data.order_id || data.id,
-        customerName: trimmedName,
-        items: sanitizedItems,
-        subtotal: itemsSubtotal,
-        shippingFee,
-        discountAmount,
-        discountCode: appliedCode,
-        total: totalPrice,
-        paymentMethod,
-        createdAt: data.created_at,
-      }),
-    });
+    // Email should not block the order, but we still capture the outcome in dev.
+    let emailResult;
+    if (trimmedEmail) {
+      emailResult = await sendEmailSafe({
+        to: trimmedEmail,
+        subject: "Order Confirmation",
+        replyTo: "support@zoya-store.com",
+        headers: {
+          // Keep a stable entity id for threading/dedup on the provider side.
+          "X-Entity-Ref-ID": String(data.order_id || data.id),
+          "List-Unsubscribe": "<mailto:unsubscribe@zoya-store.com>",
+        },
+        html: buildOrderConfirmedHtml({
+          orderId: data.order_id || data.id,
+          customerName: trimmedName,
+          items: sanitizedItems,
+          subtotal: itemsSubtotal,
+          shippingFee,
+          discountAmount,
+          discountCode: appliedCode,
+          total: totalPrice,
+          paymentMethod,
+          createdAt: data.created_at,
+        }),
+      });
+    }
     postOrderSheetsWebhook("create", data);
 
     return Response.json({
       success: true,
       order: data,
+      ...(process.env.NODE_ENV !== "production"
+        ? {
+            email: {
+              to: trimmedEmail,
+              skipped: !trimmedEmail,
+              id: emailResult?.data?.id ?? null,
+              error: emailResult?.error
+                ? {
+                    name: emailResult.error?.name,
+                    message: emailResult.error?.message,
+                    statusCode: emailResult.error?.statusCode ?? null,
+                  }
+                : null,
+            },
+          }
+        : {}),
     });
 
   } catch (err) {
@@ -865,9 +951,14 @@ export async function PATCH(req) {
         customerName: data.customer_name,
       });
       if (tpl) {
-        sendEmailSafe({
+        await sendEmailSafe({
           to: data.email,
           subject: tpl.subject,
+          replyTo: "support@zoya-store.com",
+          headers: {
+            "X-Entity-Ref-ID": String(data.order_id || data.id),
+            "List-Unsubscribe": "<mailto:unsubscribe@zoya-store.com>",
+          },
           html: tpl.html,
         });
       }
@@ -907,7 +998,7 @@ export async function DELETE(req) {
     let query = supabase
       .from("orders")
       .select(
-        "id, order_id, customer_name, phone, address, items, total_price, payment_method, status"
+        "id, order_id, customer_name, phone, address, items, total_price, payment_method, status, discount_code"
       );
 
     if (id) {
@@ -931,6 +1022,85 @@ export async function DELETE(req) {
         { success: false, error: "Order not found." },
         { status: 404 }
       );
+    }
+
+    // If the order is being deleted, undo its reserved stock first (best-effort).
+    // This prevents "oversold" alerts if an admin deletes orders instead of
+    // cancelling them. If it was already cancelled, stock should already be
+    // restored in PATCH.
+    try {
+      const items = Array.isArray(existing?.items) ? existing.items : [];
+      if (existing.status !== "cancelled" && items.length > 0) {
+        const result = await restoreStock(items);
+        if (!result?.ok) {
+          console.error(
+            "[orders DELETE] restoreStock failed for order",
+            existing.order_id || existing.id,
+            result
+          );
+        }
+      }
+    } catch (err) {
+      console.error(
+        "[orders DELETE] restoreStock threw for order",
+        existing.order_id || existing.id,
+        err
+      );
+    }
+
+    // If this order used a discount, remove its usage record so the same phone
+    // can use the code again after a full admin delete. Then decrement the
+    // code-level usage counter to keep global limits consistent.
+    if (existing.discount_code) {
+      let usageRow = null;
+      const { data: usageByOrder } = await supabase
+        .from("discount_usages")
+        .select("id")
+        .eq("order_id", existing.id)
+        .maybeSingle();
+      usageRow = usageByOrder ?? null;
+
+      if (!usageRow && existing.phone) {
+        const { data: usageByCodePhone } = await supabase
+          .from("discount_usages")
+          .select("id")
+          .eq("code", existing.discount_code)
+          .eq("phone", existing.phone)
+          .maybeSingle();
+        usageRow = usageByCodePhone ?? null;
+      }
+
+      if (usageRow?.id) {
+        const { error: usageDeleteErr } = await supabase
+          .from("discount_usages")
+          .delete()
+          .eq("id", usageRow.id);
+        if (usageDeleteErr) {
+          console.error("[orders DELETE] discount usage delete error:", usageDeleteErr);
+        } else {
+          const { data: discountRow } = await supabase
+            .from("discount_codes")
+            .select("usage_count")
+            .eq("code", existing.discount_code)
+            .maybeSingle();
+          if (discountRow) {
+            const nextCount = Math.max(
+              0,
+              Number(discountRow.usage_count || 0) - 1
+            );
+            const { error: discountUpdateErr } = await supabase
+              .from("discount_codes")
+              .update({ usage_count: nextCount })
+              .eq("code", existing.discount_code);
+            if (discountUpdateErr) {
+              console.error(
+                "[orders DELETE] discount usage_count decrement error:",
+                discountUpdateErr
+              );
+            }
+          }
+        }
+      }
     }
 
     let delQuery = supabase.from("orders").delete();

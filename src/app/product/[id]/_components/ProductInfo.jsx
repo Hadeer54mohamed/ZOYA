@@ -4,6 +4,7 @@ import { forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Plus, Truck, ShieldCheck, RotateCcw } from "lucide-react";
 import AddToCartButton from "./AddToCartButton";
+import ReturnPolicyNotice from "../../../components/ReturnPolicyNotice";
 
 const SIZE_FIT = {
   S: "Slim fit",
@@ -188,6 +189,8 @@ const ProductInfo = forwardRef(function ProductInfo(
         priceLabel={`EGP ${(product.price * quantity).toLocaleString()}`}
         hintText={!selectedSize ? "Choose your size to continue" : null}
       />
+
+      <ReturnPolicyNotice className="mt-2" />
 
       {/* Perks */}
       <div className="pt-8 border-t border-black/10 dark:border-white/5">

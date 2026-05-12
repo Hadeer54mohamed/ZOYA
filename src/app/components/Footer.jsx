@@ -263,7 +263,7 @@ export default function Footer() {
               <span className="text-[9px] tracking-[0.2em] normal-case flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-black/60 dark:text-white/60 leading-snug">
                 <span className="uppercase">Designed &amp; Developed by</span>
                 <a
-                  href="https://wa.me/201095894883"
+                  href="https://wa.me/201062801851"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-black dark:text-white font-bold hover:text-[#FF4DA3] transition-colors whitespace-nowrap inline-flex items-center gap-1"

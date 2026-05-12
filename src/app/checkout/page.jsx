@@ -4,11 +4,11 @@ import { useCart } from "../context/CartContext";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ArrowLeft, Loader2, ShoppingBag, AlertCircle, Copy, Check, PackageSearch, Wallet, ChevronDown, Tag, X, Search } from "lucide-react";
+import { CheckCircle2, ArrowLeft, Loader2, ShoppingBag, AlertCircle, Copy, Check, PackageSearch, ChevronDown, Tag, X, Search } from "lucide-react";
 import Link from "next/link";
 import { validateCheckoutForm } from "../lib/validation";
-
-const INSTAPAY_NUMBER =  process.env.NEXT_PUBLIC_INSTAPAY_NUMBER;
+import ReturnPolicyNotice from "../components/ReturnPolicyNotice";
+import InstapayNotice, { INSTAPAY_NUMBER_ENV } from "../components/InstapayNotice";
 
 export default function CheckoutPage() {
   const discountCache = useRef({});
@@ -29,6 +29,8 @@ export default function CheckoutPage() {
   const [placedOrderId, setPlacedOrderId] = useState("");
   const [copied, setCopied] = useState(false);
   const [instapayCopied, setInstapayCopied] = useState(false);
+  const [instapayTransferConfirmed, setInstapayTransferConfirmed] = useState(false);
+  const [orderCelebrating, setOrderCelebrating] = useState(false);
   const [govOpen, setGovOpen] = useState(false);
   const [govQuery, setGovQuery] = useState("");
   const govRef = useRef(null);
@@ -95,7 +97,18 @@ export default function CheckoutPage() {
     address: "",
     governorate: "",
     paymentMethod: "cash", // cash | online
+    senderNumber: "",
+    transactionReference: "",
+    paymentProof: null,
   });
+
+  useEffect(() => {
+    if (form.paymentMethod !== "online") setInstapayTransferConfirmed(false);
+  }, [form.paymentMethod]);
+
+  useEffect(() => {
+    if (step !== 2) setInstapayTransferConfirmed(false);
+  }, [step]);
 
   const [code, setCode] = useState("");
   const [discount, setDiscount] = useState(null);
@@ -285,8 +298,11 @@ export default function CheckoutPage() {
   };
 
   const handleCopyInstapay = async () => {
+    const n =
+      INSTAPAY_NUMBER_ENV != null ? String(INSTAPAY_NUMBER_ENV).trim() : "";
+    if (!n) return;
     try {
-      await navigator.clipboard.writeText(INSTAPAY_NUMBER);
+      await navigator.clipboard.writeText(n);
       setInstapayCopied(true);
       setTimeout(() => setInstapayCopied(false), 2000);
     } catch {
@@ -296,6 +312,14 @@ export default function CheckoutPage() {
 
   const handleOrder = async () => {
     if (loading || submittingRef.current) return;
+    if (
+      form.paymentMethod === "online" &&
+      (
+        !instapayTransferConfirmed ||
+        !form.senderNumber.trim() ||
+        !form.transactionReference.trim()
+      )
+    ) return;
     submittingRef.current = true;
     setLoading(true);
     setSubmitError("");
@@ -321,7 +345,9 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           name: form.name.trim(),
           phone: form.phone.trim(),
-          email: form.email.trim().toLowerCase(),
+          email: form.email.trim()
+            ? form.email.trim().toLowerCase()
+            : null,
           address: form.address.trim(),
           governorate: form.governorate,
           payment_method: form.paymentMethod,
@@ -379,13 +405,21 @@ export default function CheckoutPage() {
       const orderId = result.order?.order_id ?? result.order?.id ?? "";
       console.log("Order placed:", orderId);
       setPlacedOrderId(orderId);
+      submittingRef.current = false;
 
-      clearCart();
-      setStep(3);
-      setTimeout(() => router.prefetch("/"), 500);
+      setOrderCelebrating(true);
+      window.setTimeout(() => {
+        clearCart();
+        setStep(3);
+        setOrderCelebrating(false);
+        setInstapayTransferConfirmed(false);
+      }, 1100);
+
+      window.setTimeout(() => router.prefetch("/"), 500);
     } catch (err) {
       setLoading(false);
       submittingRef.current = false;
+      setOrderCelebrating(false);
       console.error("Unexpected order error:", err);
       setSubmitError(
         err?.message || "An unexpected error occurred. Please try again."
@@ -439,7 +473,55 @@ export default function CheckoutPage() {
     (touched.name || touched.phone || touched.email || touched.address || touched.governorate);
 
   return (
-    <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
+    <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500 relative overflow-x-hidden">
+      <AnimatePresence>
+        {orderCelebrating && (
+          <motion.div
+            key="checkout-success-burst"
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <motion.div
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#FF4DA3]/30"
+              style={{ width: "min(90vw, 420px)", height: "min(90vw, 420px)" }}
+              initial={{ scale: 0.15, opacity: 0.85 }}
+              animate={{ scale: 2.8, opacity: 0 }}
+              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+            />
+            <motion.div
+              className="relative z-10 flex flex-col items-center gap-3"
+              initial={{ scale: 0.35, opacity: 0 }}
+              animate={{ scale: [0.35, 1.12, 1], opacity: 1 }}
+              transition={{ duration: 0.55, times: [0, 0.55, 1], ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="relative">
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-[#FF4DA3]/50 blur-2xl scale-[1.4]"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 1, 0.45] }}
+                  transition={{ duration: 0.5 }}
+                />
+                <CheckCircle2
+                  size={76}
+                  className="text-[#FF4DA3] relative drop-shadow-[0_0_24px_rgba(255,77,163,0.55)]"
+                  strokeWidth={1.15}
+                />
+              </div>
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12, duration: 0.35 }}
+                className="text-[11px] font-bold uppercase tracking-[0.28em] text-black/65 dark:text-white/70"
+              >
+                Order received
+              </motion.p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* STEP INDICATOR */}
       <div className="pt-24 sm:pt-32 pb-6 sm:pb-10 px-4 flex justify-center items-center gap-2 sm:gap-4 text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-medium">
         <span className={`${step >= 1 ? "text-[#FF4DA3]" : "text-black/20 dark:text-white/20"} transition-colors`}>Information</span>
@@ -523,17 +605,19 @@ export default function CheckoutPage() {
                           {errors.phone}
                         </motion.p>
                       )}
-                      
+
                     </AnimatePresence>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs uppercase tracking-widest ml-1">Email</label>
+                    <label className="text-xs uppercase tracking-widest ml-1">
+                      Email <span className="normal-case tracking-normal text-black/40 dark:text-white/40">(optional — for updates)</span>
+                    </label>
                     <input
                       type="email"
                       inputMode="email"
                       autoComplete="email"
-                      placeholder="you@example.com (for order updates)"
+                      placeholder="you@example.com"
                       className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${touched.email && errors.email
                         ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
                         : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
@@ -541,7 +625,6 @@ export default function CheckoutPage() {
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       onBlur={() => handleBlur("email")}
-                      required
                     />
                     <AnimatePresence>
                       {touched.email && errors.email && (
@@ -760,34 +843,11 @@ export default function CheckoutPage() {
                         exit={{ opacity: 0, y: -8, height: 0 }}
                         className="overflow-hidden"
                       >
-                        <div className="mt-3 p-4 rounded-2xl bg-[#FF4DA3]/5 border border-[#FF4DA3]/30 space-y-3">
-                          <div className="flex items-start gap-3">
-                            <Wallet size={18} strokeWidth={2} className="text-[#FF4DA3] shrink-0 mt-0.5" />
-                            <div className="text-sm leading-relaxed">
-                              <p className="font-semibold text-[#FF4DA3] mb-0.5">
-                                Please send payment via InstaPay
-                              </p>
-                              <p className="text-xs text-black/60 dark:text-white/50">
-                                Transfer the total amount to the number below, then place your order. We will confirm once payment is received.
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-black/40 border border-black/5 dark:border-white/5">
-                            <span className="font-mono text-base font-bold tracking-wider text-black dark:text-white select-all">
-                              {INSTAPAY_NUMBER}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={handleCopyInstapay}
-                              aria-label="Copy InstaPay number"
-                              className={`flex-shrink-0 p-2 rounded-full transition-all ${instapayCopied
-                                ? "bg-emerald-500/15 text-emerald-500"
-                                : "bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:bg-[#FF4DA3]/15 hover:text-[#FF4DA3]"
-                                }`}
-                            >
-                              {instapayCopied ? <Check size={15} /> : <Copy size={15} />}
-                            </button>
-                          </div>
+                        <div className="mt-3">
+                          <InstapayNotice
+                            copied={instapayCopied}
+                            onCopy={handleCopyInstapay}
+                          />
                         </div>
                       </motion.div>
                     )}
@@ -811,6 +871,8 @@ export default function CheckoutPage() {
                     )}
                   </AnimatePresence>
 
+                  <ReturnPolicyNotice variant="checkout" className="mt-1" />
+
                   <button
                     onClick={handleNext}
                     disabled={!isFormValid}
@@ -826,8 +888,13 @@ export default function CheckoutPage() {
               <motion.div
                 key="step2"
                 initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
+                animate={{
+                  opacity: orderCelebrating ? 0.12 : 1,
+                  x: 0,
+                  filter: orderCelebrating ? "blur(4px)" : "blur(0px)",
+                }}
                 exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.35 }}
                 className="space-y-8"
               >
                 <button
@@ -853,7 +920,9 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4 gap-3">
                     <span className="text-sm opacity-50 font-light shrink-0">Email</span>
-                    <span className="text-sm font-medium truncate">{form.email}</span>
+                    <span className="text-sm font-medium truncate">
+                      {form.email.trim() ? form.email.trim() : "—"}
+                    </span>
                   </div>
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4">
                     <span className="text-sm opacity-50 font-light">Governorate</span>
@@ -875,35 +944,69 @@ export default function CheckoutPage() {
 
 
                 {form.paymentMethod === "online" && (
-                  <div className="p-4 sm:p-5 rounded-2xl bg-[#FF4DA3]/5 border border-[#FF4DA3]/30 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Wallet size={18} strokeWidth={2} className="text-[#FF4DA3] shrink-0 mt-0.5" />
-                      <div className="text-sm leading-relaxed">
-                        <p className="font-semibold text-[#FF4DA3] mb-0.5">
-                          Please send payment via InstaPay
-                        </p>
-                        <p className="text-xs text-black/60 dark:text-white/50">
-                          Transfer <span className="font-semibold">EGP {finalTotal.toLocaleString()}</span> to the number below before confirming your order.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-black/40 border border-black/5 dark:border-white/5">
-                      <span className="font-mono text-base font-bold tracking-wider text-black dark:text-white select-all">
-                        {INSTAPAY_NUMBER}
+                  <>
+                    <InstapayNotice
+                      amountEgp={finalTotal}
+                      copied={instapayCopied}
+                      onCopy={handleCopyInstapay}
+                    />
+                    <div className="space-y-4">
+  <div className="space-y-2">
+    <label className="text-xs uppercase tracking-widest ml-1">
+      Sender Number
+    </label>
+
+    <input
+      type="tel"
+      placeholder="01XXXXXXXXX"
+      value={form.senderNumber}
+      onChange={(e) =>
+        setForm({
+          ...form,
+          senderNumber: e.target.value.replace(/\D/g, ""),
+        })
+      }
+      className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+    />
+  </div>
+
+  <div className="space-y-2">
+    <label className="text-xs uppercase tracking-widest ml-1">
+      Transaction Reference
+    </label>
+
+    <input
+      type="text"
+      placeholder="Transaction ID / Reference"
+      value={form.transactionReference}
+      onChange={(e) =>
+        setForm({
+          ...form,
+          transactionReference: e.target.value,
+        })
+      }
+      className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+    />
+  </div>
+</div>
+                    <label className="flex items-start gap-3 cursor-pointer rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-4 sm:p-4 transition-colors hover:border-[#FF4DA3]/35">
+                      <input
+                        type="checkbox"
+                        checked={instapayTransferConfirmed}
+                        onChange={(e) =>
+                          setInstapayTransferConfirmed(e.target.checked)
+                        }
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-black/25 text-[#FF4DA3] focus:ring-[#FF4DA3]/40"
+                      />
+                      <span className="text-sm leading-snug text-black/75 dark:text-white/75">
+                        I have completed the InstaPay transfer for{" "}
+                        <span className="font-semibold text-black dark:text-white">
+                          EGP {finalTotal.toLocaleString()}
+                        </span>
+                        .
                       </span>
-                      <button
-                        type="button"
-                        onClick={handleCopyInstapay}
-                        aria-label="Copy InstaPay number"
-                        className={`flex-shrink-0 p-2 rounded-full transition-all ${instapayCopied
-                          ? "bg-emerald-500/15 text-emerald-500"
-                          : "bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:bg-[#FF4DA3]/15 hover:text-[#FF4DA3]"
-                          }`}
-                      >
-                        {instapayCopied ? <Check size={15} /> : <Copy size={15} />}
-                      </button>
-                    </div>
-                  </div>
+                    </label>
+                  </>
                 )}
 
                 <AnimatePresence>
@@ -923,10 +1026,22 @@ export default function CheckoutPage() {
                   )}
                 </AnimatePresence>
 
+                <ReturnPolicyNotice variant="checkout" className="mt-1" />
+
                 <button
                   onClick={handleOrder}
-                  disabled={loading}
-                  className="w-full py-5 rounded-2xl bg-black dark:bg-white text-white dark:text-black font-bold tracking-widest uppercase text-sm transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={
+                    loading ||
+                    (
+                      form.paymentMethod === "online" &&
+                      (
+                        !instapayTransferConfirmed ||
+                        !form.senderNumber.trim() ||
+                        !form.transactionReference.trim()
+                      )
+                    )
+                  }
+                  className="w-full py-5 rounded-2xl bg-black dark:bg-white text-white dark:text-black font-bold tracking-widest uppercase text-sm transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100"
                 >
                   {loading ? (
                     <><Loader2 className="animate-spin" size={20} /> Processing Order...</>
@@ -940,8 +1055,9 @@ export default function CheckoutPage() {
             {step === 3 && (
               <motion.div
                 key="step3"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, y: 32, scale: 0.94 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                 className="min-h-[60vh] w-full max-w-2xl mx-auto flex flex-col items-center justify-center text-center py-16 space-y-6"
               >
                 <div className="relative">
@@ -1014,7 +1130,15 @@ export default function CheckoutPage() {
 
         {/* RIGHT COLUMN: Order Summary (5 cols) - shows first on mobile */}
         {step < 3 && (
-          <div className="md:col-span-5 order-1 md:order-2">
+          <motion.div
+            className="md:col-span-5 order-1 md:order-2"
+            animate={{
+              opacity: orderCelebrating ? 0.22 : 1,
+              scale: orderCelebrating ? 0.94 : 1,
+              y: orderCelebrating ? 20 : 0,
+            }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          >
             <div className="md:sticky md:top-32 p-5 sm:p-8 rounded-2xl sm:rounded-[2rem] bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5">
               <div className="flex items-center gap-2 mb-5 sm:mb-8 border-b border-black/5 dark:border-white/5 pb-4">
                 <ShoppingBag size={18} className="text-[#FF4DA3]" />
@@ -1023,7 +1147,7 @@ export default function CheckoutPage() {
 
               <div className="space-y-4 sm:space-y-6 max-h-[35vh] sm:max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                 {cart.map((item) => (
-                  <div key={`${item.id}-${item.color?.name || "default"}`} className="flex gap-3 sm:gap-4 items-center">
+                  <div key={`${item.id}-${item.color?.name || "default"}-${item.size}`} className="flex gap-3 sm:gap-4 items-center">
                     <div className="w-14 h-16 sm:w-16 sm:h-20 bg-black/5 dark:bg-white/5 rounded-xl overflow-hidden flex-shrink-0">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                     </div>
@@ -1183,14 +1307,14 @@ export default function CheckoutPage() {
                     >
                       EGP {finalTotal.toLocaleString()}
                     </motion.span>
-                    <div className="text-[9px] sm:text-[10px] opacity-30 uppercase tracking-widest mt-1">
+                    {/*  <div className="text-[9px] sm:text-[10px] opacity-30 uppercase tracking-widest mt-1">
                       Including VAT
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
       </section>

@@ -296,6 +296,28 @@ function AdminDashboard({ password }) {
     }
   };
 
+  const deleteOrderPermanently = async (order) => {
+    const ok = window.confirm(
+      "Delete this order permanently?\n\nThis will:\n- remove the order from Supabase\n- restore stock if needed\n\nThis cannot be undone."
+    );
+    if (!ok) return;
+    try {
+      const res = await adminFetch("/api/orders", {
+        method: "DELETE",
+        body: JSON.stringify({ id: order.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        alert(data?.error || "Failed to delete order.");
+        return;
+      }
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      setSelectedOrder((prev) => (prev?.id === order.id ? null : prev));
+    } catch {
+      alert("Network error. Please try again.");
+    }
+  };
+
   const stats = useMemo(() => {
     const counts = {
       total: orders.length,
@@ -674,6 +696,7 @@ function AdminDashboard({ password }) {
             order={selectedOrder}
             onClose={() => setSelectedOrder(null)}
             onUpdateStatus={updateStatus}
+            onDeleteOrder={deleteOrderPermanently}
             customerOrderInfo={getCustomerOrderInfo(orders, selectedOrder)}
           />
         )}
@@ -709,13 +732,12 @@ function AdminDashboard({ password }) {
 // ─────────────────────────────────────────────────────────────────────────────
 const CAIRO_TZ = "Africa/Cairo";
 
-// The brand opened on May 1, 2026. We never display weeks/months before this
-// date — they'd all be zero rows that just clutter the analytics view.
+// Fallback when there are no dated orders yet — same as launch in Terms.
 // month is 0-indexed: 4 = May.
 const BRAND_START_DATE = new Date(2026, 4, 1);
 
-function fmtBrandStart() {
-  return BRAND_START_DATE.toLocaleDateString("en-US", {
+function fmtLongDate(d) {
+  return d.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
@@ -754,10 +776,36 @@ function toCairoDate(iso) {
   );
 }
 
+/** “Now” on the Cairo wall clock — use for week/day buckets so labels match order dates. */
+function cairoWallNow() {
+  return toCairoDate(new Date().toISOString()) ?? new Date();
+}
+
 function startOfDay(d) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
+}
+
+/** Earliest Cairo calendar day of a non-cancelled order; else any order; else null. */
+function getFirstOrderDayStart(orders) {
+  if (!Array.isArray(orders) || orders.length === 0) return null;
+  let min = null;
+  for (const o of orders) {
+    if (o?.status === "cancelled") continue;
+    const d = toCairoDate(o?.created_at);
+    if (!d) continue;
+    const day = startOfDay(d);
+    if (!min || day < min) min = day;
+  }
+  if (min) return min;
+  for (const o of orders) {
+    const d = toCairoDate(o?.created_at);
+    if (!d) continue;
+    const day = startOfDay(d);
+    if (!min || day < min) min = day;
+  }
+  return min;
 }
 
 // Week starts on Saturday — that's the standard week start in Egypt.
@@ -846,7 +894,11 @@ function aggregateInRange(orders, from, to) {
 
 function ProfitAnalyticsModal({ orders, onClose }) {
   const buckets = useMemo(() => {
-    const now = new Date();
+    const now = cairoWallNow();
+    const firstOrderDay = getFirstOrderDayStart(orders);
+    const floorDate = firstOrderDay ?? BRAND_START_DATE;
+    const analyticsFromFirstOrder = firstOrderDay !== null;
+
     const todayStart = startOfDay(now);
     const yesterdayStart = addDays(todayStart, -1);
     const weekStart = startOfWeek(now);
@@ -863,19 +915,19 @@ function ProfitAnalyticsModal({ orders, onClose }) {
     const lastMonth = aggregateInRange(orders, lastMonthStart, monthStart);
     const thisYear = aggregateInRange(orders, yearStart, addMonths(yearStart, 12));
 
-    // Flag whether the "previous" period for each card pre-dates the brand,
-    // so the comparison card knows to hide the trend badge.
-    const yesterdayBeforeBrand = todayStart <= BRAND_START_DATE;
-    const lastWeekBeforeBrand = weekStart <= BRAND_START_DATE;
-    const lastMonthBeforeBrand = monthStart <= BRAND_START_DATE;
+    // Hide misleading trend badges when the prior period is entirely before
+    // our analytics floor (first real order day, else launch fallback).
+    const yesterdayBeforeBrand = todayStart <= floorDate;
+    const lastWeekBeforeBrand = weekStart <= floorDate;
+    const lastMonthBeforeBrand = monthStart <= floorDate;
 
     // Last 8 weeks (most recent first), labelled by Saturday → Friday range.
-    // Skip any week that ends before the brand opened.
+    // Skip weeks that end on/before the analytics floor (no data window).
     const weeks = [];
     for (let i = 0; i < 8; i++) {
       const start = addDays(weekStart, -7 * i);
       const end = addDays(start, 7);
-      if (end <= BRAND_START_DATE) break;
+      if (end <= floorDate) break;
       const stats = aggregateInRange(orders, start, end);
       const label =
         i === 0
@@ -891,13 +943,12 @@ function ProfitAnalyticsModal({ orders, onClose }) {
       });
     }
 
-    // Last 12 months (most recent first). Skip any month entirely before the
-    // brand opened.
+    // Last 12 months (most recent first). Skip months ending on/before floor.
     const months = [];
     for (let i = 0; i < 12; i++) {
       const start = addMonths(monthStart, -i);
       const end = addMonths(start, 1);
-      if (end <= BRAND_START_DATE) break;
+      if (end <= floorDate) break;
       const stats = aggregateInRange(orders, start, end);
       months.push({ key: `m-${i}`, label: fmtMonthYear(start), ...stats });
     }
@@ -915,6 +966,8 @@ function ProfitAnalyticsModal({ orders, onClose }) {
       yesterdayBeforeBrand,
       lastWeekBeforeBrand,
       lastMonthBeforeBrand,
+      analyticsFloor: floorDate,
+      analyticsFromFirstOrder,
     };
   }, [orders]);
 
@@ -991,8 +1044,21 @@ function ProfitAnalyticsModal({ orders, onClose }) {
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40">
             <Calendar size={10} />
             <span>
-              Brand opened{" "}
-              <span className="text-[#FF4DA3] font-bold">{fmtBrandStart()}</span>
+              {buckets.analyticsFromFirstOrder ? (
+                <>
+                  Analytics from first order{" "}
+                  <span className="text-[#FF4DA3] font-bold">
+                    {fmtLongDate(buckets.analyticsFloor)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  No orders yet — using launch date{" "}
+                  <span className="text-[#FF4DA3] font-bold">
+                    {fmtLongDate(buckets.analyticsFloor)}
+                  </span>
+                </>
+              )}
             </span>
           </div>
 
@@ -1001,6 +1067,7 @@ function ProfitAnalyticsModal({ orders, onClose }) {
             title="Last 8 Weeks"
             icon={Calendar}
             rows={buckets.weeks}
+            subtitle="Each row is one Saturday–Friday week (Cairo). Old rows drop once the week ends on/before your analytics start (first order day, or launch date if there are no orders yet)."
           />
 
           {/* Monthly breakdown */}
@@ -1129,10 +1196,15 @@ function ProductAnalyticsModal({ password, onClose }) {
   const [tab, setTab] = useState("products"); // products | colors | sizes
   const [productSearch, setProductSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const [resettingStock, setResettingStock] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoading(true);
+      setErr("");
       try {
         const res = await fetch("/api/products/analytics", {
           headers: { "x-admin-pass": password },
@@ -1153,7 +1225,42 @@ function ProductAnalyticsModal({ password, onClose }) {
     return () => {
       cancelled = true;
     };
-  }, [password]);
+  }, [password, reloadNonce]);
+
+  const resetStockToInitial = async () => {
+    if (resettingStock) return;
+    const ids = Array.from(selectedProductIds);
+    if (ids.length === 0) {
+      alert("اختار منتج واحد على الأقل.");
+      return;
+    }
+    const ok = window.confirm(
+      `هترجّع المخزون لقيم initialStock للمنتجات المختارة (${ids.length}). متأكد؟`
+    );
+    if (!ok) return;
+    setResettingStock(true);
+    try {
+      const res = await fetch("/api/products/reset-stock", {
+        method: "POST",
+        headers: { "x-admin-pass": password },
+        body: JSON.stringify({ productIds: ids }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        alert(json?.error || "فشل Reset المخزون. جرّب تاني.");
+        return;
+      }
+      alert(
+        `تم Reset المخزون.\nProducts: ${json.productsTouched ?? 0}\nEntries: ${json.entriesSet ?? 0}`
+      );
+      setReloadNonce((n) => n + 1);
+      setSelectedProductIds(new Set());
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setResettingStock(false);
+    }
+  };
 
   const filteredProducts = useMemo(() => {
     if (!data?.products) return [];
@@ -1191,13 +1298,26 @@ function ProductAnalyticsModal({ password, onClose }) {
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={resetStockToInitial}
+              disabled={resettingStock || selectedProductIds.size === 0}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-500/10 hover:border-red-500/30 transition-all text-[11px] font-black uppercase tracking-widest text-black/70 dark:text-white/70"
+              title="Reset stock to initialStock (Sanity)"
+            >
+              <RefreshCw size={14} className={resettingStock ? "animate-spin" : ""} />
+              Reset stock
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="p-5 space-y-6">
@@ -1333,6 +1453,15 @@ function ProductAnalyticsModal({ password, onClose }) {
                           key={p.id}
                           product={p}
                           expanded={expandedId === p.id}
+                          selected={selectedProductIds.has(p.id)}
+                          onSelect={(next) =>
+                            setSelectedProductIds((prev) => {
+                              const s = new Set(prev);
+                              if (next) s.add(p.id);
+                              else s.delete(p.id);
+                              return s;
+                            })
+                          }
                           onToggle={() =>
                             setExpandedId((cur) => (cur === p.id ? null : p.id))
                           }
@@ -1393,7 +1522,7 @@ function SummaryCard({ label, value, hint, icon: Icon, accent }) {
   );
 }
 
-function ProductRow({ product, expanded, onToggle }) {
+function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
   const tracked = product.tracked;
   const stock = product.totalStock;
   const initial = product.totalInitial;
@@ -1438,6 +1567,16 @@ function ProductRow({ product, expanded, onToggle }) {
         onClick={onToggle}
         className="w-full flex items-center gap-3 sm:gap-4 px-4 py-3 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
       >
+        <span className="shrink-0">
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={(e) => onSelect?.(e.target.checked)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 accent-[#FF4DA3]"
+            aria-label={`Select ${product.name}`}
+          />
+        </span>
         <div className="w-12 h-14 sm:w-14 sm:h-16 shrink-0 rounded-lg overflow-hidden bg-black/5 dark:bg-white/10">
           {product.image ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -1674,7 +1813,7 @@ function DistributionTable({ rows, emptyMessage, icon: Icon }) {
   );
 }
 
-function BucketTable({ title, icon: Icon, rows }) {
+function BucketTable({ title, icon: Icon, rows, subtitle }) {
   // Bar lengths are scaled to the largest positive profit in the visible set
   // so the chart stays readable regardless of absolute amounts.
   const maxProfit = Math.max(1, ...rows.map((r) => Math.max(0, r.profit)));
@@ -1685,11 +1824,18 @@ function BucketTable({ title, icon: Icon, rows }) {
 
   return (
     <div className="rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 overflow-hidden">
-      <div className="px-4 py-3 border-b border-black/5 dark:border-white/10 flex items-center gap-2">
-        <Icon size={13} className="text-[#FF4DA3]" />
-        <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-black/60 dark:text-white/60">
-          {title}
-        </h3>
+      <div className="px-4 py-3 border-b border-black/5 dark:border-white/10">
+        <div className="flex items-center gap-2">
+          <Icon size={13} className="text-[#FF4DA3] shrink-0" />
+          <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-black/60 dark:text-white/60">
+            {title}
+          </h3>
+        </div>
+        {subtitle ? (
+          <p className="mt-2 text-[10px] leading-relaxed text-black/45 dark:text-white/45 font-normal tracking-normal normal-case max-w-prose">
+            {subtitle}
+          </p>
+        ) : null}
       </div>
       <div className="divide-y divide-black/5 dark:divide-white/5">
         {rows.map((r) => {
@@ -1870,7 +2016,7 @@ function OrderCard({ order, onClick, customerOrderInfo }) {
   );
 }
 
-function OrderModal({ order, onClose, onUpdateStatus, customerOrderInfo }) {
+function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrderInfo }) {
   const meta = STATUS_META[order.status] ?? STATUS_META.pending;
   const StatusIcon = meta.icon;
   const actions = STATUS_ACTIONS[order.status] ?? [];
@@ -1880,6 +2026,12 @@ function OrderModal({ order, onClose, onUpdateStatus, customerOrderInfo }) {
   const handleAction = async (newStatus) => {
     setUpdating(newStatus);
     await onUpdateStatus(order.id, newStatus);
+    setUpdating(null);
+  };
+
+  const handleDelete = async () => {
+    setUpdating("delete");
+    await onDeleteOrder(order);
     setUpdating(null);
   };
 
@@ -2213,6 +2365,19 @@ function OrderModal({ order, onClose, onUpdateStatus, customerOrderInfo }) {
               No further actions available for this status.
             </p>
           )}
+
+          <div className="pt-2 border-t border-black/10 dark:border-white/10">
+            <button
+              onClick={handleDelete}
+              disabled={updating !== null}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold tracking-widest uppercase text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-500/15 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {updating === "delete" ? (
+                <Loader2 className="animate-spin" size={15} />
+              ) : null}
+              Cancel + Delete Permanently
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>

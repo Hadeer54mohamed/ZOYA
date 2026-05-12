@@ -6,12 +6,31 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 
 const FROM_ADDRESS = process.env.RESEND_FROM || "Zoya <hello@zoya-store.com>";
+
+function safeJson(value) {
+  try {
+    return JSON.stringify(value, (k, v) => {
+      if (v instanceof Error) {
+        return { name: v.name, message: v.message, statusCode: v.statusCode };
+      }
+      return v;
+    });
+  } catch {
+    try {
+      return String(value);
+    } catch {
+      return "[unserializable]";
+    }
+  }
+}
 
 export async function POST(req) {
   try {
@@ -29,14 +48,16 @@ export async function POST(req) {
       .insert([{ email: normalized }]);
 
     if (error) {
-      if (error.code === "23505") {
-        return Response.json(
-          { error: "Already subscribed" },
-          { status: 409 }
-        );
+      const isDuplicate = error.code === "23505";
+      if (!isDuplicate) {
+        console.error("[subscribe] Supabase insert failed:", error);
+        return Response.json({ error: error.message }, { status: 500 });
       }
-      console.error("[subscribe] Supabase insert failed:", error);
-      return Response.json({ error: error.message }, { status: 500 });
+
+      // If the user tries to subscribe again with the same email, we still
+      // attempt to send the welcome email. This avoids the "nothing was sent"
+      // experience on retries.
+      console.warn("[subscribe] Already subscribed — proceeding to email.");
     }
 
     if (!process.env.RESEND_API_KEY) {
@@ -51,60 +72,47 @@ export async function POST(req) {
     const { data: emailData, error: emailError } = await resend.emails.send({
       from: FROM_ADDRESS,
       to: normalized,
-      subject: "Welcome to ZOYA \u2728",
+      subject: "Order Confirmation",
+      replyTo: "support@zoya-store.com",
+
+      headers: {
+        "X-Entity-Ref-ID": emailData?.id,
+        "List-Unsubscribe": "<mailto:unsubscribe@zoya-store.com>",
+      },
+    
       html: `
-  <div style="margin:0; padding:0; background:#f5f5f5;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-      <tr>
-        <td align="center">
-
-          <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.08); font-family:Arial, sans-serif;">
-
-            <!-- Header -->
-            <tr>
-              <td style="background:#000; color:#fff; text-align:center; padding:24px;">
-                <h2 style="margin:0; letter-spacing:3px; font-weight:900;">ZØYA</h2>
-              </td>
-            </tr>
-
-            <!-- Content -->
-            <tr>
-              <td style="padding:40px 30px; text-align:center;">
-                <h1 style="color:#FF4DA3; margin-bottom:12px;">
-                  Welcome 🔥
-                </h1>
-
-                <p style="color:#555; font-size:14px; line-height:1.6;">
-                  You’re officially part of the drop.<br/>
-                  Get ready for exclusive pieces & early access.
-                </p>
-
-                <!-- CTA -->
-                <a href="https://zoya-store.com"
-                   style="display:inline-block; margin-top:24px; padding:12px 28px; background:#FF4DA3; color:#fff; text-decoration:none; border-radius:999px; font-size:12px; letter-spacing:1px; font-weight:bold;">
-                  Explore ZOYA
-                </a>
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td style="padding:20px; text-align:center; font-size:11px; color:#999;">
-                © ${new Date().getFullYear()} ZOYA — All rights reserved
-              </td>
-            </tr>
-
-          </table>
-
-        </td>
-      </tr>
-    </table>
-  </div>
-`,
-    });
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2 style="color:#111;">Thank you for your order 👌</h2>
+        
+        <p>Hi there,</p>
+    
+        <p>
+          We’ve received your order successfully and it’s now being processed.
+          You’ll receive another update once it’s shipped.
+        </p>
+    
+        <hr />
+    
+        <p style="font-size: 14px; color: #555;">
+          If you have any questions, just reply to this email — we’re here to help.
+        </p>
+    
+        <p style="margin-top:20px;">
+          — ZOYA Team
+        </p>
+      </div>
+    `      });
+    console.log("RESEND DATA:", emailData);
+    console.log("RESEND ERROR:", emailError);
 
     if (emailError) {
-      console.error("[subscribe] Resend send failed:", emailError);
+      console.error(
+        `[subscribe] Resend send failed to=${safeJson(normalized)} err=${safeJson({
+          name: emailError?.name,
+          message: emailError?.message,
+          statusCode: emailError?.statusCode ?? null,
+        })}`
+      );
 
       return Response.json({
         success: true,

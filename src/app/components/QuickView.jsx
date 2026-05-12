@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useCart } from "../context/CartContext";
 import Skeleton from "./Skeleton";
 import { Lock, Truck, RotateCcw, ShieldCheck } from "lucide-react";
+import ReturnPolicyNotice from "./ReturnPolicyNotice";
 
 // Normalize color to support both legacy `image` and new `images[]`
 const colorImage = (c) => c?.images?.[0] || c?.image;
@@ -289,6 +290,9 @@ export default function QuickView({ product, onClose, initialColor = null }) {
                   <RotateCcw size={18} className="text-[#FF4DA3]" />
                   <span>Easy Returns</span>
                 </div>
+              </div>
+              <div className="mt-4">
+                <ReturnPolicyNotice />
               </div>
             </div>
             </div>
