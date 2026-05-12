@@ -2,10 +2,11 @@
 
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
+import { useRouter } from "next/navigation";
 
 export default function FeaturedDropSection() {
   const ref = useRef(null);
-
+  const router = useRouter();
   // scroll progress
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -75,6 +76,7 @@ export default function FeaturedDropSection() {
             whileHover={{ scale: 1.07 }}
             whileTap={{ scale: 0.95 }}
             className="mt-8 px-10 py-4 bg-[#FF4DA3] text-white font-black uppercase tracking-[0.2em] relative overflow-hidden"
+            onClick={() => router.push("/products")}
           >
             <span className="relative z-10">Shop Now</span>
 

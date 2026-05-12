@@ -45,6 +45,7 @@ export default function LegalPage({ title, tagline, updatedAt, sections }) {
           {sections.map((s, i) => (
             <motion.section
               key={s.title}
+              id={s.anchor || undefined}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
@@ -97,10 +98,10 @@ export default function LegalPage({ title, tagline, updatedAt, sections }) {
           className="mt-16 pt-10 border-t border-black/10 dark:border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5"
         >
           <p className="text-sm text-black/60 dark:text-white/50 max-w-sm">
-            Got questions or need clarification? Our team is one email away.
+            Got questions or need clarification? Our team is just a message away.
           </p>
           <a
-            href="mailto:hello@zoya.com"
+            href="/#contact"
             className="group inline-flex items-center gap-2 px-5 py-3 rounded-full bg-[#FF4DA3] text-white text-[10px] font-black tracking-[0.25em] uppercase hover:shadow-[0_10px_30px_-8px_#FF4DA3] active:scale-95 transition-all"
           >
             Contact Us

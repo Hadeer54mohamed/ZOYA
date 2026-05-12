@@ -115,6 +115,7 @@ export async function GET(req) {
           id,
           name: info.name,
           tracked: info.tracked,
+          image: info.image || null,
           totalStock: info.totalStock,
           totalInitial: info.totalInitial,
           byColor: info.byColor,

@@ -9,61 +9,69 @@ const sections = [
   {
     title: "Information We Collect",
     content: [
-      "At ZØYA, we collect information that helps us deliver the best experience possible. This includes data you provide directly and data collected automatically when you browse our store.",
+      "At ZØYA, we collect information necessary to process your orders and improve your shopping experience.",
       [
-        "Personal details: name, email, phone number, shipping address.",
-        "Payment information (processed securely through our payment partners — we never store card numbers).",
-        "Order history, cart contents, and saved preferences.",
-        "Device information, IP address, browser type, and interaction data.",
+        "Personal details such as your name, phone number, email address, and shipping address.",
+        "Order information including purchased products, order history, and delivery details.",
+        "Technical information like device type, browser, IP address, and site usage data.",
+        "Payment information is processed securely through trusted payment providers. We do not store full card details.",
       ],
     ],
   },
   {
     title: "How We Use Your Data",
     content: [
-      "Your information is used strictly to power your shopping experience and improve our service. We never sell your data to third parties.",
+      "Your information is used only for operating and improving ZØYA services.",
       [
-        "Processing and delivering your orders.",
-        "Sending order updates, shipping confirmations, and receipts.",
-        "Personalizing product recommendations and drops you'll love.",
-        "Analytics to improve site performance and UX.",
+        "Processing and delivering your orders across Egypt.",
+        "Sending order confirmations, shipping updates, and customer support responses.",
+        "Improving website performance, user experience, and product recommendations.",
+        "Preventing fraud, misuse, or unauthorized activity.",
       ],
     ],
   },
   {
     title: "Data Sharing & Third Parties",
     content: [
-      "We only share your information with trusted partners required to fulfill your order — shipping providers, payment processors, and email services. Each partner is bound by strict confidentiality agreements.",
+      "We may share necessary information with trusted third-party services involved in completing your order, including shipping companies, payment gateways, and email service providers.",
+      "We never sell or rent your personal information to third parties.",
     ],
   },
   {
     title: "Cookies & Tracking",
     content: [
-      "We use cookies to remember your theme preference, keep your cart alive between sessions, and understand how you interact with our site. You can disable cookies in your browser, but some features may break.",
+      "ZØYA uses cookies and similar technologies to improve your browsing experience, remember your preferences, and keep your cart saved between sessions.",
+      "You can disable cookies through your browser settings, though some website features may not function properly.",
     ],
   },
   {
     title: "Your Rights",
     content: [
-      "You own your data. At any time, you have the right to:",
+      "You have the right to control your personal information.",
       [
-        "Access the personal data we hold about you.",
-        "Request corrections or deletion of your account.",
-        "Opt out of marketing emails (one click, no hassle).",
-        "Export your data in a portable format.",
+        "Request access to the data we hold about you.",
+        "Request correction or deletion of your information.",
+        "Opt out of promotional or marketing communications.",
+        "Contact us regarding any privacy-related concerns.",
       ],
     ],
   },
   {
-    title: "Security",
+    title: "Data Security",
     content: [
-      "All sensitive data is encrypted in transit (HTTPS/TLS) and at rest. We use industry-standard practices to guard against unauthorized access. If a breach ever occurs, we'll notify you within 72 hours.",
+      "We use industry-standard security measures to help protect your personal information against unauthorized access, misuse, or disclosure.",
+    ],
+  },
+  {
+    title: "Policy Updates",
+    content: [
+      "This Privacy Policy may be updated occasionally to reflect changes in our services or legal requirements. Continued use of ZØYA after updates means you accept the revised policy.",
     ],
   },
   {
     title: "Contact",
     content: [
-      "Questions about this policy? Reach out anytime at hello@zoya.com — we read every message.",
+      "If you have any questions about this Privacy Policy or how your information is handled, please contact the ZØYA support team.",
     ],
   },
 ];
@@ -72,8 +80,8 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      tagline="Your data is yours. Here's exactly how we handle it — in plain language, no fine print tricks."
-      updatedAt="April 2026"
+      tagline="Your privacy matters. Here's how ZØYA handles your information."
+      updatedAt="May 2026"
       sections={sections}
     />
   );

@@ -222,6 +222,11 @@ export async function getProductStockMap() {
         name,
         "colors": colors[]{
           name,
+          "images": images[]{
+            asset,
+            hotspot,
+            crop
+          },
           "stockEntries": stockEntries[]{ size, stock, initialStock }
         }
       }`,
@@ -234,6 +239,20 @@ export async function getProductStockMap() {
       let totalStock = 0;
       let totalInitial = 0;
       let tracked = false;
+      let image = null;
+
+      const primaryImage = row?.colors?.[0]?.images?.[0];
+      if (primaryImage) {
+        try {
+          image = urlFor(primaryImage)
+            .width(1200)
+            .quality(85)
+            .auto("format")
+            .url();
+        } catch {
+          image = null;
+        }
+      }
       const byColor = (row.colors || []).map((c) => {
         const sizes = (c?.stockEntries || [])
           .filter((s) => s && typeof s.size === "string")
@@ -260,6 +279,7 @@ export async function getProductStockMap() {
       });
       map[row.id] = {
         name: row.name || row.id,
+        image,
         tracked,
         totalStock,
         totalInitial,
@@ -564,6 +584,136 @@ export async function restoreStock(items) {
       code: "patch_failed",
       error: "Could not restore stock.",
     };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN: reset stock to initial
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STOCK_RESET_QUERY_ALL = /* groq */ `
+  *[_type == "product"]{
+    _id,
+    "id": slug.current,
+    name,
+    "colors": colors[]{
+      _key,
+      name,
+      "stockEntries": stockEntries[]{
+        _key,
+        size,
+        stock,
+        initialStock
+      }
+    }
+  }
+`;
+
+const STOCK_RESET_QUERY_BY_IDS = /* groq */ `
+  *[_type == "product" && slug.current in $ids]{
+    _id,
+    "id": slug.current,
+    name,
+    "colors": colors[]{
+      _key,
+      name,
+      "stockEntries": stockEntries[]{
+        _key,
+        size,
+        stock,
+        initialStock
+      }
+    }
+  }
+`;
+
+export async function resetAllTrackedStockToInitial(productIds) {
+  if (!hasWriteToken) {
+    return {
+      ok: false,
+      code: "no_token",
+      error: "Sanity write token missing.",
+    };
+  }
+
+  const ids = Array.isArray(productIds)
+    ? productIds
+        .map((v) => String(v || "").trim())
+        .filter(Boolean)
+    : [];
+
+  let products;
+  try {
+    products = await client.fetch(
+      ids.length > 0 ? STOCK_RESET_QUERY_BY_IDS : STOCK_RESET_QUERY_ALL,
+      ids.length > 0 ? { ids } : {},
+      { next: { revalidate: 0 } }
+    );
+  } catch (err) {
+    console.error("[sanity] resetAllTrackedStockToInitial fetch failed:", err?.message || err);
+    return { ok: false, code: "fetch_failed", error: "Could not load stock data." };
+  }
+
+  const tx = writeClient.transaction();
+  let productsTouched = 0;
+  let entriesSet = 0;
+  const skipped = {
+    untrackedProducts: 0,
+    missingInitial: 0,
+  };
+
+  for (const p of products || []) {
+    const colors = Array.isArray(p?.colors) ? p.colors : [];
+    const productHasStock = colors.some(
+      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0
+    );
+    if (!productHasStock) {
+      skipped.untrackedProducts += 1;
+      continue;
+    }
+
+    let touchedThisProduct = false;
+    for (const c of colors) {
+      const colorKey = c?._key;
+      const entries = Array.isArray(c?.stockEntries) ? c.stockEntries : [];
+      if (!colorKey || entries.length === 0) continue;
+      for (const e of entries) {
+        const stockKey = e?._key;
+        const initial = e?.initialStock;
+        if (!stockKey) continue;
+        if (typeof initial !== "number" || !Number.isFinite(initial)) {
+          skipped.missingInitial += 1;
+          continue;
+        }
+        tx.patch(p._id, (patch) =>
+          patch.set({
+            [`colors[_key=="${colorKey}"].stockEntries[_key=="${stockKey}"].stock`]:
+              initial,
+          })
+        );
+        entriesSet += 1;
+        touchedThisProduct = true;
+      }
+    }
+
+    if (touchedThisProduct) productsTouched += 1;
+  }
+
+  if (entriesSet === 0) {
+    return {
+      ok: true,
+      productsTouched: 0,
+      entriesSet: 0,
+      skipped,
+    };
+  }
+
+  try {
+    await tx.commit({ visibility: "async" });
+    return { ok: true, productsTouched, entriesSet, skipped };
+  } catch (err) {
+    console.error("[sanity] resetAllTrackedStockToInitial commit failed:", err?.message || err);
+    return { ok: false, code: "patch_failed", error: "Could not reset stock." };
   }
 }
 
