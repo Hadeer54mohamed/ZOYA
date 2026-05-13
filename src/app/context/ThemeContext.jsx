@@ -1,11 +1,23 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 
 const ThemeContext = createContext();
 const STORAGE_KEY = "zoya-theme";
 const COOKIE_KEY = "zoya-theme";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+
+function normalizePreference(value) {
+  if (value === "light" || value === "dark" || value === "system") return value;
+  return "system";
+}
 
 function setCookie(name, value) {
   try {
@@ -24,32 +36,42 @@ function readCookie(name) {
   }
 }
 
-export function ThemeProvider({ initialTheme = "dark", children }) {
-  const [theme, setTheme] = useState(initialTheme);
+function computeResolved(theme, systemDark) {
+  if (theme === "light") return "light";
+  if (theme === "dark") return "dark";
+  return systemDark ? "dark" : "light";
+}
+
+export function ThemeProvider({ initialTheme = "system", children }) {
+  const [theme, setTheme] = useState(() => normalizePreference(initialTheme));
+  const [systemDark, setSystemDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    let stored = null;
     try {
-      const fromCookie = readCookie(COOKIE_KEY);
-      const fromStorage = localStorage.getItem(STORAGE_KEY);
-      const initial =
-        fromCookie ||
-        fromStorage ||
-        (document.documentElement.classList.contains("dark")
-          ? "dark"
-          : "light");
-      setTheme(initial);
-    } catch (_) {
-      setTheme(initialTheme);
-    } finally {
-      setMounted(true);
-    }
+      stored = readCookie(COOKIE_KEY) || localStorage.getItem(STORAGE_KEY);
+    } catch (_) {}
+    setTheme(normalizePreference(stored || initialTheme));
+
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setSystemDark(mq.matches);
+    setMounted(true);
+
+    const onChange = () => setSystemDark(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, [initialTheme]);
+
+  const resolvedTheme = useMemo(
+    () => computeResolved(theme, systemDark),
+    [theme, systemDark]
+  );
 
   useEffect(() => {
     if (!mounted) return;
     const root = document.documentElement;
-    if (theme === "dark") {
+    if (resolvedTheme === "dark") {
       root.classList.add("dark");
       root.style.colorScheme = "dark";
     } else {
@@ -60,13 +82,19 @@ export function ThemeProvider({ initialTheme = "dark", children }) {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch (_) {}
     setCookie(COOKIE_KEY, theme);
-  }, [theme, mounted]);
+  }, [theme, resolvedTheme, mounted]);
 
   const toggleTheme = () =>
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+    setTheme((prev) => {
+      if (prev === "system") return "light";
+      if (prev === "light") return "dark";
+      return "system";
+    });
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, mounted }}>
+    <ThemeContext.Provider
+      value={{ theme, resolvedTheme, toggleTheme, mounted }}
+    >
       {children}
     </ThemeContext.Provider>
   );
@@ -75,7 +103,12 @@ export function ThemeProvider({ initialTheme = "dark", children }) {
 export const useTheme = () => {
   const ctx = useContext(ThemeContext);
   if (!ctx) {
-    return { theme: "dark", toggleTheme: () => {}, mounted: false };
+    return {
+      theme: "system",
+      resolvedTheme: "light",
+      toggleTheme: () => {},
+      mounted: false,
+    };
   }
   return ctx;
 };

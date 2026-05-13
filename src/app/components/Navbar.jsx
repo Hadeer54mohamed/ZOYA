@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
-import { ShoppingBag, Sun, Moon, Search } from "lucide-react";
+import { ShoppingBag, Sun, Moon, Monitor, Search } from "lucide-react";
 import SearchOverlay from "./SearchOverlay";
 
 const links = [
@@ -33,7 +33,7 @@ export default function Navbar({ products = [] }) {
   const [active, setActive] = useState("Home");
   const [searchOpen, setSearchOpen] = useState(false);
   const { cartCount, setIsCartOpen, cartIconRef, isCartOpen } = useCart();
-  const { theme, toggleTheme, mounted } = useTheme();
+  const { theme, resolvedTheme, toggleTheme } = useTheme();
   const [pulse, setPulse] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -138,7 +138,14 @@ export default function Navbar({ products = [] }) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isHome, pathname]);
 
-  const isDark = theme === "dark";
+  const isDark = resolvedTheme === "dark";
+
+  const themeToggleAria =
+    theme === "system"
+      ? "Theme follows device. Click for light mode."
+      : theme === "light"
+        ? "Light mode. Click for dark mode."
+        : "Dark mode. Click to follow device.";
 
   return (
     <>
@@ -201,8 +208,19 @@ export default function Navbar({ products = [] }) {
                 <Search size={18} />
               </button>
               
-              <button onClick={toggleTheme} className="hidden sm:block p-2 text-black/50 dark:text-white/50 hover:text-[#FF4DA3] transition-colors">
-                {mounted && (isDark ? <Sun size={18} /> : <Moon size={18} />)}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-label={themeToggleAria}
+                className="hidden sm:block p-2 text-black/50 dark:text-white/50 hover:text-[#FF4DA3] transition-colors"
+              >
+                {theme === "system" ? (
+                  <Monitor size={18} />
+                ) : theme === "dark" ? (
+                  <Moon size={18} />
+                ) : (
+                  <Sun size={18} />
+                )}
               </button>
 
               <button
@@ -265,8 +283,19 @@ export default function Navbar({ products = [] }) {
                   {/* Theme toggle inside mobile menu for convenience */}
                   <div className={`flex justify-between items-center px-8 py-5 mt-2 border-t ${isDark ? "border-white/5" : "border-black/5"}`}>
                     <span className={`text-[9px] tracking-[0.3em] uppercase ${isDark ? "text-white/30" : "text-black/30"}`}>Switch Theme</span>
-                    <button onClick={toggleTheme} className={`p-2 rounded-full transition-colors ${isDark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}>
-                      {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      aria-label={themeToggleAria}
+                      className={`p-2 rounded-full transition-colors ${isDark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}
+                    >
+                      {theme === "system" ? (
+                        <Monitor size={16} />
+                      ) : theme === "dark" ? (
+                        <Moon size={16} />
+                      ) : (
+                        <Sun size={16} />
+                      )}
                     </button>
                   </div>
                 </div>

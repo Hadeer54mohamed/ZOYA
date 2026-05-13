@@ -1,12 +1,13 @@
 /**
  * Google Sheets webhook (Apps Script Web App). Use ONE deployment URL everywhere.
- * Set ORDERS_WEBHOOK_URL or GOOGLE_SHEETS_WEBHOOK_URL in env — do not rely on fallbacks in production.
+ * Set GOOGLE_SHEET_WEBHOOK_URL, ORDERS_WEBHOOK_URL, or GOOGLE_SHEETS_WEBHOOK_URL — avoid fallbacks in production.
  */
 export function getOrdersWebhookUrl() {
   return (
+    process.env.GOOGLE_SHEET_WEBHOOK_URL ||
     process.env.ORDERS_WEBHOOK_URL ||
     process.env.GOOGLE_SHEETS_WEBHOOK_URL ||
-    "https://script.google.com/macros/s/AKfycbwbFa2ib0nVk_AcZIsgtjbPvTsesASvEVa1daWxLONvn0xNfTh8UZwy0HqnAvlWv1w/exec"
+    "https://script.google.com/macros/s/AKfycbzgPwVOKS6ckJeosiweGPjK4-UmpmoVRWCFPruy0r4prePNdCia_z55hA70p6U9DaqQDw/exec"
   );
 }
 

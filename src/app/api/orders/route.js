@@ -1,4 +1,4 @@
-﻿import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import {
   getShippingFeeFromMap,
@@ -11,19 +11,21 @@ import {
   restoreStock,
 } from "../../../sanity/lib/products";
 import { postOrderSheetsWebhook } from "../../../lib/ordersSheetsWebhook";
+import { sendOrderToSheet } from "../../../lib/sendOrderToSheet";
+import { computeDiscountAmountEgp } from "../../lib/discountAmount";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY 
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
-const FROM_ADDRESS =
-  process.env.RESEND_FROM || "Zoya <hello@zoya-store.com>";
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://zoya-store.com")
-  .replace(/\/$/, "");
+const FROM_ADDRESS = process.env.RESEND_FROM || "Zoya <hello@zoya-store.com>";
+const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL || "https://zoya-store.com"
+).replace(/\/$/, "");
 const LOGO_URL = process.env.NEXT_PUBLIC_EMAIL_LOGO_URL || "";
 const PHONE_RE = /^01[0125][0-9]{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,11 +81,11 @@ async function sendEmailSafe(payload, { timeoutMs = 8000 } = {}) {
             resolve({
               data: null,
               error: new Error(
-                `Timed out after ${timeoutMs}ms while sending email`
+                `Timed out after ${timeoutMs}ms while sending email`,
               ),
             }),
-          timeoutMs
-        )
+          timeoutMs,
+        ),
       ),
     ]);
 
@@ -95,7 +97,7 @@ async function sendEmailSafe(payload, { timeoutMs = 8000 } = {}) {
         cause: result.error?.cause ? String(result.error.cause) : null,
       };
       console.error(
-        `[orders] Resend send failed meta=${safeJson(meta)} err=${safeJson(errInfo)}`
+        `[orders] Resend send failed meta=${safeJson(meta)} err=${safeJson(errInfo)}`,
       );
     } else {
       console.log("[orders] Email queued:", meta, result?.data?.id);
@@ -109,7 +111,7 @@ async function sendEmailSafe(payload, { timeoutMs = 8000 } = {}) {
       cause: err?.cause ? String(err.cause) : null,
     };
     console.error(
-      `[orders] Resend threw meta=${safeJson(meta)} err=${safeJson(errInfo)}`
+      `[orders] Resend threw meta=${safeJson(meta)} err=${safeJson(errInfo)}`,
     );
   }
 }
@@ -365,7 +367,7 @@ function buildStatusUpdateEmail(status, { orderId, customerName }) {
         subject: "Your Order is Confirmed 🖤",
         html: wrap(
           "Order Confirmed 🎉",
-          `<p style="color:#333; line-height:1.6;">Your order has been confirmed and is being prepared.</p>`
+          `<p style="color:#333; line-height:1.6;">Your order has been confirmed and is being prepared.</p>`,
         ),
       };
     case "shipped":
@@ -373,7 +375,7 @@ function buildStatusUpdateEmail(status, { orderId, customerName }) {
         subject: "Your Order is on the way 🚚",
         html: wrap(
           "On the way 🚚",
-          `<p style="color:#333; line-height:1.6;">Your order has been shipped! It should arrive soon.</p>`
+          `<p style="color:#333; line-height:1.6;">Your order has been shipped! It should arrive soon.</p>`,
         ),
       };
     case "delivered":
@@ -381,7 +383,7 @@ function buildStatusUpdateEmail(status, { orderId, customerName }) {
         subject: "Your Order has been Delivered 📦",
         html: wrap(
           "Delivered 📦",
-          `<p style="color:#333; line-height:1.6;">Your order was delivered. We hope you love it!</p>`
+          `<p style="color:#333; line-height:1.6;">Your order was delivered. We hope you love it!</p>`,
         ),
       };
     case "cancelled":
@@ -389,7 +391,7 @@ function buildStatusUpdateEmail(status, { orderId, customerName }) {
         subject: "Your Order has been Cancelled",
         html: wrap(
           "Order Cancelled",
-          `<p style="color:#333; line-height:1.6;">Your order was cancelled. If this wasn't expected, please contact us.</p>`
+          `<p style="color:#333; line-height:1.6;">Your order was cancelled. If this wasn't expected, please contact us.</p>`,
         ),
       };
     default:
@@ -422,12 +424,16 @@ export async function POST(req) {
       payment_method,
       items,
       discount_code,
+      sender_number,
+      transaction_reference,
+      payment_proof_url,
+      instapay_transfer_confirmed,
     } = body;
 
     if (!name || !phone || !address || !items?.length) {
       return Response.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -435,7 +441,7 @@ export async function POST(req) {
     if (trimmedName.split(/\s+/).filter(Boolean).length < 2) {
       return Response.json(
         { error: "Please enter your full name (at least two words)." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -443,18 +449,17 @@ export async function POST(req) {
     if (!PHONE_RE.test(trimmedPhone)) {
       return Response.json(
         { error: "Please enter a valid Egyptian phone number." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const emailRaw =
       email === null || email === undefined ? "" : email.toString().trim();
-    const trimmedEmail =
-      emailRaw === "" ? null : emailRaw.toLowerCase();
+    const trimmedEmail = emailRaw === "" ? null : emailRaw.toLowerCase();
     if (trimmedEmail !== null && !EMAIL_RE.test(trimmedEmail)) {
       return Response.json(
         { error: "Please enter a valid email address." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -462,7 +467,7 @@ export async function POST(req) {
     if (trimmedAddress.length <= 15) {
       return Response.json(
         { error: "Address must be at least 16 characters." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -475,7 +480,7 @@ export async function POST(req) {
     if (!isValidGovernorateInMap(shippingFeesMap, trimmedGovernorate)) {
       return Response.json(
         { error: "Please select a valid governorate." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -483,8 +488,30 @@ export async function POST(req) {
     if (!ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
       return Response.json(
         { error: "Invalid payment method." },
-        { status: 400 }
+        { status: 400 },
       );
+    }
+
+    if (paymentMethod === "online") {
+      if (instapay_transfer_confirmed !== true) {
+        return Response.json(
+          {
+            error:
+              "Please confirm you completed the InstaPay transfer before placing the order.",
+          },
+          { status: 400 },
+        );
+      }
+      const sender = sender_number != null ? String(sender_number).trim() : "";
+      if (!sender) {
+        return Response.json(
+          {
+            error:
+              "Transfer sender phone number is required for online (InstaPay) orders.",
+          },
+          { status: 400 },
+        );
+      }
     }
 
     const sanitizedItems = [];
@@ -493,10 +520,7 @@ export async function POST(req) {
       const itemName = raw?.name?.toString();
       const quantity = Math.max(1, Math.floor(Number(raw?.quantity) || 0));
       if (!id || !itemName || quantity < 1) {
-        return Response.json(
-          { error: "Invalid item data." },
-          { status: 400 }
-        );
+        return Response.json({ error: "Invalid item data." }, { status: 400 });
       }
       sanitizedItems.push({
         id,
@@ -507,19 +531,25 @@ export async function POST(req) {
         price: 0,
         quantity,
         sold_quantity: quantity,
-        availableColors: Array.isArray(raw?.availableColors) ? raw.availableColors : [],
-        availableSizes: Array.isArray(raw?.availableSizes) ? raw.availableSizes : [],
+        availableColors: Array.isArray(raw?.availableColors)
+          ? raw.availableColors
+          : [],
+        availableSizes: Array.isArray(raw?.availableSizes)
+          ? raw.availableSizes
+          : [],
       });
     }
 
     // The server is the source of truth for prices and costs.
     // Client-supplied prices are intentionally ignored — we always
     // re-fetch the authoritative price/cost from Sanity by product id.
-    const priceMap = await getProductCostsByIds(sanitizedItems.map((it) => it.id));
+    const priceMap = await getProductCostsByIds(
+      sanitizedItems.map((it) => it.id),
+    );
     if (priceMap === null) {
       return Response.json(
         { error: "Could not verify product prices. Please try again." },
-        { status: 503 }
+        { status: 503 },
       );
     }
 
@@ -528,7 +558,7 @@ export async function POST(req) {
       if (!entry || !Number.isFinite(Number(entry.price))) {
         return Response.json(
           { error: `Product not available: ${it.name}` },
-          { status: 400 }
+          { status: 400 },
         );
       }
       it.price = Number(entry.price);
@@ -543,17 +573,17 @@ export async function POST(req) {
     // Recalculate shipping server-side based on governorate.
     const shippingFee = getShippingFeeFromMap(
       shippingFeesMap,
-      trimmedGovernorate
+      trimmedGovernorate,
     );
 
     // Recalculate subtotal/cost from the server-trusted prices above.
     const itemsSubtotal = sanitizedItems.reduce(
       (sum, it) => sum + it.price * it.quantity,
-      0
+      0,
     );
     const totalCost = sanitizedItems.reduce(
       (sum, it) => sum + it.cost * it.quantity,
-      0
+      0,
     );
 
     // Re-validate the discount code from the DB. Never trust the client.
@@ -563,14 +593,16 @@ export async function POST(req) {
       const normalized = discount_code.trim().toUpperCase();
       const { data: discount } = await supabase
         .from("discount_codes")
-        .select("code, discount_type, value, is_active, usage_limit, usage_count")
+        .select(
+          "code, discount_type, value, is_active, usage_limit, usage_count",
+        )
         .eq("code", normalized)
         .maybeSingle();
 
       if (!discount || !discount.is_active) {
         return Response.json(
           { error: "Invalid discount code" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -583,7 +615,7 @@ export async function POST(req) {
             success: false,
             error: "This code reached its limit.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -601,35 +633,19 @@ export async function POST(req) {
             success: false,
             error: "You already used this discount code.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       appliedCode = discount.code;
-      const value = Number(discount.value) || 0;
-
-      // Tolerate variations in how `discount_type` is stored in the DB.
-      const rawType = (discount.discount_type ?? "").toString().toLowerCase().trim();
-      const isPercent = ["percent", "percentage", "%"].includes(rawType);
-      const isFixed = ["fixed", "flat", "amount"].includes(rawType);
-
-      if (isPercent) {
-        discountAmount = Math.round((itemsSubtotal * value) / 100);
-      } else if (isFixed) {
-        discountAmount = Math.min(itemsSubtotal, value);
-      } else {
-        console.warn(
-          "[orders] Unknown discount_type in DB:",
-          discount.discount_type,
-          "for code:",
-          discount.code
-        );
-      }
-      discountAmount = Math.max(0, Math.min(itemsSubtotal, discountAmount));
+      discountAmount = computeDiscountAmountEgp(discount, itemsSubtotal);
     }
 
     // Final price the customer pays — computed entirely server-side.
-    const totalPrice = Math.max(0, itemsSubtotal + shippingFee - discountAmount);
+    const totalPrice = Math.max(
+      0,
+      itemsSubtotal + shippingFee - discountAmount,
+    );
     const profit = itemsSubtotal - discountAmount - totalCost;
 
     // Reserve (decrement) stock for tracked products. We intentionally do NOT
@@ -643,7 +659,7 @@ export async function POST(req) {
         color: it.color,
         size: it.size,
         quantity: it.quantity,
-      }))
+      })),
     );
     if (!stockResult.ok) {
       // Only infrastructure failures (Sanity fetch/commit error) end up here.
@@ -652,7 +668,7 @@ export async function POST(req) {
       console.error(
         "[orders] reserveStock infrastructure failure — proceeding with order without decrementing stock:",
         stockResult.code,
-        stockResult.error
+        stockResult.error,
       );
     }
     const stockAlerts = Array.isArray(stockResult.alerts)
@@ -665,7 +681,7 @@ export async function POST(req) {
       // variant negative.
       console.warn(
         "[orders] stock alerts triggered by this order:",
-        stockAlerts
+        stockAlerts,
       );
     }
 
@@ -689,6 +705,10 @@ export async function POST(req) {
           discount_amount: discountAmount,
           status: "pending",
           order_id: generateOrderId(),
+          sender_number: sender_number || null,
+          transaction_reference: transaction_reference || null,
+          payment_proof_url: payment_proof_url || null,
+          payment_verified: paymentMethod === "online",
         },
       ])
       .select()
@@ -703,13 +723,10 @@ export async function POST(req) {
       if (stockResult.applied?.length) {
         console.error(
           "[orders] STOCK MISMATCH: stock was decremented but the order was not saved. Affected applies:",
-          stockResult.applied
+          stockResult.applied,
         );
       }
-      return Response.json(
-        { error: error.message },
-        { status: 500 }
-      );
+      return Response.json({ error: error.message }, { status: 500 });
     }
 
     if (appliedCode) {
@@ -746,13 +763,13 @@ export async function POST(req) {
               ? "You already used this discount code."
               : "Could not record discount usage. Please try again.",
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       const { error: rpcError } = await supabase.rpc(
         "increment_discount_usage",
-        { code_input: appliedCode }
+        { code_input: appliedCode },
       );
       if (rpcError) {
         console.error("increment_discount_usage RPC error:", rpcError);
@@ -785,7 +802,13 @@ export async function POST(req) {
         }),
       });
     }
-    postOrderSheetsWebhook("create", data);
+    const sheetSync = await sendOrderToSheet(data);
+    if (!sheetSync.ok) {
+      console.warn(
+        "[orders] Google Sheet sync did not succeed — check GOOGLE_SHEET_WEBHOOK_URL and Apps Script doPost. Result:",
+        sheetSync,
+      );
+    }
 
     return Response.json({
       success: true,
@@ -804,16 +827,13 @@ export async function POST(req) {
                   }
                 : null,
             },
+            sheet: sheetSync,
           }
         : {}),
     });
-
   } catch (err) {
     console.error("Order POST unexpected:", err);
-    return Response.json(
-      { error: "Server error" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Server error" }, { status: 500 });
   }
 }
 
@@ -825,7 +845,7 @@ export async function GET(req) {
       if (!isAuthorizedAdmin(req)) {
         return Response.json(
           { success: false, error: "Unauthorized" },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -838,7 +858,7 @@ export async function GET(req) {
         console.error("Orders GET (all) error:", error);
         return Response.json(
           { success: false, error: error.message },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
@@ -847,13 +867,13 @@ export async function GET(req) {
 
     return Response.json(
       { success: false, error: "Missing query parameter." },
-      { status: 400 }
+      { status: 400 },
     );
   } catch (err) {
     console.error("Orders GET unexpected:", err);
     return Response.json(
       { success: false, error: "Server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -863,7 +883,7 @@ export async function PATCH(req) {
     if (!isAuthorizedAdmin(req)) {
       return Response.json(
         { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -874,14 +894,14 @@ export async function PATCH(req) {
     if (!id) {
       return Response.json(
         { success: false, error: "Missing order id." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!ALLOWED_STATUSES.has(status)) {
       return Response.json(
         { success: false, error: "Invalid status." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -909,7 +929,7 @@ export async function PATCH(req) {
       console.error("Order PATCH error:", error);
       return Response.json(
         { success: false, error: error.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -921,8 +941,8 @@ export async function PATCH(req) {
     const orderItems = Array.isArray(data?.items)
       ? data.items
       : Array.isArray(existing?.items)
-      ? existing.items
-      : [];
+        ? existing.items
+        : [];
 
     if (!wasCancelled && willBeCancelled && orderItems.length > 0) {
       const result = await restoreStock(orderItems);
@@ -930,7 +950,7 @@ export async function PATCH(req) {
         console.error(
           "[orders PATCH] restoreStock failed for order",
           data.order_id || data.id,
-          result
+          result,
         );
       }
     } else if (wasCancelled && !willBeCancelled && orderItems.length > 0) {
@@ -939,7 +959,7 @@ export async function PATCH(req) {
         console.warn(
           "[orders PATCH] could not re-reserve stock when re-opening order",
           data.order_id || data.id,
-          result
+          result,
         );
       }
     }
@@ -970,7 +990,7 @@ export async function PATCH(req) {
     console.error("Order PATCH unexpected:", err);
     return Response.json(
       { success: false, error: "Server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -980,7 +1000,7 @@ export async function DELETE(req) {
     if (!isAuthorizedAdmin(req)) {
       return Response.json(
         { success: false, error: "Unauthorized" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -991,14 +1011,14 @@ export async function DELETE(req) {
     if (!id && !orderId) {
       return Response.json(
         { success: false, error: "Missing order id." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     let query = supabase
       .from("orders")
       .select(
-        "id, order_id, customer_name, phone, address, items, total_price, payment_method, status, discount_code"
+        "id, order_id, customer_name, phone, address, items, total_price, payment_method, status, discount_code",
       );
 
     if (id) {
@@ -1013,14 +1033,14 @@ export async function DELETE(req) {
       console.error("Order DELETE lookup error:", fetchErr);
       return Response.json(
         { success: false, error: fetchErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     if (!existing) {
       return Response.json(
         { success: false, error: "Order not found." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -1036,7 +1056,7 @@ export async function DELETE(req) {
           console.error(
             "[orders DELETE] restoreStock failed for order",
             existing.order_id || existing.id,
-            result
+            result,
           );
         }
       }
@@ -1044,7 +1064,7 @@ export async function DELETE(req) {
       console.error(
         "[orders DELETE] restoreStock threw for order",
         existing.order_id || existing.id,
-        err
+        err,
       );
     }
 
@@ -1076,7 +1096,10 @@ export async function DELETE(req) {
           .delete()
           .eq("id", usageRow.id);
         if (usageDeleteErr) {
-          console.error("[orders DELETE] discount usage delete error:", usageDeleteErr);
+          console.error(
+            "[orders DELETE] discount usage delete error:",
+            usageDeleteErr,
+          );
         } else {
           const { data: discountRow } = await supabase
             .from("discount_codes")
@@ -1086,7 +1109,7 @@ export async function DELETE(req) {
           if (discountRow) {
             const nextCount = Math.max(
               0,
-              Number(discountRow.usage_count || 0) - 1
+              Number(discountRow.usage_count || 0) - 1,
             );
             const { error: discountUpdateErr } = await supabase
               .from("discount_codes")
@@ -1095,7 +1118,7 @@ export async function DELETE(req) {
             if (discountUpdateErr) {
               console.error(
                 "[orders DELETE] discount usage_count decrement error:",
-                discountUpdateErr
+                discountUpdateErr,
               );
             }
           }
@@ -1115,7 +1138,7 @@ export async function DELETE(req) {
       console.error("Order DELETE error:", deleteErr);
       return Response.json(
         { success: false, error: deleteErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
     postOrderSheetsWebhook("delete", existing);
@@ -1125,7 +1148,7 @@ export async function DELETE(req) {
     console.error("Order DELETE unexpected:", err);
     return Response.json(
       { success: false, error: "Server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

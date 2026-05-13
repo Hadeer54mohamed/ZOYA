@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./context/CartContext";
@@ -21,10 +22,15 @@ export const metadata = {
   description: "ZØYA - Wear Your Identity",
 };
 
+const THEME_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var m=document.cookie.match(/(?:^|; )zoya-theme=([^;]*)/);var v=m?decodeURIComponent(m[1]):'';var mode=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=mode==='dark'||(mode==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(mode==='light')dark=false;if(dark){d.classList.add('dark');d.style.colorScheme='dark';}else{d.classList.remove('dark');d.style.colorScheme='light';}}catch(e){}})();`;
+
 export default async function RootLayout({ children }) {
   const cookieStore = await cookies();
   const themeCookie = cookieStore.get("zoya-theme")?.value;
-  const theme = themeCookie === "light" ? "light" : "dark";
+  const theme =
+    themeCookie === "light" || themeCookie === "dark" || themeCookie === "system"
+      ? themeCookie
+      : "system";
   const isDark = theme === "dark";
 
   const products = await getAllProducts();
@@ -35,9 +41,18 @@ export default async function RootLayout({ children }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased ${
         isDark ? "dark" : ""
       }`}
-      style={{ colorScheme: theme }}
+      style={{
+        colorScheme: theme === "system" ? "normal" : theme,
+      }}
       suppressHydrationWarning
     >
+      <head>
+        <Script
+          id="zoya-theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
         <ThemeProvider initialTheme={theme}>
           <CartProvider>

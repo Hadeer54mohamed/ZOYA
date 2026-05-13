@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCart } from "../context/CartContext";
 import Skeleton from "./Skeleton";
-import { Lock, Truck, RotateCcw, ShieldCheck } from "lucide-react";
+import { Truck, RotateCcw, ShieldCheck } from "lucide-react";
 import ReturnPolicyNotice from "./ReturnPolicyNotice";
 
 // Normalize color to support both legacy `image` and new `images[]`
@@ -277,7 +277,7 @@ export default function QuickView({ product, onClose, initialColor = null }) {
 
               {/* Perks - moved into scrollable area (desktop shows at bottom of info, mobile shows above sticky actions) */}
               <div className="pt-8 border-t border-black/10 dark:border-white/5">
-              <div className="grid grid-cols-3 gap-4 text-[11px] tracking-tight text-black/60 dark:text-white/40 uppercase">
+              <div className="hidden sm:grid grid-cols-3 gap-4 text-[11px] tracking-tight text-black/60 dark:text-white/40 uppercase">
                 <div className="flex flex-col items-center gap-2 text-center">
                   <Truck size={18} className="text-[#FF4DA3]" />
                   <span>Express Delivery</span>
@@ -358,17 +358,20 @@ export default function QuickView({ product, onClose, initialColor = null }) {
                 </svg>
               </Link>
 
-              {/* Mobile perks - compact icons only */}
-              <div className="sm:hidden grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-black/5 dark:border-white/5 text-[8px] text-black/40 dark:text-white/30 font-bold uppercase tracking-[0.15em]">
-                <span className="flex items-center justify-center gap-1">
-                  <Lock size={10} /> Secure
-                </span>
-                <span className="flex items-center justify-center gap-1">
-                  <Truck size={10} /> Express
-                </span>
-                <span className="flex items-center justify-center gap-1">
-                  <RotateCcw size={10} /> Returns
-                </span>
+              {/* Mobile: same perks row as desktop, once — below actions */}
+              <div className="sm:hidden grid grid-cols-3 gap-4 mt-3 pt-3 border-t border-black/10 dark:border-white/5 text-[11px] tracking-tight text-black/60 dark:text-white/40 uppercase">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <Truck size={18} className="text-[#FF4DA3]" />
+                  <span>Express Delivery</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <ShieldCheck size={18} className="text-[#FF4DA3]" />
+                  <span>Secure Payment</span>
+                </div>
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <RotateCcw size={18} className="text-[#FF4DA3]" />
+                  <span>Easy Returns</span>
+                </div>
               </div>
             </div>
           </div>
