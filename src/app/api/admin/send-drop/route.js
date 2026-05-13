@@ -1,10 +1,18 @@
 import { Resend } from "resend";
-import { getLatestProduct } from "../../../../sanity/lib/products";
+import {
+  getLatestProduct,
+  getProductForNewsletterBySlug,
+} from "../../../../sanity/lib/products";
 import { getSubscribers } from "../../newsletter/_lib/subscribers";
 import {
   buildAutomaticDropHtml,
-  sendNewsletterEmailsInBatches,
-} from "../../newsletter/_lib/sendNewsletterBatches";
+  buildDropSubject,
+} from "../../newsletter/_lib/newsletterDropHtml";
+import {
+  parseNewsletterPostBody,
+  pickNewsletterProductSlug,
+} from "../../newsletter/_lib/parseNewsletterPostBody";
+import { sendNewsletterEmailsInBatches } from "../../newsletter/_lib/sendNewsletterBatches";
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -33,18 +41,25 @@ export async function POST(req) {
       );
     }
 
-    const product = await getLatestProduct();
+    const body = await parseNewsletterPostBody(req);
+    const slug = pickNewsletterProductSlug(body);
+    const product = slug
+      ? await getProductForNewsletterBySlug(slug)
+      : await getLatestProduct();
     const subscribers = await getSubscribers();
 
     if (!product) {
-      return Response.json({ error: "No product found" }, { status: 404 });
+      return Response.json(
+        { error: slug ? "Product not found" : "No product found" },
+        { status: slug ? 404 : 400 }
+      );
     }
     if (subscribers.length === 0) {
       return Response.json({ error: "No subscribers" }, { status: 400 });
     }
 
     const productUrl = `${SITE_URL}/product/${encodeURIComponent(product.id)}`;
-    const subject = `New Drop: ${product.name} ✦`;
+    const subject = buildDropSubject(product.name, { manual: false });
     const html = buildAutomaticDropHtml(product, productUrl);
 
     const result = await sendNewsletterEmailsInBatches(resend, {
@@ -55,11 +70,14 @@ export async function POST(req) {
       batchSize: 50,
       maxAttemptsPerBatch: 6,
       logPrefix: "[admin/send-drop]",
+      campaignId: body?.campaignId ?? null,
     });
 
     return Response.json({
       ...result,
       product: product.name,
+      productId: product.id,
+      usedLatestProduct: !slug,
       url: productUrl,
     });
   } catch (err) {

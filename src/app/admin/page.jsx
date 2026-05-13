@@ -38,6 +38,7 @@ import {
   Palette,
   Ruler,
   AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 
 const STATUS_META = {
@@ -162,6 +163,10 @@ function AdminDashboard({ password }) {
   const [profitModalOpen, setProfitModalOpen] = useState(false);
   const [productsModalOpen, setProductsModalOpen] = useState(false);
   const [sendDropLoading, setSendDropLoading] = useState(false);
+  const [newsletterProductId, setNewsletterProductId] = useState("");
+  const [newsletterCatalog, setNewsletterCatalog] = useState([]);
+  const [newsletterPickModalOpen, setNewsletterPickModalOpen] = useState(false);
+  const [newsletterPickSearch, setNewsletterPickSearch] = useState("");
   const [stockSummary, setStockSummary] = useState(null);
   const [stockBannerDismissed, setStockBannerDismissed] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -177,20 +182,67 @@ function AdminDashboard({ password }) {
     });
   };
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/products");
+        const j = await r.json();
+        if (cancelled || !j?.success || !Array.isArray(j.products)) return;
+        const sorted = [...j.products].sort((a, b) =>
+          String(a.name || "").localeCompare(String(b.name || ""), "en", {
+            sensitivity: "base",
+          })
+        );
+        setNewsletterCatalog(sorted);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (newsletterPickModalOpen) setNewsletterPickSearch("");
+  }, [newsletterPickModalOpen]);
+
+  const newsletterPickedProduct = useMemo(
+    () => newsletterCatalog.find((p) => p.id === newsletterProductId) ?? null,
+    [newsletterCatalog, newsletterProductId]
+  );
+
+  const newsletterFilteredCatalog = useMemo(() => {
+    const q = newsletterPickSearch.trim().toLowerCase();
+    if (!q) return newsletterCatalog;
+    return newsletterCatalog.filter(
+      (p) =>
+        (p.name && String(p.name).toLowerCase().includes(q)) ||
+        (p.id && String(p.id).toLowerCase().includes(q))
+    );
+  }, [newsletterCatalog, newsletterPickSearch]);
+
   const sendManualDropEmail = async () => {
     if (sendDropLoading || !password) return;
+    const slug = newsletterProductId.trim();
+    const scopeHint = slug
+      ? `Selected product (slug: ${slug}).`
+      : "Latest product in Sanity (by creation date, automatic).";
     const confirmed = window.confirm(
-      "سيتم إرسال بريد Manual Drop لجميع المشتركين (آخر منتج في Sanity حسب تاريخ الإنشاء). متابعة؟"
+      `Send a Manual Drop email to all newsletter subscribers?\n${scopeHint}\nContinue?`
     );
     if (!confirmed) return;
     setSendDropLoading(true);
     try {
       const res = await adminFetch("/api/newsletter/send-manual", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(slug ? { productId: slug } : {}),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(json?.error || "فشل إرسال النشرة.");
+        alert(json?.error || "Newsletter send failed.");
         return;
       }
       const ok =
@@ -198,8 +250,8 @@ function AdminDashboard({ password }) {
         (json.batchesFailed === 0 && (json.sentPayloads ?? 0) > 0);
       alert(
         ok
-          ? `تم الإرسال.\nالمستلمون (رسائل فردية): ${json.sentPayloads ?? "—"}\nدفعات ناجحة: ${json.batchesSucceeded ?? "—"} / ${json.batchesAttempted ?? "—"}\nإعادة محاولة إجمالية للدفعات: ${json.batchRetries ?? 0}\nالمنتج: ${json.product ?? "—"}`
-          : `اكتمل الإرسال مع وجود دفعات فاشلة.\nتحققي من السجلات على السيرفر.\n${JSON.stringify(json, null, 2)}`
+          ? `Sent.\nCampaign: ${json.campaignId ?? "—"}\nRecipients (individual messages): ${json.sentPayloads ?? "—"}\nSuccessful batches: ${json.batchesSucceeded ?? "—"} / ${json.batchesAttempted ?? "—"}\nTotal batch retries: ${json.batchRetries ?? 0}\nProduct: ${json.product ?? "—"}${json.usedLatestProduct === false ? " (picked)" : json.usedLatestProduct === true ? " (latest)" : ""}`
+          : `Send finished with failed batches.\nCheck server logs.\n${JSON.stringify(json, null, 2)}`
       );
     } catch {
       alert("Network error. Please try again.");
@@ -459,12 +511,51 @@ function AdminDashboard({ password }) {
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setNewsletterPickModalOpen(true)}
+              disabled={sendDropLoading || !password}
+              title="Pick newsletter product (or latest product)"
+              aria-haspopup="dialog"
+              aria-expanded={newsletterPickModalOpen}
+              className="flex items-center gap-2 pl-1 pr-2.5 sm:pr-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed"
+            >
+              <span className="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden bg-black/[0.06] dark:bg-white/[0.08] ring-1 ring-black/10 dark:ring-white/10 grid place-items-center">
+                {newsletterPickedProduct?.image ? (
+                  <Image
+                    src={newsletterPickedProduct.image}
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="h-full w-full object-cover"
+                    sizes="36px"
+                  />
+                ) : (
+                  <Sparkles
+                    size={16}
+                    className="text-[#FF4DA3]/80"
+                    aria-hidden
+                  />
+                )}
+              </span>
+              <span className="hidden sm:flex flex-col items-start min-w-0 max-w-[120px] text-left leading-tight">
+                <span className="text-[9px] uppercase tracking-[0.2em] text-black/40 dark:text-white/45 font-semibold">
+                  Newsletter
+                </span>
+                <span className="text-[10px] font-bold text-black/75 dark:text-white/80 truncate w-full">
+                  {newsletterProductId
+                    ? newsletterPickedProduct?.name || newsletterProductId
+                    : "Latest product"}
+                </span>
+              </span>
+            </button>
             <button
               type="button"
               onClick={sendManualDropEmail}
               disabled={sendDropLoading || !password}
               className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed"
-              title="يرسل أحدث منتج لقائمة newsletter_subscribers عبر Resend (دفعات ٥٠ + إعادة محاولة)"
+              title="Send Manual Drop via Resend (batched + retries). Optional: pick a product or use latest."
             >
               <Send
                 size={14}
@@ -477,6 +568,7 @@ function AdminDashboard({ password }) {
               </span>
               <div className="absolute inset-0 rounded-full bg-[#FF4DA3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
+          </div>
 
             <button
               onClick={() => setProductsModalOpen(true)}
@@ -704,7 +796,7 @@ function AdminDashboard({ password }) {
               ))}
             </div>
 
-            {/* Pagination Controls - تظهر فقط إذا كان هناك أكثر من صفحة */}
+            {/* Pagination — only when more than one page */}
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-4 mt-10 pb-10">
                 <button
@@ -769,6 +861,159 @@ function AdminDashboard({ password }) {
             password={password}
             onClose={() => setProductsModalOpen(false)}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {newsletterPickModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setNewsletterPickModalOpen(false)}
+            role="presentation"
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-3xl max-h-[88vh] flex flex-col bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/25"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="newsletter-pick-title"
+            >
+              <div className="shrink-0 flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-black/10 dark:border-white/10">
+                <div className="min-w-0">
+                  <h2
+                    id="newsletter-pick-title"
+                    className="text-base sm:text-lg font-bold tracking-tight"
+                  >
+                    Newsletter product
+                  </h2>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-black/45 dark:text-white/45 mt-0.5">
+                    Image + name · or latest product (automatic)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNewsletterPickModalOpen(false)}
+                  aria-label="Close"
+                  className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="shrink-0 px-4 sm:px-5 pt-3 pb-2">
+                <div className="relative">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-black/35 dark:text-white/35"
+                    size={16}
+                  />
+                  <input
+                    type="search"
+                    value={newsletterPickSearch}
+                    onChange={(e) => setNewsletterPickSearch(e.target.value)}
+                    placeholder="Search by name or slug…"
+                    className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.05] py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#FF4DA3]/35"
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 pb-5 pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewsletterProductId("");
+                      setNewsletterPickModalOpen(false);
+                    }}
+                    className={`group text-left rounded-2xl border-2 overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] ${
+                      !newsletterProductId
+                        ? "border-[#FF4DA3] ring-2 ring-[#FF4DA3]/25 shadow-[0_0_0_1px_rgba(255,77,163,0.2)]"
+                        : "border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/50"
+                    }`}
+                  >
+                    <div className="aspect-square bg-gradient-to-br from-[#FF4DA3]/20 to-black/5 dark:to-white/5 grid place-items-center">
+                      <Sparkles
+                        size={32}
+                        className="text-[#FF4DA3]"
+                        strokeWidth={2}
+                      />
+                    </div>
+                    <div className="p-2.5 border-t border-black/5 dark:border-white/5">
+                      <p className="text-[11px] font-black uppercase tracking-wide text-[#FF4DA3]">
+                        Automatic
+                      </p>
+                      <p className="text-[10px] text-black/55 dark:text-white/50 mt-0.5 line-clamp-2">
+                        Latest product in Sanity (by creation date)
+                      </p>
+                    </div>
+                  </button>
+
+                  {newsletterFilteredCatalog.map((p) => {
+                    const selected = newsletterProductId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setNewsletterProductId(p.id);
+                          setNewsletterPickModalOpen(false);
+                        }}
+                        className={`group text-left rounded-2xl border-2 overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] ${
+                          selected
+                            ? "border-[#FF4DA3] ring-2 ring-[#FF4DA3]/25 shadow-[0_0_0_1px_rgba(255,77,163,0.2)]"
+                            : "border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/40"
+                        }`}
+                      >
+                        <div className="aspect-square relative bg-black/[0.04] dark:bg-white/[0.06]">
+                          {p.image ? (
+                            <Image
+                              src={p.image}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              sizes="(max-width:640px) 50vw, 33vw"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 grid place-items-center text-[10px] font-bold text-black/30 dark:text-white/30">
+                              No image
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-2.5 border-t border-black/5 dark:border-white/5">
+                          <p className="text-[11px] font-bold text-black/90 dark:text-white/90 line-clamp-2 leading-snug">
+                            {p.name}
+                          </p>
+                          <p className="text-[9px] text-black/40 dark:text-white/40 mt-0.5 font-mono truncate">
+                            {p.id}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {newsletterPickSearch.trim() &&
+                  newsletterFilteredCatalog.length === 0 && (
+                    <p className="text-center text-xs text-black/50 dark:text-white/45 py-4">
+                      No products match your search. Try other keywords or clear the search.
+                    </p>
+                  )}
+
+                {newsletterCatalog.length === 0 && (
+                  <p className="text-center text-sm text-black/45 dark:text-white/45 py-6">
+                    No products loaded. Check your connection or{" "}
+                    <code className="text-[11px]">/api/products</code>.
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -1283,11 +1528,11 @@ function ProductAnalyticsModal({ password, onClose }) {
     if (resettingStock) return;
     const ids = Array.from(selectedProductIds);
     if (ids.length === 0) {
-      alert("اختار منتج واحد على الأقل.");
+      alert("Select at least one product.");
       return;
     }
     const ok = window.confirm(
-      `هترجّع المخزون لقيم initialStock للمنتجات المختارة (${ids.length}). متأكد؟`
+      `This will reset stock to initialStock for ${ids.length} selected product(s). Continue?`
     );
     if (!ok) return;
     setResettingStock(true);
@@ -1299,11 +1544,11 @@ function ProductAnalyticsModal({ password, onClose }) {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.success) {
-        alert(json?.error || "فشل Reset المخزون. جرّب تاني.");
+        alert(json?.error || "Stock reset failed. Please try again.");
         return;
       }
       alert(
-        `تم Reset المخزون.\nProducts: ${json.productsTouched ?? 0}\nEntries: ${json.entriesSet ?? 0}`
+        `Stock reset complete.\nProducts: ${json.productsTouched ?? 0}\nEntries: ${json.entriesSet ?? 0}`
       );
       setReloadNonce((n) => n + 1);
       setSelectedProductIds(new Set());

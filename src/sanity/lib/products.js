@@ -126,6 +126,32 @@ const LATEST_PRODUCT_QUERY = /* groq */ `
   }
 `;
 
+function mapNewsletterProductRow(raw) {
+  if (!raw?.id) return null;
+  let image = null;
+  if (raw.firstImage) {
+    try {
+      image = urlFor(raw.firstImage)
+        .width(1200)
+        .quality(85)
+        .auto("format")
+        .url();
+    } catch {
+      image = null;
+    }
+  }
+  return {
+    _id: raw._id,
+    id: raw.id,
+    name: raw.name,
+    description: raw.description || "",
+    category: raw.category || "",
+    image,
+    price: raw.price ?? 0,
+    url: `${process.env.NEXT_PUBLIC_SITE_URL}/product/${raw.id}`,
+  };
+}
+
 export async function getLatestProduct() {
   try {
     const raw = await client.fetch(
@@ -133,33 +159,41 @@ export async function getLatestProduct() {
       {},
       { next: { revalidate: 0 } }
     );
-    if (!raw?.id) return null;
-
-    let image = null;
-    if (raw.firstImage) {
-      try {
-        image = urlFor(raw.firstImage)
-          .width(1200)
-          .quality(85)
-          .auto("format")
-          .url();
-      } catch {
-        image = null;
-      }
-    }
-
-    return {
-      _id: raw._id,
-      id: raw.id,
-      name: raw.name,
-      description: raw.description || "",
-      category: raw.category || "",
-      image,
-      price: raw.price ?? 0,
-      url: `${process.env.NEXT_PUBLIC_SITE_URL}/product/${raw.id}`,
-    };
+    return mapNewsletterProductRow(raw);
   } catch (err) {
     console.error("[sanity] getLatestProduct failed:", err?.message || err);
+    return null;
+  }
+}
+
+/** Same shape as `getLatestProduct` but for a specific product slug (newsletter / admin pick). */
+const PRODUCT_BY_SLUG_FOR_NEWSLETTER_QUERY = /* groq */ `
+  *[_type == "product" && slug.current == $slug][0]{
+    _id,
+    "id": slug.current,
+    name,
+    description,
+    price,
+    "category": category->title,
+    "firstImage": colors[0].images[0]
+  }
+`;
+
+export async function getProductForNewsletterBySlug(slug) {
+  const id = String(slug ?? "").trim();
+  if (!id) return null;
+  try {
+    const raw = await client.fetch(
+      PRODUCT_BY_SLUG_FOR_NEWSLETTER_QUERY,
+      { slug: id },
+      { next: { revalidate: 0 } }
+    );
+    return mapNewsletterProductRow(raw);
+  } catch (err) {
+    console.error(
+      "[sanity] getProductForNewsletterBySlug failed:",
+      err?.message || err
+    );
     return null;
   }
 }
