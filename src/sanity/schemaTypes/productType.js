@@ -1,5 +1,7 @@
 import { defineField, defineType, defineArrayMember } from "sanity";
 
+import { HomeSliderColorsInput } from "../components/HomeSliderColorsInput";
+
 export const productType = defineType({
   name: "product",
   title: "Product",
@@ -214,6 +216,20 @@ export const productType = defineType({
           },
         }),
       ],
+    }),
+    defineField({
+      name: "homeSliderColor",
+      title: "Home Slider colors (Limited section)",
+      type: "array",
+      description:
+        "Pick one or more color variants — each gets its own card in the Limited home slider. Leave empty to use the first color’s image only.",
+      of: [defineArrayMember({ type: "string" })],
+      options: {
+        list: [],
+      },
+      components: {
+        input: HomeSliderColorsInput,
+      },
     }),
     defineField({
       name: "sizes",

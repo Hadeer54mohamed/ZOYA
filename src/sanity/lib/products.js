@@ -2,6 +2,17 @@ import { client } from "./client";
 import { urlFor } from "./image";
 import { writeClient, hasWriteToken } from "./writeClient";
 
+/** Normalize legacy string or new string[] from Sanity. */
+function normalizeHomeSliderColors(value) {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v ?? "").trim()).filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) {
+    return [value.trim()];
+  }
+  return [];
+}
+
 const PRODUCTS_QUERY = /* groq */ `
   *[_type == "product"] | order(coalesce(order, 100) asc, _createdAt asc) {
     "id": slug.current,
@@ -11,6 +22,7 @@ const PRODUCTS_QUERY = /* groq */ `
     originalPrice,
     description,
     badge,
+    homeSliderColor,
     sizes,
     "colors": colors[]{
       name,
@@ -52,6 +64,7 @@ function mapProduct(raw) {
     originalPrice,
     description: raw.description || "",
     badge: raw.badge || null,
+    homeSliderColor: normalizeHomeSliderColors(raw.homeSliderColor),
     sizes: Array.isArray(raw.sizes) && raw.sizes.length ? raw.sizes : ["S", "M", "L"],
     colors: (raw.colors || []).map((c) => ({
       name: c?.name || "Default",

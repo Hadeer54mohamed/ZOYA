@@ -1,26 +1,74 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
 import Image from "next/image";
 
+function getHomeSliderEntries(product) {
+  const colors = Array.isArray(product?.colors) ? product.colors : [];
+  const picks = Array.isArray(product?.homeSliderColor)
+    ? product.homeSliderColor.map((x) => String(x ?? "").trim()).filter(Boolean)
+    : typeof product?.homeSliderColor === "string" &&
+        String(product.homeSliderColor).trim()
+      ? [String(product.homeSliderColor).trim()]
+      : [];
+
+  const entries = [];
+  for (const name of picks) {
+    const found = colors.find((c) => String(c?.name ?? "").trim() === name);
+    const url = found?.images?.[0];
+    if (typeof url === "string" && url) {
+      entries.push({ imageUrl: url, colorName: name });
+    }
+  }
+
+  if (entries.length === 0) {
+    const variant = colors[0];
+    const url = variant?.images?.[0];
+    if (typeof url === "string" && url) {
+      entries.push({
+        imageUrl: url,
+        colorName: String(variant?.name ?? "").trim(),
+      });
+    }
+  }
+  return entries;
+}
+
 export default function HorizontalProductSection({ products = [] }) {
   const router = useRouter();
   const scrollRef = useRef(null);
-
-  const limitedProducts = products.filter(
-    (p) => String(p?.badge || "").toUpperCase() === "LIMITED"
-  );
-
-  if (limitedProducts.length === 0) return null;
-
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [progress, setProgress] = useState(12);
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  const limitedProducts = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          Array.isArray(p?.homeSliderColor) && p.homeSliderColor.length > 0,
+      ),
+    [products],
+  );
+
+  const sliderItems = useMemo(
+    () =>
+      limitedProducts
+        .flatMap((p) =>
+          getHomeSliderEntries(p).map(({ imageUrl, colorName }, idx) => ({
+            key: `${p.id}-${colorName || "default"}-${idx}`,
+            product: p,
+            imageUrl,
+            colorName: colorName || "",
+          })),
+        )
+        .filter((x) => x.imageUrl),
+    [limitedProducts],
+  );
 
   const updateScrollState = () => {
     const el = scrollRef.current;
@@ -43,7 +91,7 @@ export default function HorizontalProductSection({ products = [] }) {
       el.removeEventListener("scroll", updateScrollState);
       window.removeEventListener("resize", updateScrollState);
     };
-  }, []);
+  }, [sliderItems.length]);
 
   const scrollBy = (dir) => {
     const el = scrollRef.current;
@@ -51,6 +99,8 @@ export default function HorizontalProductSection({ products = [] }) {
     const step = Math.min(el.clientWidth * 0.8, 340);
     el.scrollBy({ left: dir * step, behavior: "smooth" });
   };
+
+  if (sliderItems.length === 0) return null;
 
   const handleCardClick = (product) => {
     setSelectedProduct(product);
@@ -62,7 +112,10 @@ export default function HorizontalProductSection({ products = [] }) {
   };
 
   return (
-    <section id="collections" className="relative  bg-[#fafafa] dark:bg-[#050505] overflow-hidden transition-colors duration-500">
+    <section
+      id="collections"
+      className="relative  bg-[#fafafa] dark:bg-[#050505] overflow-hidden transition-colors duration-500"
+    >
       {/* Background accents */}
       <div className="pointer-events-none absolute top-10 right-0 h-[300px] w-[300px] rounded-full bg-[#FF4DA3]/10 blur-[120px]" />
       <div className="pointer-events-none absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-purple-500/10 blur-[120px]" />
@@ -121,94 +174,67 @@ export default function HorizontalProductSection({ products = [] }) {
           className="flex gap-5 md:gap-6 px-6 overflow-x-auto overflow-y-hidden scroll-smooth snap-x snap-mandatory no-scrollbar"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          {limitedProducts.map((p, i) => (
-            <motion.div
-              key={p.id}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ delay: Math.min(i * 0.05, 0.4), duration: 0.6 }}
-              whileHover={{ y: -6 }}
-              onClick={() => handleCardClick(p)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setSelectedProduct(p);
-                }
-              }}
-              className="shrink-0 snap-start w-[260px] sm:w-[300px] md:w-[340px] group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] rounded-2xl"
-            >
-              <div className="relative overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
-                <Image
-                  width={100}
-                  height={100}
-                  src={p.colors[0].images[0]}
-                  alt={p.name}
-                  draggable={false}
-                  className="w-full h-[380px] md:h-[420px] object-cover pointer-events-none group-hover:scale-110 transition-transform duration-700 ease-out"
-                />
+          {sliderItems.map(
+            ({ key, product: p, imageUrl: sliderImg, colorName }, i) => (
+              <motion.div
+                key={key}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ delay: Math.min(i * 0.05, 0.4), duration: 0.6 }}
+                whileHover={{ y: -6 }}
+                onClick={() => handleCardClick(p)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedProduct(p);
+                  }
+                }}
+                className="shrink-0 snap-start w-[260px] sm:w-[300px] md:w-[340px] group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] rounded-2xl"
+              >
+                <div className="relative overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
+                  <Image
+                    width={100}
+                    height={100}
+                    src={sliderImg}
+                    alt={p.name}
+                    draggable={false}
+                    className="w-full h-[380px] md:h-[420px] object-cover pointer-events-none group-hover:scale-110 transition-transform duration-700 ease-out"
+                  />
 
-                {/* Bottom gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                  {/* Bottom gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
-                {/* Pink glow on hover */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-gradient-to-t from-[#FF4DA3]/20 to-transparent" />
+                  {/* Pink glow on hover */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-500 bg-gradient-to-t from-[#FF4DA3]/20 to-transparent" />
 
-                {/* Top badge */}
-                <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/90 text-black text-[9px] font-bold tracking-widest uppercase shadow">
-                  #{String(i + 1).padStart(2, "0")}
-                </span>
+                  {/* Top badge */}
+                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/90 text-black text-[9px] font-bold tracking-widest uppercase shadow">
+                    #{String(i + 1).padStart(2, "0")}
+                  </span>
+                  {colorName ? (
+                    <span className="absolute top-12 left-3 max-w-[70%] truncate px-2 py-0.5 rounded-md bg-black/55 text-white text-[9px] font-semibold tracking-wide backdrop-blur-sm">
+                      {colorName}
+                    </span>
+                  ) : null}
 
-                {/* Details pill — always visible on mobile, hover-only on desktop */}
-                <button
-                  type="button"
-                  onClick={(e) => handleGoToProduct(e, p)}
-                  aria-label="View full details"
-                  className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 hover:bg-black backdrop-blur-md text-white text-[9px] font-bold tracking-widest uppercase shadow opacity-100 md:opacity-0 md:group-hover:opacity-100 transition"
-                >
-                  Details
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M5 12h14" />
-                    <path d="m12 5 7 7-7 7" />
-                  </svg>
-                </button>
-
-                {/* Info */}
-                <div className="absolute inset-x-0 bottom-0 p-5 text-white flex items-end justify-between">
-                  <div>
-                    <p className="text-white/60 text-[9px] tracking-[0.3em] uppercase">
-                      {p.category}
-                    </p>
-                    <h3 className="text-lg font-semibold leading-tight mt-1">
-                      {p.name}
-                    </h3>
-                    <p className="text-white/70 text-sm mt-0.5">
-                      EGP {p.price}
-                    </p>
-                  </div>
+                  {/* Details pill — always visible on mobile, hover-only on desktop */}
                   <button
-                    aria-label="View full details"
+                    type="button"
                     onClick={(e) => handleGoToProduct(e, p)}
-                    className="h-10 w-10 grid place-items-center rounded-full bg-[#FF4DA3] text-black md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 transition-all duration-300 hover:scale-105"
+                    aria-label="View full details"
+                    className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 hover:bg-black backdrop-blur-md text-white text-[9px] font-bold tracking-widest uppercase shadow opacity-100 md:opacity-0 md:group-hover:opacity-100 transition"
                   >
+                    Details
                     <svg
-                      width="14"
-                      height="14"
+                      width="10"
+                      height="10"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="2.5"
+                      strokeWidth="2.4"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     >
@@ -216,10 +242,44 @@ export default function HorizontalProductSection({ products = [] }) {
                       <path d="m12 5 7 7-7 7" />
                     </svg>
                   </button>
+
+                  {/* Info */}
+                  <div className="absolute inset-x-0 bottom-0 p-5 text-white flex items-end justify-between">
+                    <div>
+                      <p className="text-white/60 text-[9px] tracking-[0.3em] uppercase">
+                        {p.category}
+                      </p>
+                      <h3 className="text-lg font-semibold leading-tight mt-1">
+                        {p.name}
+                      </h3>
+                      <p className="text-white/70 text-sm mt-0.5">
+                        EGP {p.price}
+                      </p>
+                    </div>
+                    <button
+                      aria-label="View full details"
+                      onClick={(e) => handleGoToProduct(e, p)}
+                      className="h-10 w-10 grid place-items-center rounded-full bg-[#FF4DA3] text-black md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 transition-all duration-300 hover:scale-105"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M5 12h14" />
+                        <path d="m12 5 7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ),
+          )}
         </div>
       </div>
 

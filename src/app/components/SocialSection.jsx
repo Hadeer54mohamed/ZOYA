@@ -29,7 +29,7 @@ const TikTokIcon = (props) => (
 const socials = [
   { name: "Instagram", icon: InstagramIcon, link: "#", color: "#FF4DA3", desc: "Behind the scenes" },
   { name: "Facebook", icon: FacebookIcon, link: "#", color: "#1877F2", desc: "Updates & news" },
-  { name: "WhatsApp", icon: WhatsAppIcon, link: "#", color: "#25D366", desc: "Instant contact" },
+  { name: "WhatsApp", icon: WhatsAppIcon, link: "https://wa.me/201095894883", color: "#25D366", desc: "Instant contact" },
   { name: "TikTok", icon: TikTokIcon, link: "#", color: "#000000", desc: "Short form vibes" },
 ];
 

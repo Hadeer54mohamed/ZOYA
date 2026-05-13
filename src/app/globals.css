@@ -157,3 +157,11 @@ html {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #FF4DA3;
 }
+
+/* next-sanity defaults the Studio shell to 100vh; with a site header (and footer)
+   the document pane grows past the viewport and Publish / Delete sit off-screen. */
+.studio-route-shell [data-ui="NextStudioLayout"] {
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
