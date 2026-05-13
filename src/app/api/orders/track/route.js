@@ -6,6 +6,7 @@ import {
 import { getShippingFeesMapCached } from "../../../../sanity/lib/shippingFees";
 import { getProductCostsByIds } from "../../../../sanity/lib/products";
 import { postOrderSheetsWebhook } from "../../../../lib/ordersSheetsWebhook";
+import { notifyCustomerTrackOrderChange } from "../../../../lib/customerOrderEditedEmail";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -219,7 +220,7 @@ export async function PATCH(req) {
     const { data: existingRows, error: fetchErr } = await supabase
       .from("orders")
       .select(
-        "id, order_id, customer_name, status, phone, address, items, governorate, shipping_fee, total_price, total_cost, profit, cost_complete, discount_code, discount_amount, payment_method"
+        "id, order_id, customer_name, email, status, phone, address, items, governorate, shipping_fee, total_price, total_cost, profit, cost_complete, discount_code, discount_amount, payment_method"
       )
       .in("order_id", idCandidates)
       .order("created_at", { ascending: false })
@@ -271,6 +272,11 @@ export async function PATCH(req) {
       }
 
       postOrderSheetsWebhook("update", { ...existing, status: "cancelled" });
+
+      await notifyCustomerTrackOrderChange(
+        { ...existing, status: "cancelled" },
+        "cancelled"
+      );
 
       return Response.json({ success: true, cancelled: true });
     }
@@ -488,12 +494,16 @@ export async function PATCH(req) {
     const { data: updated } = await supabase
       .from("orders")
       .select(
-        "id, order_id, customer_name, phone, address, items, total_price, payment_method, status, created_at"
+        "id, order_id, customer_name, email, phone, address, items, total_price, shipping_fee, discount_code, discount_amount, payment_method, status, created_at"
       )
       .eq("id", existing.id)
       .maybeSingle();
 
     if (updated) postOrderSheetsWebhook("update", updated);
+
+    if (updated) {
+      await notifyCustomerTrackOrderChange(updated, "updated");
+    }
 
     return Response.json({ success: true });
   } catch (err) {

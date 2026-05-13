@@ -34,6 +34,7 @@ import {
   ArrowDown,
   Minus,
   Boxes,
+  Send,
   Palette,
   Ruler,
   AlertTriangle,
@@ -160,6 +161,7 @@ function AdminDashboard({ password }) {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [profitModalOpen, setProfitModalOpen] = useState(false);
   const [productsModalOpen, setProductsModalOpen] = useState(false);
+  const [sendDropLoading, setSendDropLoading] = useState(false);
   const [stockSummary, setStockSummary] = useState(null);
   const [stockBannerDismissed, setStockBannerDismissed] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -173,6 +175,37 @@ function AdminDashboard({ password }) {
         ...(init.headers || {}),
       },
     });
+  };
+
+  const sendManualDropEmail = async () => {
+    if (sendDropLoading || !password) return;
+    const confirmed = window.confirm(
+      "سيتم إرسال بريد Manual Drop لجميع المشتركين (آخر منتج في Sanity حسب تاريخ الإنشاء). متابعة؟"
+    );
+    if (!confirmed) return;
+    setSendDropLoading(true);
+    try {
+      const res = await adminFetch("/api/newsletter/send-manual", {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(json?.error || "فشل إرسال النشرة.");
+        return;
+      }
+      const ok =
+        json.success === true ||
+        (json.batchesFailed === 0 && (json.sentPayloads ?? 0) > 0);
+      alert(
+        ok
+          ? `تم الإرسال.\nالمستلمون (رسائل فردية): ${json.sentPayloads ?? "—"}\nدفعات ناجحة: ${json.batchesSucceeded ?? "—"} / ${json.batchesAttempted ?? "—"}\nإعادة محاولة إجمالية للدفعات: ${json.batchRetries ?? 0}\nالمنتج: ${json.product ?? "—"}`
+          : `اكتمل الإرسال مع وجود دفعات فاشلة.\nتحققي من السجلات على السيرفر.\n${JSON.stringify(json, null, 2)}`
+      );
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setSendDropLoading(false);
+    }
   };
 
   const fetchOrders = async ({ silent = false } = {}) => {
@@ -426,6 +459,25 @@ function AdminDashboard({ password }) {
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={sendManualDropEmail}
+              disabled={sendDropLoading || !password}
+              className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed"
+              title="يرسل أحدث منتج لقائمة newsletter_subscribers عبر Resend (دفعات ٥٠ + إعادة محاولة)"
+            >
+              <Send
+                size={14}
+                className={`text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors ${
+                  sendDropLoading ? "animate-pulse" : ""
+                }`}
+              />
+              <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] font-semibold text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors">
+                {sendDropLoading ? "Sending…" : "Send Drop Email"}
+              </span>
+              <div className="absolute inset-0 rounded-full bg-[#FF4DA3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+
             <button
               onClick={() => setProductsModalOpen(true)}
               className={`group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border transition-all active:scale-95 ${

@@ -7,8 +7,22 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, ArrowLeft, Loader2, ShoppingBag, AlertCircle, Copy, Check, PackageSearch, ChevronDown, Tag, X, Search } from "lucide-react";
 import Link from "next/link";
 import { validateCheckoutForm } from "../lib/validation";
+import {
+  computeDiscountAmountEgp,
+  discountAppliedSubtitle,
+} from "../lib/discountAmount";
 import ReturnPolicyNotice from "../components/ReturnPolicyNotice";
 import InstapayNotice, { INSTAPAY_NUMBER_ENV } from "../components/InstapayNotice";
+
+const DISCOUNT_CACHE_TTL_MS = 10 * 60 * 1000;
+
+/** Digits-only + Egypt country prefix → `01xxxxxxxxx` for APIs & discount cache keys. */
+function phoneForApi(value) {
+  let d = String(value ?? "").replace(/\D/g, "");
+  if (d.startsWith("20") && d.length >= 12) d = d.slice(2);
+  if (d.length === 10 && /^1[0125]/.test(d)) d = `0${d}`;
+  return d;
+}
 
 export default function CheckoutPage() {
   const discountCache = useRef({});
@@ -30,6 +44,7 @@ export default function CheckoutPage() {
   const [copied, setCopied] = useState(false);
   const [instapayCopied, setInstapayCopied] = useState(false);
   const [instapayTransferConfirmed, setInstapayTransferConfirmed] = useState(false);
+  const [instapayConfirmedAt, setInstapayConfirmedAt] = useState(null);
   const [orderCelebrating, setOrderCelebrating] = useState(false);
   const [govOpen, setGovOpen] = useState(false);
   const [govQuery, setGovQuery] = useState("");
@@ -103,12 +118,11 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => {
-    if (form.paymentMethod !== "online") setInstapayTransferConfirmed(false);
-  }, [form.paymentMethod]);
-
-  useEffect(() => {
-    if (step !== 2) setInstapayTransferConfirmed(false);
-  }, [step]);
+    if (form.paymentMethod !== "online" || step !== 2) {
+      setInstapayTransferConfirmed(false);
+      setInstapayConfirmedAt(null);
+    }
+  }, [form.paymentMethod, step]);
 
   const [code, setCode] = useState("");
   const [discount, setDiscount] = useState(null);
@@ -120,44 +134,32 @@ export default function CheckoutPage() {
   const codeAbortRef = useRef(null);
   const discountInputRef = useRef(null);
 
-  const shippingFee = shippingFees
-    ? shippingFees[form.governorate] || 0
-    : 0;
+  const shippingFeeInvalid =
+    shippingFees != null &&
+    Boolean(form.governorate?.trim()) &&
+    !Object.prototype.hasOwnProperty.call(shippingFees, form.governorate);
 
-  const discountAmount = useMemo(() => {
-    if (!discount) return 0;
-    const value = Number(discount.value) || 0;
-    if (value <= 0) return 0;
+  const shippingFee =
+    shippingFees == null
+      ? 0
+      : !form.governorate?.trim()
+        ? 0
+        : shippingFeeInvalid
+          ? 0
+          : Number(shippingFees[form.governorate]) || 0;
 
-    // Be lenient about how the type is spelled in the DB — accept percent /
-    // percentage / % and fixed / flat / amount in any case.
-    const rawType = (discount.discount_type ?? "").toString().toLowerCase().trim();
-    const isPercent = ["percent", "percentage", "%"].includes(rawType);
-    const isFixed = ["fixed", "flat", "amount"].includes(rawType);
+  const discountAmount = useMemo(
+    () => computeDiscountAmountEgp(discount, cartTotal),
+    [discount, cartTotal]
+  );
 
-    let amount = 0;
-    if (isPercent) {
-      amount = Math.round((cartTotal * value) / 100);
-    } else if (isFixed) {
-      amount = value;
-    } else {
-      console.warn(
-        "[checkout] Unknown discount_type from API:",
-        discount.discount_type,
-        "— full discount object:",
-        discount
-      );
-    }
-    // Clamp between 0 and the subtotal — the discount can never exceed the items
-    // total or go negative, and shipping is never discounted by the code itself.
-    return Math.max(0, Math.min(cartTotal, amount));
-  }, [discount, cartTotal]);
-
-  const finalTotal = Math.max(0, cartTotal + shippingFee - discountAmount);
+  const finalTotal = shippingFeeInvalid
+    ? null
+    : Math.max(0, cartTotal + shippingFee - discountAmount);
 
   const validateDiscountCode = async (rawCode, { silent = false } = {}) => {
     const trimmed = (rawCode ?? "").trim().toUpperCase();
-    const phone = form.phone.trim();
+    const phone = phoneForApi(form.phone);
     // Cache key depends on phone too — a code valid for one phone may be
     // invalid for another (e.g. that phone already used it).
     const cacheKey = `${trimmed}|${phone}`;
@@ -177,14 +179,24 @@ export default function CheckoutPage() {
     // Cache hit — apply instantly, skip the network entirely.
     // We cache positive results only, so the server stays the source of truth
     // for invalid/expired codes (avoids stale "invalid" if an admin re-enables one).
-    const cached = discountCache.current[cacheKey];
-    if (cached) {
+    const cachedRaw = discountCache.current[cacheKey];
+    if (cachedRaw && typeof cachedRaw.ts !== "number") {
+      delete discountCache.current[cacheKey];
+    }
+    const cached =
+      cachedRaw && typeof cachedRaw.ts === "number" ? cachedRaw : null;
+    const cacheFresh =
+      cached && Date.now() - cached.ts <= DISCOUNT_CACHE_TTL_MS;
+    if (cached && !cacheFresh) {
+      delete discountCache.current[cacheKey];
+    }
+    if (cached && cacheFresh) {
       latestCodeReqRef.current = trimmed;
       setApplyingCode(false);
       discountInputRef.current?.blur();
-      setDiscount(cached);
+      setDiscount(cached.data);
       setCodeError("");
-      setCode(cached.code);
+      setCode(cached.data.code);
       return;
     }
 
@@ -222,7 +234,10 @@ export default function CheckoutPage() {
       console.log("[checkout] Discount validated:", result.discount);
 
       // Cache the validated discount so re-typing / re-applying skips the network.
-      discountCache.current[cacheKey] = result.discount;
+      discountCache.current[cacheKey] = {
+        data: result.discount,
+        ts: Date.now(),
+      };
 
       // Visually confirm "done" — blur the input so the keyboard caret leaves
       // and the field stops looking editable before the pill swaps in.
@@ -311,15 +326,21 @@ export default function CheckoutPage() {
   };
 
   const handleOrder = async () => {
-    if (loading || submittingRef.current) return;
+    if (submittingRef.current) return;
+    if (shippingFeeInvalid || finalTotal === null) {
+      setSubmitError(
+        "Shipping for your governorate could not be loaded. Please go back and select a valid region."
+      );
+      return;
+    }
     if (
       form.paymentMethod === "online" &&
       (
         !instapayTransferConfirmed ||
-        !form.senderNumber.trim() ||
-        !form.transactionReference.trim()
+        !form.senderNumber.trim()
       )
     ) return;
+
     submittingRef.current = true;
     setLoading(true);
     setSubmitError("");
@@ -344,7 +365,7 @@ export default function CheckoutPage() {
         },
         body: JSON.stringify({
           name: form.name.trim(),
-          phone: form.phone.trim(),
+          phone: phoneForApi(form.phone),
           email: form.email.trim()
             ? form.email.trim().toLowerCase()
             : null,
@@ -355,6 +376,13 @@ export default function CheckoutPage() {
           total_price: finalTotal,
           items: orderItems,
           discount_code: discount?.code ?? null,
+          sender_number: form.senderNumber || null,
+          transaction_reference: form.transactionReference || null,
+          payment_proof_url: form.paymentProofUrl || null,
+          instapay_transfer_confirmed:
+            form.paymentMethod === "online"
+              ? instapayTransferConfirmed
+              : false,
         })
       });
 
@@ -364,7 +392,6 @@ export default function CheckoutPage() {
       } catch {
         result = {};
       }
-      setLoading(false);
 
       if (!res.ok || !result?.success) {
         const serverMsg = result?.error || "";
@@ -380,7 +407,7 @@ export default function CheckoutPage() {
 
         if (isDiscountIssue) {
           if (discount?.code) {
-            const phoneKey = form.phone.trim();
+            const phoneKey = phoneForApi(form.phone);
             delete discountCache.current[`${discount.code}|${phoneKey}`];
           }
           if (codeAbortRef.current) codeAbortRef.current.abort();
@@ -397,15 +424,12 @@ export default function CheckoutPage() {
             serverMsg || `Order failed (${res.status}). Please try again.`
           );
         }
-
-        submittingRef.current = false;
         return;
       }
 
       const orderId = result.order?.order_id ?? result.order?.id ?? "";
       console.log("Order placed:", orderId);
       setPlacedOrderId(orderId);
-      submittingRef.current = false;
 
       setOrderCelebrating(true);
       window.setTimeout(() => {
@@ -413,17 +437,19 @@ export default function CheckoutPage() {
         setStep(3);
         setOrderCelebrating(false);
         setInstapayTransferConfirmed(false);
+        setInstapayConfirmedAt(null);
       }, 1100);
 
       window.setTimeout(() => router.prefetch("/"), 500);
     } catch (err) {
-      setLoading(false);
-      submittingRef.current = false;
       setOrderCelebrating(false);
       console.error("Unexpected order error:", err);
       setSubmitError(
         err?.message || "An unexpected error occurred. Please try again."
       );
+    } finally {
+      setLoading(false);
+      submittingRef.current = false;
     }
   };
 
@@ -773,6 +799,8 @@ export default function CheckoutPage() {
                                       onClick={() => {
                                         setForm({ ...form, governorate: gov });
                                         setGovOpen(false);
+                                        setGovQuery("");
+                                        govSearchRef.current?.blur();
                                         setTouched((t) => ({ ...t, governorate: true }));
                                       }}
                                       className={`w-full px-4 py-3 flex items-center justify-between gap-3 text-sm transition-colors ${isSelected
@@ -892,6 +920,7 @@ export default function CheckoutPage() {
                   opacity: orderCelebrating ? 0.12 : 1,
                   x: 0,
                   filter: orderCelebrating ? "blur(4px)" : "blur(0px)",
+                  pointerEvents: orderCelebrating ? "none" : "auto",
                 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.35 }}
@@ -946,66 +975,83 @@ export default function CheckoutPage() {
                 {form.paymentMethod === "online" && (
                   <>
                     <InstapayNotice
-                      amountEgp={finalTotal}
+                      amountEgp={finalTotal ?? 0}
                       copied={instapayCopied}
                       onCopy={handleCopyInstapay}
                     />
                     <div className="space-y-4">
-  <div className="space-y-2">
-    <label className="text-xs uppercase tracking-widest ml-1">
-      Sender Number
-    </label>
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-widest ml-1">
+                          Sender Number
+                        </label>
 
-    <input
-      type="tel"
-      placeholder="01XXXXXXXXX"
-      value={form.senderNumber}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          senderNumber: e.target.value.replace(/\D/g, ""),
-        })
-      }
-      className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
-    />
-  </div>
+                        <input
+                          type="tel"
+                          placeholder="01XXXXXXXXX"
+                          value={form.senderNumber}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              senderNumber: e.target.value.replace(/\D/g, ""),
+                            })
+                          }
+                          className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                        />
+                      </div>
 
-  <div className="space-y-2">
-    <label className="text-xs uppercase tracking-widest ml-1">
-      Transaction Reference
-    </label>
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-widest ml-1">
+                          Transaction reference{" "}
+                          <span className="font-normal normal-case tracking-normal text-black/45 dark:text-white/45">
+                            (optional)
+                          </span>
+                        </label>
 
-    <input
-      type="text"
-      placeholder="Transaction ID / Reference"
-      value={form.transactionReference}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          transactionReference: e.target.value,
-        })
-      }
-      className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
-    />
-  </div>
-</div>
+                        <input
+                          type="text"
+                          placeholder="Transaction ID / Reference"
+                          value={form.transactionReference}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              transactionReference: e.target.value,
+                            })
+                          }
+                          className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                        />
+                        <p className="text-[11px] leading-relaxed text-pink/60 dark:text-white/55 ml-1">
+                          Please send a <span className="font-semibold text-[#FF4DA3]">screenshot</span> of the transfer to WhatsApp to confirm the order.
+                        </p>
+                      </div>
+                    </div>
                     <label className="flex items-start gap-3 cursor-pointer rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-4 sm:p-4 transition-colors hover:border-[#FF4DA3]/35">
                       <input
                         type="checkbox"
                         checked={instapayTransferConfirmed}
-                        onChange={(e) =>
-                          setInstapayTransferConfirmed(e.target.checked)
-                        }
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setInstapayTransferConfirmed(checked);
+                          setInstapayConfirmedAt(checked ? Date.now() : null);
+                        }}
                         className="mt-0.5 h-4 w-4 shrink-0 rounded border-black/25 text-[#FF4DA3] focus:ring-[#FF4DA3]/40"
                       />
                       <span className="text-sm leading-snug text-black/75 dark:text-white/75">
                         I have completed the InstaPay transfer for{" "}
                         <span className="font-semibold text-black dark:text-white">
-                          EGP {finalTotal.toLocaleString()}
+                          EGP{" "}
+                          {(finalTotal != null
+                            ? finalTotal
+                            : Math.max(0, cartTotal - discountAmount)
+                          ).toLocaleString()}
                         </span>
                         .
                       </span>
                     </label>
+                    {instapayConfirmedAt != null && (
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400/90 ml-1">
+                        Confirmation saved — you can place the order when ready.
+                      </p>
+                    )}
                   </>
                 )}
 
@@ -1032,12 +1078,13 @@ export default function CheckoutPage() {
                   onClick={handleOrder}
                   disabled={
                     loading ||
+                    shippingFeeInvalid ||
+                    finalTotal === null ||
                     (
                       form.paymentMethod === "online" &&
                       (
                         !instapayTransferConfirmed ||
-                        !form.senderNumber.trim() ||
-                        !form.transactionReference.trim()
+                        !form.senderNumber.trim()
                       )
                     )
                   }
@@ -1136,6 +1183,7 @@ export default function CheckoutPage() {
               opacity: orderCelebrating ? 0.22 : 1,
               scale: orderCelebrating ? 0.94 : 1,
               y: orderCelebrating ? 20 : 0,
+              pointerEvents: orderCelebrating ? "none" : "auto",
             }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           >
@@ -1163,7 +1211,7 @@ export default function CheckoutPage() {
               </div>
 
               {/* Discount code */}
-              <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10">
+              {/*   <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10">
                 <label className="text-[10px] uppercase tracking-[0.25em] opacity-60 ml-1">
                   Discount code
                 </label>
@@ -1193,9 +1241,7 @@ export default function CheckoutPage() {
                             {discount.code}
                           </p>
                           <p className="text-[10px] opacity-60">
-                            {discount.discount_type === "percent"
-                              ? `${discount.value}% off applied`
-                              : `EGP ${Number(discount.value).toLocaleString()} off applied`}
+                            {discountAppliedSubtitle(discount)}
                           </p>
                         </div>
                       </div>
@@ -1269,7 +1315,7 @@ export default function CheckoutPage() {
                     </motion.p>
                   )}
                 </AnimatePresence>
-              </div>
+              </div> */}
 
               <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10 space-y-3 sm:space-y-4">
                 <div className="flex justify-between text-xs sm:text-sm opacity-50">
@@ -1279,9 +1325,11 @@ export default function CheckoutPage() {
                 <div className="flex justify-between text-xs sm:text-sm opacity-50">
                   <span>Shipping</span>
                   <span>
-                    {form.governorate
-                      ? `EGP ${shippingFee.toLocaleString()}`
-                      : "Select governorate"}
+                    {!form.governorate
+                      ? "Select governorate"
+                      : shippingFeeInvalid
+                        ? "Invalid region — re-select"
+                        : `EGP ${shippingFee.toLocaleString()}`}
                   </span>
                 </div>
                 {discount && discountAmount > 0 && (
@@ -1300,12 +1348,14 @@ export default function CheckoutPage() {
                   <span className="text-base sm:text-lg font-serif italic">Total</span>
                   <div className="text-right">
                     <motion.span
-                      key={finalTotal}
+                      key={finalTotal ?? "pending"}
                       initial={{ opacity: 0.5, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="text-base sm:text-lg font-semibold"
                     >
-                      EGP {finalTotal.toLocaleString()}
+                      {finalTotal != null
+                        ? `EGP ${finalTotal.toLocaleString()}`
+                        : "—"}
                     </motion.span>
                     {/*  <div className="text-[9px] sm:text-[10px] opacity-30 uppercase tracking-widest mt-1">
                       Including VAT

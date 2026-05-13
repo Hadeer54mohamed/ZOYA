@@ -113,6 +113,57 @@ export async function getProductById(id) {
   return list.find((p) => String(p.id) === String(id)) || null;
 }
 
+/** Most recently created product (by Sanity `_createdAt`). Images come from the first color’s first image — there is no top-level `images` on `product` in this studio schema. */
+const LATEST_PRODUCT_QUERY = /* groq */ `
+  *[_type == "product"] | order(_createdAt desc)[0]{
+    _id,
+    "id": slug.current,
+    name,
+    description,
+    price,
+    "category": category->title,
+    "firstImage": colors[0].images[0]
+  }
+`;
+
+export async function getLatestProduct() {
+  try {
+    const raw = await client.fetch(
+      LATEST_PRODUCT_QUERY,
+      {},
+      { next: { revalidate: 0 } }
+    );
+    if (!raw?.id) return null;
+
+    let image = null;
+    if (raw.firstImage) {
+      try {
+        image = urlFor(raw.firstImage)
+          .width(1200)
+          .quality(85)
+          .auto("format")
+          .url();
+      } catch {
+        image = null;
+      }
+    }
+
+    return {
+      _id: raw._id,
+      id: raw.id,
+      name: raw.name,
+      description: raw.description || "",
+      category: raw.category || "",
+      image,
+      price: raw.price ?? 0,
+      url: `${process.env.NEXT_PUBLIC_SITE_URL}/product/${raw.id}`,
+    };
+  } catch (err) {
+    console.error("[sanity] getLatestProduct failed:", err?.message || err);
+    return null;
+  }
+}
+
 export async function getRelatedProducts(id, limit = 4) {
   const list = await getAllProducts();
   const current = list.find((p) => String(p.id) === String(id));
