@@ -24,6 +24,10 @@ const PRODUCTS_QUERY = /* groq */ `
     badge,
     homeSliderColor,
     sizes,
+    sizeGuide[]{
+      size,
+      description
+    },
     "colors": colors[]{
       name,
       "value": coalesce(value.hex, value),
@@ -65,7 +69,18 @@ function mapProduct(raw) {
     description: raw.description || "",
     badge: raw.badge || null,
     homeSliderColor: normalizeHomeSliderColors(raw.homeSliderColor),
-    sizes: Array.isArray(raw.sizes) && raw.sizes.length ? raw.sizes : ["S", "M", "L"],
+    sizeGuide: Array.isArray(raw.sizeGuide)
+      ? raw.sizeGuide
+          .filter((entry) => entry && typeof entry.size === "string")
+          .map((entry) => ({
+            size: entry.size,
+            description: String(entry.description || "").trim(),
+          }))
+      : [],
+    sizes:
+      Array.isArray(raw.sizes) && raw.sizes.length
+        ? raw.sizes
+        : ["S", "M", "L"],
     colors: (raw.colors || []).map((c) => ({
       name: c?.name || "Default",
       value: c?.value || "#000000",
@@ -97,7 +112,7 @@ export async function getAllProducts() {
     const data = await client.fetch(
       PRODUCTS_QUERY,
       {},
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 0 } },
     );
     return (data || []).map(mapProduct).filter((p) => p && p.id);
   } catch (err) {
@@ -111,7 +126,7 @@ export async function getAllCategories() {
     const data = await client.fetch(
       CATEGORIES_QUERY,
       {},
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 0 } },
     );
     const titles = (data || []).map((c) => c.title).filter(Boolean);
     return ["All", ...titles];
@@ -170,7 +185,7 @@ export async function getLatestProduct() {
     const raw = await client.fetch(
       LATEST_PRODUCT_QUERY,
       {},
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 0 } },
     );
     return mapNewsletterProductRow(raw);
   } catch (err) {
@@ -199,13 +214,13 @@ export async function getProductForNewsletterBySlug(slug) {
     const raw = await client.fetch(
       PRODUCT_BY_SLUG_FOR_NEWSLETTER_QUERY,
       { slug: id },
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 0 } },
     );
     return mapNewsletterProductRow(raw);
   } catch (err) {
     console.error(
       "[sanity] getProductForNewsletterBySlug failed:",
-      err?.message || err
+      err?.message || err,
     );
     return null;
   }
@@ -216,10 +231,10 @@ export async function getRelatedProducts(id, limit = 4) {
   const current = list.find((p) => String(p.id) === String(id));
   if (!current) return [];
   const same = list.filter(
-    (p) => p.category === current.category && p.id !== current.id
+    (p) => p.category === current.category && p.id !== current.id,
   );
   const others = list.filter(
-    (p) => p.category !== current.category && p.id !== current.id
+    (p) => p.category !== current.category && p.id !== current.id,
   );
   return [...same, ...others].slice(0, limit);
 }
@@ -243,7 +258,7 @@ export async function getProductCostsByIds(ids) {
         cost
       }`,
       { ids: unique },
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 0 } },
     );
     const map = {};
     for (const row of data || []) {
@@ -329,7 +344,7 @@ export async function getProductStockMap() {
         }
       }`,
       {},
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 0 } },
     );
     const map = {};
     for (const row of data || []) {
@@ -363,7 +378,7 @@ export async function getProductStockMap() {
         const colorTotalStock = sizes.reduce((sum, s) => sum + s.stock, 0);
         const colorTotalInitial = sizes.reduce(
           (sum, s) => sum + (s.initialStock ?? 0),
-          0
+          0,
         );
         if (sizes.length > 0) tracked = true;
         totalStock += colorTotalStock;
@@ -430,12 +445,14 @@ export async function reserveStock(items) {
     products = await client.fetch(STOCK_LOOKUP_QUERY, { ids });
   } catch (err) {
     console.error("[sanity] reserveStock fetch failed:", err?.message || err);
-    return { ok: false, code: "fetch_failed", error: "Could not verify stock." };
+    return {
+      ok: false,
+      code: "fetch_failed",
+      error: "Could not verify stock.",
+    };
   }
 
-  const productById = new Map(
-    (products || []).map((p) => [String(p.id), p])
-  );
+  const productById = new Map((products || []).map((p) => [String(p.id), p]));
 
   // Group desired qty by (productId, colorKey, stockKey) so a cart with
   // duplicate lines (e.g. two of the same variant added separately) is
@@ -464,7 +481,7 @@ export async function reserveStock(items) {
 
     const colors = Array.isArray(product.colors) ? product.colors : [];
     const productHasStock = colors.some(
-      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0
+      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0,
     );
     if (!productHasStock) {
       // Product opted out of stock tracking — skip silently.
@@ -496,7 +513,7 @@ export async function reserveStock(items) {
       ? colorMatch.stockEntries
       : [];
     const entryMatch = entries.find(
-      (e) => (e?.size || "").toString().trim() === wantedSize
+      (e) => (e?.size || "").toString().trim() === wantedSize,
     );
     if (!entryMatch) {
       alerts.push({
@@ -541,7 +558,7 @@ export async function reserveStock(items) {
       p.dec({
         [`colors[_key=="${colorKey}"].stockEntries[_key=="${stockKey}"].stock`]:
           info.qty,
-      })
+      }),
     );
     applied.push({ productId, colorKey, stockKey, qty: info.qty });
 
@@ -599,7 +616,11 @@ export async function restoreStock(items) {
     products = await client.fetch(STOCK_LOOKUP_QUERY, { ids });
   } catch (err) {
     console.error("[sanity] restoreStock fetch failed:", err?.message || err);
-    return { ok: false, code: "fetch_failed", error: "Could not restore stock." };
+    return {
+      ok: false,
+      code: "fetch_failed",
+      error: "Could not restore stock.",
+    };
   }
 
   const productById = new Map((products || []).map((p) => [String(p.id), p]));
@@ -612,14 +633,14 @@ export async function restoreStock(items) {
     if (!product) {
       console.warn(
         "[sanity] restoreStock: product no longer exists, skipping:",
-        it.id
+        it.id,
       );
       continue;
     }
 
     const colors = Array.isArray(product.colors) ? product.colors : [];
     const productHasStock = colors.some(
-      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0
+      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0,
     );
     if (!productHasStock) continue;
 
@@ -632,7 +653,7 @@ export async function restoreStock(items) {
       console.warn(
         "[sanity] restoreStock: color not found, skipping:",
         product.name,
-        wantedColor
+        wantedColor,
       );
       continue;
     }
@@ -640,14 +661,14 @@ export async function restoreStock(items) {
       ? colorMatch.stockEntries
       : [];
     const entryMatch = entries.find(
-      (e) => (e?.size || "").toString().trim() === wantedSize
+      (e) => (e?.size || "").toString().trim() === wantedSize,
     );
     if (!entryMatch) {
       console.warn(
         "[sanity] restoreStock: size not found, skipping:",
         product.name,
         wantedColor,
-        wantedSize
+        wantedSize,
       );
       continue;
     }
@@ -667,7 +688,7 @@ export async function restoreStock(items) {
       p.inc({
         [`colors[_key=="${colorKey}"].stockEntries[_key=="${stockKey}"].stock`]:
           qty,
-      })
+      }),
     );
     applied.push({ productId, colorKey, stockKey, qty });
   }
@@ -735,9 +756,7 @@ export async function resetAllTrackedStockToInitial(productIds) {
   }
 
   const ids = Array.isArray(productIds)
-    ? productIds
-        .map((v) => String(v || "").trim())
-        .filter(Boolean)
+    ? productIds.map((v) => String(v || "").trim()).filter(Boolean)
     : [];
 
   let products;
@@ -745,11 +764,18 @@ export async function resetAllTrackedStockToInitial(productIds) {
     products = await client.fetch(
       ids.length > 0 ? STOCK_RESET_QUERY_BY_IDS : STOCK_RESET_QUERY_ALL,
       ids.length > 0 ? { ids } : {},
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 0 } },
     );
   } catch (err) {
-    console.error("[sanity] resetAllTrackedStockToInitial fetch failed:", err?.message || err);
-    return { ok: false, code: "fetch_failed", error: "Could not load stock data." };
+    console.error(
+      "[sanity] resetAllTrackedStockToInitial fetch failed:",
+      err?.message || err,
+    );
+    return {
+      ok: false,
+      code: "fetch_failed",
+      error: "Could not load stock data.",
+    };
   }
 
   const tx = writeClient.transaction();
@@ -763,7 +789,7 @@ export async function resetAllTrackedStockToInitial(productIds) {
   for (const p of products || []) {
     const colors = Array.isArray(p?.colors) ? p.colors : [];
     const productHasStock = colors.some(
-      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0
+      (c) => Array.isArray(c?.stockEntries) && c.stockEntries.length > 0,
     );
     if (!productHasStock) {
       skipped.untrackedProducts += 1;
@@ -787,7 +813,7 @@ export async function resetAllTrackedStockToInitial(productIds) {
           patch.set({
             [`colors[_key=="${colorKey}"].stockEntries[_key=="${stockKey}"].stock`]:
               initial,
-          })
+          }),
         );
         entriesSet += 1;
         touchedThisProduct = true;
@@ -810,8 +836,10 @@ export async function resetAllTrackedStockToInitial(productIds) {
     await tx.commit({ visibility: "async" });
     return { ok: true, productsTouched, entriesSet, skipped };
   } catch (err) {
-    console.error("[sanity] resetAllTrackedStockToInitial commit failed:", err?.message || err);
+    console.error(
+      "[sanity] resetAllTrackedStockToInitial commit failed:",
+      err?.message || err,
+    );
     return { ok: false, code: "patch_failed", error: "Could not reset stock." };
   }
 }
-

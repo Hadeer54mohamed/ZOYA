@@ -30,6 +30,7 @@ import {
   Tag,
   BarChart3,
   Calendar,
+  Trash2,
   ArrowUp,
   ArrowDown,
   Minus,
@@ -204,6 +205,7 @@ function AdminDashboard({ password }) {
   const [stockBannerDismissed, setStockBannerDismissed] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 9;
+  const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const adminFetch = async (url, init = {}) => {
     return fetch(url, {
       ...init,
@@ -640,6 +642,21 @@ function AdminDashboard({ password }) {
                   {stockAlertCount > 99 ? "99+" : stockAlertCount}
                 </span>
               )}
+              <div className="absolute inset-0 rounded-full bg-[#FF4DA3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDiscountModalOpen(true)}
+              className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30 transition-all active:scale-95"
+            >
+              <Tag
+                size={14}
+                className="text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors"
+              />
+              <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] font-semibold text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors">
+                Discount Code
+              </span>
               <div className="absolute inset-0 rounded-full bg-[#FF4DA3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
 
@@ -1101,8 +1118,655 @@ function AdminDashboard({ password }) {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {discountModalOpen && (
+          <DiscountCodeModal onClose={() => setDiscountModalOpen(false)} />
+        )}
+      </AnimatePresence>
+
       <AdminFooter />
     </main>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Discount code row (Manage tab): edit fields, toggle active, delete
+// ─────────────────────────────────────────────────────────────────────────────
+function DiscountCodeListRow({ code, onPatch, onDelete }) {
+  const [codeStr, setCodeStr] = useState(code.code);
+  const [discountType, setDiscountType] = useState(code.discount_type);
+  const [valueStr, setValueStr] = useState(String(code.value ?? ""));
+  const [limitStr, setLimitStr] = useState(
+    code.usage_limit != null && code.usage_limit !== ""
+      ? String(code.usage_limit)
+      : "",
+  );
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [inlineErr, setInlineErr] = useState("");
+
+  useEffect(() => {
+    setCodeStr(code.code);
+    setDiscountType(code.discount_type);
+    setValueStr(String(code.value ?? ""));
+    setLimitStr(
+      code.usage_limit != null && code.usage_limit !== ""
+        ? String(code.usage_limit)
+        : "",
+    );
+    setInlineErr("");
+  }, [code.id, code.code, code.discount_type, code.value, code.usage_limit]);
+
+  const saveEdits = async () => {
+    setInlineErr("");
+    const v = parseInt(valueStr, 10);
+    if (!Number.isFinite(v) || v < 0) {
+      setInlineErr("Enter a whole number for value.");
+      return;
+    }
+    if (discountType === "PERCENT" && v > 100) {
+      setInlineErr("Percent cannot exceed 100.");
+      return;
+    }
+    let usageLimit = null;
+    if (limitStr.trim() !== "") {
+      usageLimit = parseInt(limitStr, 10);
+      if (!Number.isFinite(usageLimit) || usageLimit < 1) {
+        setInlineErr("Usage limit must be a positive integer or empty.");
+        return;
+      }
+    }
+    const nextCode = codeStr.trim().toUpperCase();
+    if (!nextCode) {
+      setInlineErr("Code cannot be empty.");
+      return;
+    }
+    setSavingEdits(true);
+    await onPatch(code.id, {
+      code: nextCode,
+      discount_type: discountType,
+      value: v,
+      usage_limit: usageLimit,
+    });
+    setSavingEdits(false);
+  };
+
+  return (
+    <div className="p-4 rounded-xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="font-mono text-sm font-bold text-[#FF4DA3]">
+              {code.code}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                code.is_active
+                  ? "bg-green-500/15 text-green-700 dark:text-green-300"
+                  : "bg-red-500/15 text-red-700 dark:text-red-300"
+              }`}
+            >
+              {code.is_active ? "Active" : "Inactive"}
+            </span>
+          </div>
+          <p className="text-sm text-black/60 dark:text-white/60">
+            {code.discount_type === "PERCENT"
+              ? `${code.value}% off`
+              : `${code.value} EGP off`}
+            {code.usage_limit != null &&
+              ` · Used ${code.usage_count ?? 0}/${code.usage_limit}`}
+            {(code.usage_limit == null || code.usage_limit === "") &&
+              ` · Used ${code.usage_count ?? 0} times`}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onDelete(code.id)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 text-red-600 dark:text-red-400 transition-colors text-xs font-semibold shrink-0"
+          title="Delete this code"
+        >
+          <Trash2 size={14} />
+          Delete
+        </button>
+      </div>
+
+      <div className="pt-1 border-t border-black/10 dark:border-white/10 space-y-3">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-black/40 dark:text-white/40">
+          Edit code and discount
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.15em] text-black/45 dark:text-white/45 mb-1">
+              Code
+            </label>
+            <input
+              type="text"
+              value={codeStr}
+              onChange={(e) => setCodeStr(e.target.value)}
+              className="w-full px-2 py-1.5 text-sm rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40 font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.15em] text-black/45 dark:text-white/45 mb-1">
+              Type
+            </label>
+            <select
+              value={discountType}
+              onChange={(e) => setDiscountType(e.target.value)}
+              className="w-full px-2 py-1.5 text-sm rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3]"
+            >
+              <option value="PERCENT">Percent (%)</option>
+              <option value="FIXED">Fixed (EGP)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.15em] text-black/45 dark:text-white/45 mb-1">
+              Value (whole number)
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={valueStr}
+              onChange={(e) => setValueStr(e.target.value)}
+              className="w-full px-2 py-1.5 text-sm rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.15em] text-black/45 dark:text-white/45 mb-1">
+              Usage limit (optional)
+            </label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={limitStr}
+              onChange={(e) => setLimitStr(e.target.value)}
+              placeholder="Unlimited"
+              className="w-full px-2 py-1.5 text-sm rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40"
+            />
+          </div>
+        </div>
+        {inlineErr && (
+          <p className="text-xs text-red-600 dark:text-red-400">{inlineErr}</p>
+        )}
+        <button
+          type="button"
+          disabled={savingEdits}
+          onClick={saveEdits}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-black/80 dark:bg-white text-white dark:text-black text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+        >
+          {savingEdits ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <CheckCircle2 size={14} />
+          )}
+          {savingEdits ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-1 border-t border-black/10 dark:border-white/10">
+        <div className="flex-1 min-w-0">
+          <label className="block text-[10px] uppercase tracking-[0.2em] text-black/40 dark:text-white/40 mb-1">
+            Expires at
+          </label>
+          <input
+            type="datetime-local"
+            value={
+              code.expires_at
+                ? new Date(code.expires_at).toISOString().slice(0, 16)
+                : ""
+            }
+            onChange={(e) =>
+              onPatch(code.id, {
+                expires_at: e.target.value
+                  ? new Date(e.target.value).toISOString()
+                  : null,
+              })
+            }
+            className="w-full px-2 py-1 text-sm rounded bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40"
+          />
+        </div>
+        <div className="flex items-center gap-2 shrink-0 pb-0.5">
+          <input
+            type="checkbox"
+            checked={code.is_active}
+            onChange={(e) =>
+              onPatch(code.id, { is_active: e.target.checked })
+            }
+            className="w-4 h-4 accent-[#FF4DA3]"
+            id={`active-${code.id}`}
+          />
+          <label
+            htmlFor={`active-${code.id}`}
+            className="text-xs font-medium text-black/70 dark:text-white/70"
+          >
+            Active (live on checkout)
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Discount Code Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function DiscountCodeModal({ onClose }) {
+  const [tab, setTab] = useState("create");
+  const [form, setForm] = useState({
+    code: "",
+    discount_type: "PERCENT",
+    value: "",
+    is_active: true,
+    expires_at: "",
+    usage_limit: "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [codes, setCodes] = useState([]);
+  const [loadingCodes, setLoadingCodes] = useState(false);
+  const [listError, setListError] = useState("");
+  const [manageMsg, setManageMsg] = useState({ kind: "", text: "" });
+
+  useEffect(() => {
+    if (manageMsg.kind !== "ok" || !manageMsg.text) return;
+    const t = setTimeout(
+      () => setManageMsg({ kind: "", text: "" }),
+      2800,
+    );
+    return () => clearTimeout(t);
+  }, [manageMsg]);
+
+  useEffect(() => {
+    if (tab === "manage") {
+      fetchCodes();
+    }
+  }, [tab]);
+
+  const fetchCodes = async () => {
+    setLoadingCodes(true);
+    setListError("");
+    try {
+      const res = await fetch("/api/discount-codes");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          [data.error, data.details].filter(Boolean).join(" — ") ||
+          "Failed to load discount codes";
+        setListError(msg);
+        setCodes([]);
+        return;
+      }
+      setCodes(Array.isArray(data.codes) ? data.codes : []);
+    } catch (err) {
+      console.error("Failed to fetch codes:", err);
+      setListError(err.message || "Failed to load discount codes");
+      setCodes([]);
+    } finally {
+      setLoadingCodes(false);
+    }
+  };
+
+  const patchCode = async (id, updates) => {
+    setManageMsg({ kind: "", text: "" });
+    try {
+      const res = await fetch(`/api/discount-codes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setManageMsg({
+          kind: "err",
+          text:
+            [data.error, data.details].filter(Boolean).join(" — ") ||
+            "Update failed",
+        });
+        return false;
+      }
+      setManageMsg({ kind: "ok", text: "Saved." });
+      await fetchCodes();
+      return true;
+    } catch (err) {
+      setManageMsg({
+        kind: "err",
+        text: err.message || "Update failed",
+      });
+      return false;
+    }
+  };
+
+  const deleteCode = async (id) => {
+    if (!confirm("Are you sure you want to delete this discount code?"))
+      return;
+    setManageMsg({ kind: "", text: "" });
+    try {
+      const res = await fetch(`/api/discount-codes/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setManageMsg({
+          kind: "err",
+          text:
+            [data.error, data.details].filter(Boolean).join(" — ") ||
+            "Delete failed",
+        });
+        return;
+      }
+      setManageMsg({ kind: "ok", text: "Code deleted." });
+      await fetchCodes();
+    } catch (err) {
+      setManageMsg({
+        kind: "err",
+        text: err.message || "Delete failed",
+      });
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    const numValue = Math.round(Number(form.value));
+    if (!Number.isFinite(numValue) || numValue < 0) {
+      setError("Enter a valid whole-number discount value.");
+      setLoading(false);
+      return;
+    }
+    if (form.discount_type === "PERCENT" && numValue > 100) {
+      setError("Percent cannot exceed 100.");
+      setLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/discount-codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: form.code,
+          discount_type: form.discount_type,
+          value: numValue,
+          is_active: form.is_active,
+          expires_at: form.expires_at
+            ? new Date(form.expires_at).toISOString()
+            : null,
+          usage_limit: form.usage_limit
+            ? parseInt(form.usage_limit, 10)
+            : null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg =
+          [data.error, data.details].filter(Boolean).join(" — ") ||
+          "Failed to create discount code";
+        throw new Error(msg);
+      }
+      setForm({
+        code: "",
+        discount_type: "PERCENT",
+        value: "",
+        is_active: true,
+        expires_at: "",
+        usage_limit: "",
+      });
+      setTab("manage");
+      await fetchCodes();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <motion.div
+        initial={{ y: 40, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        transition={{ type: "spring", damping: 28, stiffness: 320 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md max-h-[90vh] flex flex-col bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/25"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="discount-title"
+      >
+        <div className="shrink-0 flex items-center justify-between gap-3 p-4 sm:p-5 border-b border-black/10 dark:border-white/10">
+          <div className="min-w-0">
+            <h2
+              id="discount-title"
+              className="text-base sm:text-lg font-bold tracking-tight"
+            >
+              Discount Codes
+            </h2>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-black/45 dark:text-white/45 mt-0.5">
+              Create and manage discount codes
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="shrink-0 flex border-b border-black/10 dark:border-white/10">
+          <button
+            onClick={() => setTab("create")}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              tab === "create"
+                ? "text-[#FF4DA3] border-b-2 border-[#FF4DA3]"
+                : "text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+            }`}
+          >
+            Create
+          </button>
+          <button
+            onClick={() => setTab("manage")}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              tab === "manage"
+                ? "text-[#FF4DA3] border-b-2 border-[#FF4DA3]"
+                : "text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+            }`}
+          >
+            Manage
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+          {tab === "create" ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-sm">
+                  <AlertCircle
+                    size={16}
+                    strokeWidth={2.5}
+                    className="shrink-0 mt-0.5"
+                  />
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Code</label>
+                <input
+                  type="text"
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40"
+                  placeholder="e.g. ZOYA10"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Discount Type
+                </label>
+                <select
+                  value={form.discount_type}
+                  onChange={(e) =>
+                    setForm({ ...form, discount_type: e.target.value })
+                  }
+                  className="w-full px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40"
+                >
+                  <option value="PERCENT">Percent (%)</option>
+                  <option value="FIXED">Fixed Amount (EGP)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Value</label>
+                <input
+                  type="number"
+                  value={form.value}
+                  onChange={(e) => setForm({ ...form, value: e.target.value })}
+                  required
+                  min={0}
+                  step={1}
+                  className="w-full px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40"
+                  placeholder={form.discount_type === "PERCENT" ? "10" : "50"}
+                />
+                <p className="mt-1.5 text-xs text-black/50 dark:text-white/50">
+                  Whole numbers only — your database stores this as an integer
+                  (decimals are rounded).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Expires At (optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={form.expires_at}
+                  onChange={(e) =>
+                    setForm({ ...form, expires_at: e.target.value })
+                  }
+                  className="w-full px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Usage Limit (optional)
+                </label>
+                <input
+                  type="number"
+                  value={form.usage_limit}
+                  onChange={(e) =>
+                    setForm({ ...form, usage_limit: e.target.value })
+                  }
+                  min="1"
+                  className="w-full px-3 py-2 rounded-lg bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]/40"
+                  placeholder="e.g. 100"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  checked={form.is_active}
+                  onChange={(e) =>
+                    setForm({ ...form, is_active: e.target.checked })
+                  }
+                  className="w-4 h-4 accent-[#FF4DA3]"
+                />
+                <label htmlFor="is_active" className="text-sm font-medium">
+                  Active
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#FF4DA3] text-white font-semibold hover:bg-[#FF4DA3]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Tag size={16} />
+                )}
+                {loading ? "Creating..." : "Create Discount Code"}
+              </button>
+            </form>
+          ) : tab === "manage" ? (
+            <>
+              {listError && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-sm">
+                  <AlertCircle
+                    size={16}
+                    strokeWidth={2.5}
+                    className="shrink-0 mt-0.5"
+                  />
+                  {listError}
+                </div>
+              )}
+              {manageMsg.text && (
+                <div
+                  className={`flex items-start gap-2 p-3 rounded-xl text-sm border ${
+                    manageMsg.kind === "err"
+                      ? "bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300"
+                      : "bg-green-500/10 border-green-500/30 text-green-800 dark:text-green-300"
+                  }`}
+                >
+                  {manageMsg.kind === "err" ? (
+                    <AlertCircle
+                      size={16}
+                      strokeWidth={2.5}
+                      className="shrink-0 mt-0.5"
+                    />
+                  ) : (
+                    <CheckCircle2
+                      size={16}
+                      strokeWidth={2.5}
+                      className="shrink-0 mt-0.5"
+                    />
+                  )}
+                  {manageMsg.text}
+                </div>
+              )}
+              {loadingCodes ? (
+                <div className="flex flex-col items-center justify-center py-8 text-black/50 dark:text-white/50">
+                  <Loader2 className="animate-spin mb-3" size={24} />
+                  <p className="text-sm">Loading codes...</p>
+                </div>
+              ) : codes.length === 0 && !listError ? (
+                <div className="flex flex-col items-center justify-center py-8 text-black/40 dark:text-white/40">
+                  <Tag size={32} strokeWidth={1} className="mb-3" />
+                  <p className="text-sm">No discount codes yet.</p>
+                </div>
+              ) : codes.length === 0 ? null : (
+                <div className="space-y-3">
+                  {codes.map((code) => (
+                    <DiscountCodeListRow
+                      key={code.id}
+                      code={code}
+                      onPatch={patchCode}
+                      onDelete={deleteCode}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

@@ -32,8 +32,20 @@ const ProductInfo = forwardRef(function ProductInfo(
     isAdded,
     onAddToCart,
   },
-  ref
+  ref,
 ) {
+  const sizeGuideText = (() => {
+    const size = hoveredSize || selectedSize;
+    if (!size) return "";
+    if (Array.isArray(product.sizeGuide)) {
+      const entry = product.sizeGuide.find((item) => item?.size === size);
+      if (entry?.description) {
+        return entry.description;
+      }
+    }
+    return SIZE_FIT[size] || "";
+  })();
+
   return (
     <div ref={ref} className="flex flex-col lg:pl-6 space-y-10">
       {/* Header */}
@@ -142,7 +154,7 @@ const ProductInfo = forwardRef(function ProductInfo(
             <span>
               Size{" "}
               <AnimatePresence mode="wait">
-                {(hoveredSize || selectedSize) && (
+                {sizeGuideText && (
                   <motion.span
                     key={hoveredSize || selectedSize}
                     initial={{ opacity: 0, x: -4 }}
@@ -151,7 +163,7 @@ const ProductInfo = forwardRef(function ProductInfo(
                     transition={{ duration: 0.2 }}
                     className="normal-case tracking-normal ml-2 text-[#FF4DA3] font-bold"
                   >
-                    · {SIZE_FIT[hoveredSize || selectedSize] || ""}
+                    · {sizeGuideText}
                   </motion.span>
                 )}
               </AnimatePresence>

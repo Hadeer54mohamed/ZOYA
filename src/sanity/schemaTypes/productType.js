@@ -163,10 +163,15 @@ export const productType = defineType({
                     }),
                   ],
                   preview: {
-                    select: { size: "size", stock: "stock", initial: "initialStock" },
+                    select: {
+                      size: "size",
+                      stock: "stock",
+                      initial: "initialStock",
+                    },
                     prepare({ size, stock, initial }) {
                       const left = typeof stock === "number" ? stock : "—";
-                      const total = typeof initial === "number" ? ` / ${initial}` : "";
+                      const total =
+                        typeof initial === "number" ? ` / ${initial}` : "";
                       let status = "";
                       if (typeof stock === "number") {
                         if (stock < 0) status = "  ⚠️ OVERSOLD";
@@ -195,9 +200,11 @@ export const productType = defineType({
               if (Array.isArray(entries) && entries.length > 0) {
                 const total = entries.reduce(
                   (sum, e) => sum + (Number(e?.stock) || 0),
-                  0
+                  0,
                 );
-                const oversold = entries.some((e) => (Number(e?.stock) || 0) < 0);
+                const oversold = entries.some(
+                  (e) => (Number(e?.stock) || 0) < 0,
+                );
                 const out = entries.some((e) => (Number(e?.stock) || 0) === 0);
                 let badge = "";
                 if (oversold) badge = "  ⚠️ oversold";
@@ -249,11 +256,49 @@ export const productType = defineType({
       validation: (Rule) => Rule.required().min(1),
     }),
     defineField({
+      name: "sizeGuide",
+      title: "Size guide",
+      type: "array",
+      description:
+        "Add a description for each size so the product page can show the correct fit details.",
+      of: [
+        defineArrayMember({
+          type: "object",
+          name: "sizeGuideEntry",
+          title: "Size Guide Entry",
+          fields: [
+            defineField({
+              name: "size",
+              title: "Size",
+              type: "string",
+              options: {
+                list: [
+                  { title: "XS", value: "XS" },
+                  { title: "S", value: "S" },
+                  { title: "M", value: "M" },
+                  { title: "L", value: "L" },
+                  { title: "XL", value: "XL" },
+                  { title: "XXL", value: "XXL" },
+                ],
+              },
+              validation: (Rule) => Rule.required(),
+            }),
+            defineField({
+              name: "description",
+              title: "Description",
+              type: "string",
+              validation: (Rule) => Rule.required(),
+            }),
+          ],
+        }),
+      ],
+    }),
+    defineField({
       name: "order",
       title: "Display Order",
       type: "number",
       description:
-        "Lower numbers appear first (e.g. 1, 2, 3...). Used for the \"Featured\" sort.",
+        'Lower numbers appear first (e.g. 1, 2, 3...). Used for the "Featured" sort.',
       initialValue: 100,
     }),
   ],

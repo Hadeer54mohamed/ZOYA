@@ -1397,7 +1397,7 @@ export default function CheckoutPage() {
               </div>
 
               {/* Discount code */}
-              {/*   <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10">
+              {/* <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10">
                 <label className="text-[10px] uppercase tracking-[0.25em] opacity-60 ml-1">
                   Discount code
                 </label>
@@ -1408,14 +1408,23 @@ export default function CheckoutPage() {
                       initial={{ opacity: 0, y: -6, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                      transition={{ type: "spring", stiffness: 320, damping: 24 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 320,
+                        damping: 24,
+                      }}
                       className="mt-2 flex items-center justify-between gap-3 p-3 rounded-xl bg-[#FF4DA3]/10 border border-[#FF4DA3]/30"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <motion.span
                           initial={{ scale: 0, rotate: -90 }}
                           animate={{ scale: 1, rotate: 0 }}
-                          transition={{ delay: 0.05, type: "spring", stiffness: 400, damping: 18 }}
+                          transition={{
+                            delay: 0.05,
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 18,
+                          }}
                           className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FF4DA3] text-white"
                           aria-hidden="true"
                         >
@@ -1473,7 +1482,11 @@ export default function CheckoutPage() {
                         type="button"
                         onClick={handleApplyCode}
                         disabled={applyingCode || !code.trim()}
-                        aria-label={applyingCode ? "Validating code" : "Apply discount code"}
+                        aria-label={
+                          applyingCode
+                            ? "Validating code"
+                            : "Apply discount code"
+                        }
                         className="inline-flex items-center justify-center gap-2 min-w-[90px] sm:min-w-[100px] px-4 sm:px-5 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black text-xs font-bold tracking-widest uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                       >
                         {applyingCode ? (
