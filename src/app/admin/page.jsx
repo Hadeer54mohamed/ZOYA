@@ -39,6 +39,8 @@ import {
   Ruler,
   AlertTriangle,
   Sparkles,
+  Mail,
+  ExternalLink,
 } from "lucide-react";
 
 const STATUS_META = {
@@ -79,21 +81,52 @@ const STATUS_META = {
   },
 };
 
+function paymentMethodLabel(method) {
+  if (method === "online") return "Instapay / Wallet";
+  if (method === "cash") return "Cash on Delivery";
+  if (method == null || method === "") return "—";
+  return String(method);
+}
+
 const STATUS_ACTIONS = {
   pending: [
-    { label: "Confirm", value: "confirmed", style: "bg-blue-500 hover:bg-blue-600" },
-    { label: "Cancel", value: "cancelled", style: "bg-red-500/80 hover:bg-red-600" },
+    {
+      label: "Confirm",
+      value: "confirmed",
+      style: "bg-blue-500 hover:bg-blue-600",
+    },
+    {
+      label: "Cancel",
+      value: "cancelled",
+      style: "bg-red-500/80 hover:bg-red-600",
+    },
   ],
   confirmed: [
-    { label: "Mark Shipped", value: "shipped", style: "bg-purple-500 hover:bg-purple-600" },
-    { label: "Cancel", value: "cancelled", style: "bg-red-500/80 hover:bg-red-600" },
+    {
+      label: "Mark Shipped",
+      value: "shipped",
+      style: "bg-purple-500 hover:bg-purple-600",
+    },
+    {
+      label: "Cancel",
+      value: "cancelled",
+      style: "bg-red-500/80 hover:bg-red-600",
+    },
   ],
   shipped: [
-    { label: "Mark Delivered", value: "delivered", style: "bg-emerald-500 hover:bg-emerald-600" },
+    {
+      label: "Mark Delivered",
+      value: "delivered",
+      style: "bg-emerald-500 hover:bg-emerald-600",
+    },
   ],
   delivered: [],
   cancelled: [
-    { label: "Reopen as Pending", value: "pending", style: "bg-amber-500 hover:bg-amber-600" },
+    {
+      label: "Reopen as Pending",
+      value: "pending",
+      style: "bg-amber-500 hover:bg-amber-600",
+    },
   ],
 };
 
@@ -192,7 +225,7 @@ function AdminDashboard({ password }) {
         const sorted = [...j.products].sort((a, b) =>
           String(a.name || "").localeCompare(String(b.name || ""), "en", {
             sensitivity: "base",
-          })
+          }),
         );
         setNewsletterCatalog(sorted);
       } catch {
@@ -210,7 +243,7 @@ function AdminDashboard({ password }) {
 
   const newsletterPickedProduct = useMemo(
     () => newsletterCatalog.find((p) => p.id === newsletterProductId) ?? null,
-    [newsletterCatalog, newsletterProductId]
+    [newsletterCatalog, newsletterProductId],
   );
 
   const newsletterFilteredCatalog = useMemo(() => {
@@ -219,7 +252,7 @@ function AdminDashboard({ password }) {
     return newsletterCatalog.filter(
       (p) =>
         (p.name && String(p.name).toLowerCase().includes(q)) ||
-        (p.id && String(p.id).toLowerCase().includes(q))
+        (p.id && String(p.id).toLowerCase().includes(q)),
     );
   }, [newsletterCatalog, newsletterPickSearch]);
 
@@ -230,7 +263,7 @@ function AdminDashboard({ password }) {
       ? `Selected product (slug: ${slug}).`
       : "Latest product in Sanity (by creation date, automatic).";
     const confirmed = window.confirm(
-      `Send a Manual Drop email to all newsletter subscribers?\n${scopeHint}\nContinue?`
+      `Send a Manual Drop email to all newsletter subscribers?\n${scopeHint}\nContinue?`,
     );
     if (!confirmed) return;
     setSendDropLoading(true);
@@ -251,7 +284,7 @@ function AdminDashboard({ password }) {
       alert(
         ok
           ? `Sent.\nCampaign: ${json.campaignId ?? "—"}\nRecipients (individual messages): ${json.sentPayloads ?? "—"}\nSuccessful batches: ${json.batchesSucceeded ?? "—"} / ${json.batchesAttempted ?? "—"}\nTotal batch retries: ${json.batchRetries ?? 0}\nProduct: ${json.product ?? "—"}${json.usedLatestProduct === false ? " (picked)" : json.usedLatestProduct === true ? " (latest)" : ""}`
-          : `Send finished with failed batches.\nCheck server logs.\n${JSON.stringify(json, null, 2)}`
+          : `Send finished with failed batches.\nCheck server logs.\n${JSON.stringify(json, null, 2)}`,
       );
     } catch {
       alert("Network error. Please try again.");
@@ -371,10 +404,10 @@ function AdminDashboard({ password }) {
         return;
       }
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)),
       );
       setSelectedOrder((prev) =>
-        prev && prev.id === orderId ? { ...prev, status: newStatus } : prev
+        prev && prev.id === orderId ? { ...prev, status: newStatus } : prev,
       );
     } catch {
       alert("Network error. Please try again.");
@@ -383,7 +416,7 @@ function AdminDashboard({ password }) {
 
   const deleteOrderPermanently = async (order) => {
     const ok = window.confirm(
-      "Delete this order permanently?\n\nThis will:\n- remove the order from Supabase\n- restore stock if needed\n\nThis cannot be undone."
+      "Delete this order permanently?\n\nThis will:\n- remove the order from Supabase\n- restore stock if needed\n\nThis cannot be undone.",
     );
     if (!ok) return;
     try {
@@ -431,13 +464,12 @@ function AdminDashboard({ password }) {
           // legacy order has a stale `total_price`.
           const itemsSubtotal = Array.isArray(o.items)
             ? o.items.reduce(
-                (s, it) =>
-                  s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
-                0
+                (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
+                0,
               )
             : Math.max(
                 0,
-                Number(o.total_price ?? 0) - Number(o.shipping_fee ?? 0)
+                Number(o.total_price ?? 0) - Number(o.shipping_fee ?? 0),
               );
           const discount = Number(o.discount_amount ?? 0);
           const totalCost = Number(o.total_cost ?? 0);
@@ -471,7 +503,10 @@ function AdminDashboard({ password }) {
   const ordersFilterKey = `${search}::${statusFilter}`;
   const ordersFilterKeyRef = useRef(ordersFilterKey);
   useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(filteredOrders.length / ordersPerPage));
+    const maxPage = Math.max(
+      1,
+      Math.ceil(filteredOrders.length / ordersPerPage),
+    );
     const filtersChanged = ordersFilterKeyRef.current !== ordersFilterKey;
     ordersFilterKeyRef.current = ordersFilterKey;
     setCurrentPage((prev) => (filtersChanged ? 1 : Math.min(prev, maxPage)));
@@ -511,64 +546,64 @@ function AdminDashboard({ password }) {
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setNewsletterPickModalOpen(true)}
-              disabled={sendDropLoading || !password}
-              title="Pick newsletter product (or latest product)"
-              aria-haspopup="dialog"
-              aria-expanded={newsletterPickModalOpen}
-              className="flex items-center gap-2 pl-1 pr-2.5 sm:pr-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed"
-            >
-              <span className="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden bg-black/[0.06] dark:bg-white/[0.08] ring-1 ring-black/10 dark:ring-white/10 grid place-items-center">
-                {newsletterPickedProduct?.image ? (
-                  <Image
-                    src={newsletterPickedProduct.image}
-                    alt=""
-                    width={36}
-                    height={36}
-                    className="h-full w-full object-cover"
-                    sizes="36px"
-                  />
-                ) : (
-                  <Sparkles
-                    size={16}
-                    className="text-[#FF4DA3]/80"
-                    aria-hidden
-                  />
-                )}
-              </span>
-              <span className="hidden sm:flex flex-col items-start min-w-0 max-w-[120px] text-left leading-tight">
-                <span className="text-[9px] uppercase tracking-[0.2em] text-black/40 dark:text-white/45 font-semibold">
-                  Newsletter
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setNewsletterPickModalOpen(true)}
+                disabled={sendDropLoading || !password}
+                title="Pick newsletter product (or latest product)"
+                aria-haspopup="dialog"
+                aria-expanded={newsletterPickModalOpen}
+                className="flex items-center gap-2 pl-1 pr-2.5 sm:pr-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed"
+              >
+                <span className="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden bg-black/[0.06] dark:bg-white/[0.08] ring-1 ring-black/10 dark:ring-white/10 grid place-items-center">
+                  {newsletterPickedProduct?.image ? (
+                    <Image
+                      src={newsletterPickedProduct.image}
+                      alt=""
+                      width={36}
+                      height={36}
+                      className="h-full w-full object-cover"
+                      sizes="36px"
+                    />
+                  ) : (
+                    <Sparkles
+                      size={16}
+                      className="text-[#FF4DA3]/80"
+                      aria-hidden
+                    />
+                  )}
                 </span>
-                <span className="text-[10px] font-bold text-black/75 dark:text-white/80 truncate w-full">
-                  {newsletterProductId
-                    ? newsletterPickedProduct?.name || newsletterProductId
-                    : "Latest product"}
+                <span className="hidden sm:flex flex-col items-start min-w-0 max-w-[120px] text-left leading-tight">
+                  <span className="text-[9px] uppercase tracking-[0.2em] text-black/40 dark:text-white/45 font-semibold">
+                    Newsletter
+                  </span>
+                  <span className="text-[10px] font-bold text-black/75 dark:text-white/80 truncate w-full">
+                    {newsletterProductId
+                      ? newsletterPickedProduct?.name || newsletterProductId
+                      : "Latest product"}
+                  </span>
                 </span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={sendManualDropEmail}
-              disabled={sendDropLoading || !password}
-              className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed"
-              title="Send Manual Drop via Resend (batched + retries). Optional: pick a product or use latest."
-            >
-              <Send
-                size={14}
-                className={`text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors ${
-                  sendDropLoading ? "animate-pulse" : ""
-                }`}
-              />
-              <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] font-semibold text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors">
-                {sendDropLoading ? "Sending…" : "Send Drop Email"}
-              </span>
-              <div className="absolute inset-0 rounded-full bg-[#FF4DA3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-          </div>
+              </button>
+              <button
+                type="button"
+                onClick={sendManualDropEmail}
+                disabled={sendDropLoading || !password}
+                className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed"
+                title="Send Manual Drop via Resend (batched + retries). Optional: pick a product or use latest."
+              >
+                <Send
+                  size={14}
+                  className={`text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors ${
+                    sendDropLoading ? "animate-pulse" : ""
+                  }`}
+                />
+                <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] font-semibold text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors">
+                  {sendDropLoading ? "Sending…" : "Send Drop Email"}
+                </span>
+                <div className="absolute inset-0 rounded-full bg-[#FF4DA3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            </div>
 
             <button
               onClick={() => setProductsModalOpen(true)}
@@ -576,8 +611,8 @@ function AdminDashboard({ password }) {
                 stockUrgentCount > 0
                   ? "border-red-500/40 hover:border-red-500/60"
                   : stockAlertCount > 0
-                  ? "border-amber-500/40 hover:border-amber-500/60"
-                  : "border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30"
+                    ? "border-amber-500/40 hover:border-amber-500/60"
+                    : "border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30"
               }`}
             >
               <Boxes
@@ -586,8 +621,8 @@ function AdminDashboard({ password }) {
                   stockUrgentCount > 0
                     ? "text-red-500"
                     : stockAlertCount > 0
-                    ? "text-amber-500"
-                    : "text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3]"
+                      ? "text-amber-500"
+                      : "text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3]"
                 }`}
               />
               <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] font-semibold text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors">
@@ -667,7 +702,7 @@ function AdminDashboard({ password }) {
                       .map((a) =>
                         a.severity === "oversold"
                           ? `${a.name} (${a.totalStock})`
-                          : `${a.name}${a.severity === "low" ? ` · ${a.totalStock} left` : ""}`
+                          : `${a.name}${a.severity === "low" ? ` · ${a.totalStock} left` : ""}`,
                       )
                       .join(" · ")}
                     {stockSummary.alerts.length > 3
@@ -701,12 +736,42 @@ function AdminDashboard({ password }) {
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatCard label="Total" value={stats.total} icon={Package} accent="text-black dark:text-white" />
-          <StatCard label="Pending" value={stats.pending} icon={Clock} accent="text-amber-600 dark:text-amber-400" />
-          <StatCard label="Confirmed" value={stats.confirmed} icon={CheckCircle2} accent="text-blue-600 dark:text-blue-400" />
-          <StatCard label="Shipped" value={stats.shipped} icon={Truck} accent="text-purple-600 dark:text-purple-400" />
-          <StatCard label="Delivered" value={stats.delivered} icon={PackageCheck} accent="text-emerald-600 dark:text-emerald-400" />
-          <StatCard label="Cancelled" value={stats.cancelled} icon={XCircle} accent="text-red-600 dark:text-red-400" />
+          <StatCard
+            label="Total"
+            value={stats.total}
+            icon={Package}
+            accent="text-black dark:text-white"
+          />
+          <StatCard
+            label="Pending"
+            value={stats.pending}
+            icon={Clock}
+            accent="text-amber-600 dark:text-amber-400"
+          />
+          <StatCard
+            label="Confirmed"
+            value={stats.confirmed}
+            icon={CheckCircle2}
+            accent="text-blue-600 dark:text-blue-400"
+          />
+          <StatCard
+            label="Shipped"
+            value={stats.shipped}
+            icon={Truck}
+            accent="text-purple-600 dark:text-purple-400"
+          />
+          <StatCard
+            label="Delivered"
+            value={stats.delivered}
+            icon={PackageCheck}
+            accent="text-emerald-600 dark:text-emerald-400"
+          />
+          <StatCard
+            label="Cancelled"
+            value={stats.cancelled}
+            icon={XCircle}
+            accent="text-red-600 dark:text-red-400"
+          />
         </div>
 
         {/* Money stats */}
@@ -740,7 +805,10 @@ function AdminDashboard({ password }) {
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40" />
+            <Search
+              size={16}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40"
+            />
             <input
               type="text"
               value={search}
@@ -750,7 +818,14 @@ function AdminDashboard({ password }) {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            {["all", "pending", "confirmed", "shipped", "delivered", "cancelled"].map((s) => (
+            {[
+              "all",
+              "pending",
+              "confirmed",
+              "shipped",
+              "delivered",
+              "cancelled",
+            ].map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
@@ -774,7 +849,11 @@ function AdminDashboard({ password }) {
           </div>
         ) : fetchError ? (
           <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400">
-            <AlertCircle size={18} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+            <AlertCircle
+              size={18}
+              strokeWidth={2.5}
+              className="shrink-0 mt-0.5"
+            />
             <div className="text-sm">{fetchError}</div>
           </div>
         ) : filteredOrders.length === 0 ? (
@@ -801,19 +880,22 @@ function AdminDashboard({ password }) {
               <div className="flex items-center justify-center gap-4 mt-10 pb-10">
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
                   disabled={currentPage === 1}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FF4DA3]/10 hover:border-[#FF4DA3]/30 transition-all font-medium text-sm"
                 >
                   <ChevronRight className="rotate-180" size={16} />
-                  
                 </button>
 
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold tracking-widest text-[#FF4DA3]">
                     {currentPage}
                   </span>
-                  <span className="text-xs text-black/40 dark:text-white/40">/</span>
+                  <span className="text-xs text-black/40 dark:text-white/40">
+                    /
+                  </span>
                   <span className="text-xs text-black/60 dark:text-white/60">
                     {totalPages}
                   </span>
@@ -821,11 +903,12 @@ function AdminDashboard({ password }) {
 
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
                   disabled={currentPage === totalPages}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FF4DA3]/10 hover:border-[#FF4DA3]/30 transition-all font-medium text-sm"
                 >
-                  
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -1001,7 +1084,8 @@ function AdminDashboard({ password }) {
                 {newsletterPickSearch.trim() &&
                   newsletterFilteredCatalog.length === 0 && (
                     <p className="text-center text-xs text-black/50 dark:text-white/45 py-4">
-                      No products match your search. Try other keywords or clear the search.
+                      No products match your search. Try other keywords or clear
+                      the search.
                     </p>
                   )}
 
@@ -1069,7 +1153,7 @@ function toCairoDate(iso) {
     get("day"),
     get("hour") % 24,
     get("minute"),
-    get("second")
+    get("second"),
   );
 }
 
@@ -1157,7 +1241,7 @@ function orderProfit(o) {
   const itemsSubtotal = Array.isArray(o?.items)
     ? o.items.reduce(
         (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
-        0
+        0,
       )
     : Math.max(0, Number(o?.total_price ?? 0) - Number(o?.shipping_fee ?? 0));
   const discount = Number(o?.discount_amount ?? 0);
@@ -1208,9 +1292,17 @@ function ProfitAnalyticsModal({ orders, onClose }) {
     const yesterday = aggregateInRange(orders, yesterdayStart, todayStart);
     const thisWeek = aggregateInRange(orders, weekStart, addDays(weekStart, 7));
     const lastWeek = aggregateInRange(orders, lastWeekStart, weekStart);
-    const thisMonth = aggregateInRange(orders, monthStart, addMonths(monthStart, 1));
+    const thisMonth = aggregateInRange(
+      orders,
+      monthStart,
+      addMonths(monthStart, 1),
+    );
     const lastMonth = aggregateInRange(orders, lastMonthStart, monthStart);
-    const thisYear = aggregateInRange(orders, yearStart, addMonths(yearStart, 12));
+    const thisYear = aggregateInRange(
+      orders,
+      yearStart,
+      addMonths(yearStart, 12),
+    );
 
     // Hide misleading trend badges when the prior period is entirely before
     // our analytics floor (first real order day, else launch fallback).
@@ -1230,8 +1322,8 @@ function ProfitAnalyticsModal({ orders, onClose }) {
         i === 0
           ? "This week"
           : i === 1
-          ? "Last week"
-          : `${fmtShortDate(start)} – ${fmtShortDate(addDays(end, -1))}`;
+            ? "Last week"
+            : `${fmtShortDate(start)} – ${fmtShortDate(addDays(end, -1))}`;
       weeks.push({
         key: `w-${i}`,
         label,
@@ -1378,12 +1470,14 @@ function ProfitAnalyticsModal({ orders, onClose }) {
           <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 text-[11px] leading-relaxed text-black/50 dark:text-white/50">
             <p>
               <b>Profit formula:</b>{" "}
-              <span className="font-mono">(items subtotal − discount) − total cost</span>.
-              Shipping fees are excluded since they aren&apos;t kept by the store.
-              Cancelled orders are ignored. Orders with incomplete cost data
-              (missing in Sanity) are counted in the order count but excluded
-              from the profit total — fix them in Sanity to make the analytics
-              fully accurate.
+              <span className="font-mono">
+                (items subtotal − discount) − total cost
+              </span>
+              . Shipping fees are excluded since they aren&apos;t kept by the
+              store. Cancelled orders are ignored. Orders with incomplete cost
+              data (missing in Sanity) are counted in the order count but
+              excluded from the profit total — fix them in Sanity to make the
+              analytics fully accurate.
             </p>
           </div>
         </div>
@@ -1392,15 +1486,20 @@ function ProfitAnalyticsModal({ orders, onClose }) {
   );
 }
 
-function ComparisonCard({ label, current, previous, previousLabel, accent, previousStartsBeforeBrand }) {
+function ComparisonCard({
+  label,
+  current,
+  previous,
+  previousLabel,
+  accent,
+  previousStartsBeforeBrand,
+}) {
   // Decide whether we should compare to the previous period at all.
   // We only show a trend badge when both sides have meaningful data — comparing
   // a real week to an empty week (e.g. before the brand opened) would produce
   // a misleading "+∞%" / "-100%" change.
   const hasPrev =
-    previous !== undefined &&
-    !previousStartsBeforeBrand &&
-    previous.count > 0;
+    previous !== undefined && !previousStartsBeforeBrand && previous.count > 0;
 
   let trend = null;
   let pct = null;
@@ -1416,16 +1515,17 @@ function ComparisonCard({ label, current, previous, previousLabel, accent, previ
     current.profit > 0
       ? accent || "text-emerald-600 dark:text-emerald-400"
       : current.profit < 0
-      ? "text-red-600 dark:text-red-400"
-      : "text-black/50 dark:text-white/50";
+        ? "text-red-600 dark:text-red-400"
+        : "text-black/50 dark:text-white/50";
 
-  const TrendIcon = trend === "up" ? ArrowUp : trend === "down" ? ArrowDown : Minus;
+  const TrendIcon =
+    trend === "up" ? ArrowUp : trend === "down" ? ArrowDown : Minus;
   const trendCls =
     trend === "up"
       ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
       : trend === "down"
-      ? "text-red-600 dark:text-red-400 bg-red-500/10"
-      : "text-black/40 dark:text-white/40 bg-black/5 dark:bg-white/5";
+        ? "text-red-600 dark:text-red-400 bg-red-500/10"
+        : "text-black/40 dark:text-white/40 bg-black/5 dark:bg-white/5";
 
   // Cap absurd percentages so the badge stays readable when comparing tiny
   // numbers (e.g. 1 EGP last week vs 200 EGP this week would otherwise show
@@ -1532,7 +1632,7 @@ function ProductAnalyticsModal({ password, onClose }) {
       return;
     }
     const ok = window.confirm(
-      `This will reset stock to initialStock for ${ids.length} selected product(s). Continue?`
+      `This will reset stock to initialStock for ${ids.length} selected product(s). Continue?`,
     );
     if (!ok) return;
     setResettingStock(true);
@@ -1548,7 +1648,7 @@ function ProductAnalyticsModal({ password, onClose }) {
         return;
       }
       alert(
-        `Stock reset complete.\nProducts: ${json.productsTouched ?? 0}\nEntries: ${json.entriesSet ?? 0}`
+        `Stock reset complete.\nProducts: ${json.productsTouched ?? 0}\nEntries: ${json.entriesSet ?? 0}`,
       );
       setReloadNonce((n) => n + 1);
       setSelectedProductIds(new Set());
@@ -1603,7 +1703,10 @@ function ProductAnalyticsModal({ password, onClose }) {
               className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-500/10 hover:border-red-500/30 transition-all text-[11px] font-black uppercase tracking-widest text-black/70 dark:text-white/70"
               title="Reset stock to initialStock (Sanity)"
             >
-              <RefreshCw size={14} className={resettingStock ? "animate-spin" : ""} />
+              <RefreshCw
+                size={14}
+                className={resettingStock ? "animate-spin" : ""}
+              />
               Reset stock
             </button>
             <button
@@ -1625,7 +1728,11 @@ function ProductAnalyticsModal({ password, onClose }) {
             </div>
           ) : err ? (
             <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400">
-              <AlertCircle size={18} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+              <AlertCircle
+                size={18}
+                strokeWidth={2.5}
+                className="shrink-0 mt-0.5"
+              />
               <div className="text-sm">{err}</div>
             </div>
           ) : data ? (
@@ -1645,7 +1752,8 @@ function ProductAnalyticsModal({ password, onClose }) {
                   hint={
                     data.summary.totalUnitsSold > 0
                       ? `Avg ${Math.round(
-                          data.summary.totalRevenue / data.summary.totalUnitsSold
+                          data.summary.totalRevenue /
+                            data.summary.totalUnitsSold,
                         ).toLocaleString()} EGP / unit`
                       : "—"
                   }
@@ -1672,19 +1780,23 @@ function ProductAnalyticsModal({ password, onClose }) {
                     data.summary.outOfStock > 0
                       ? "text-red-600 dark:text-red-400"
                       : data.summary.lowStock > 0
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-emerald-600 dark:text-emerald-400"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-emerald-600 dark:text-emerald-400"
                   }
                 />
               </div>
 
               {data.stockUnavailable && (
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-[11px] leading-relaxed">
-                  <AlertCircle size={13} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                  <AlertCircle
+                    size={13}
+                    strokeWidth={2.5}
+                    className="shrink-0 mt-0.5"
+                  />
                   <p>
-                    Stock data couldn&apos;t be loaded from Sanity. Sales numbers
-                    below are still accurate, but inventory totals will be
-                    missing until Sanity is reachable again.
+                    Stock data couldn&apos;t be loaded from Sanity. Sales
+                    numbers below are still accurate, but inventory totals will
+                    be missing until Sanity is reachable again.
                   </p>
                 </div>
               )}
@@ -1694,9 +1806,9 @@ function ProductAnalyticsModal({ password, onClose }) {
                   <span className="font-bold text-amber-600 dark:text-amber-400">
                     {data.summary.untrackedProducts}
                   </span>{" "}
-                  product{data.summary.untrackedProducts === 1 ? "" : "s"} aren&apos;t
-                  tracking stock yet — open them in Sanity and add a Stock-by-Size
-                  row for each color to enable inventory tracking.
+                  product{data.summary.untrackedProducts === 1 ? "" : "s"}{" "}
+                  aren&apos;t tracking stock yet — open them in Sanity and add a
+                  Stock-by-Size row for each color to enable inventory tracking.
                 </p>
               )}
 
@@ -1729,7 +1841,10 @@ function ProductAnalyticsModal({ password, onClose }) {
               {tab === "products" && (
                 <div className="space-y-3">
                   <div className="relative">
-                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40" />
+                    <Search
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40"
+                    />
                     <input
                       type="text"
                       value={productSearch}
@@ -1809,7 +1924,9 @@ function SummaryCard({ label, value, hint, icon: Icon, accent }) {
         </p>
         <Icon size={14} className={accent} />
       </div>
-      <p className={`text-lg sm:text-xl font-bold ${accent} truncate`}>{value}</p>
+      <p className={`text-lg sm:text-xl font-bold ${accent} truncate`}>
+        {value}
+      </p>
       {hint && (
         <p className="text-[10px] text-black/40 dark:text-white/40 mt-1 truncate">
           {hint}
@@ -1895,7 +2012,11 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
                     ? "bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30"
                     : "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30"
                 }`}
-                title={isOutOfStock ? "Out of stock - restock needed" : "Low stock - restock soon"}
+                title={
+                  isOutOfStock
+                    ? "Out of stock - restock needed"
+                    : "Low stock - restock soon"
+                }
               >
                 <AlertTriangle size={10} />
                 Restock
@@ -1904,7 +2025,10 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <span className="text-[10px] text-black/50 dark:text-white/50">
-              <b className="text-black dark:text-white">{sold.toLocaleString()}</b> sold
+              <b className="text-black dark:text-white">
+                {sold.toLocaleString()}
+              </b>{" "}
+              sold
             </span>
             {product.revenue > 0 && (
               <span className="text-[10px] text-black/40 dark:text-white/40">
@@ -1965,7 +2089,10 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
                       <span className="text-[10px] text-black/50 dark:text-white/50">
                         Total: <b>{c.totalStock}</b>
                         {c.totalInitial > 0 && (
-                          <span className="opacity-60"> / {c.totalInitial}</span>
+                          <span className="opacity-60">
+                            {" "}
+                            / {c.totalInitial}
+                          </span>
                         )}
                       </span>
                     </div>
@@ -1985,8 +2112,8 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
                                 isOut
                                   ? "bg-red-500/5 border-red-500/30 text-red-600 dark:text-red-400"
                                   : isLow
-                                  ? "bg-amber-500/5 border-amber-500/30 text-amber-700 dark:text-amber-400"
-                                  : "bg-black/[0.03] dark:bg-white/5 border-black/10 dark:border-white/10"
+                                    ? "bg-amber-500/5 border-amber-500/30 text-amber-700 dark:text-amber-400"
+                                    : "bg-black/[0.03] dark:bg-white/5 border-black/10 dark:border-white/10"
                               }`}
                             >
                               <span className="font-bold uppercase">
@@ -2084,7 +2211,10 @@ function DistributionTable({ rows, emptyMessage, icon: Icon }) {
           const pct = (r.units / max) * 100;
           const sharePct = total > 0 ? Math.round((r.units / total) * 100) : 0;
           return (
-            <div key={r.key} className="px-4 py-3 grid grid-cols-12 gap-3 items-center text-xs">
+            <div
+              key={r.key}
+              className="px-4 py-3 grid grid-cols-12 gap-3 items-center text-xs"
+            >
               <div className="col-span-4 sm:col-span-3 min-w-0">
                 <p className="font-medium truncate">{r.label}</p>
               </div>
@@ -2141,10 +2271,10 @@ function BucketTable({ title, icon: Icon, rows, subtitle }) {
           const profitCls = isEmpty
             ? "text-black/30 dark:text-white/25"
             : r.profit > 0
-            ? "text-emerald-600 dark:text-emerald-400"
-            : r.profit < 0
-            ? "text-red-600 dark:text-red-400"
-            : "text-black/40 dark:text-white/40";
+              ? "text-emerald-600 dark:text-emerald-400"
+              : r.profit < 0
+                ? "text-red-600 dark:text-red-400"
+                : "text-black/40 dark:text-white/40";
 
           return (
             <div
@@ -2180,7 +2310,9 @@ function BucketTable({ title, icon: Icon, rows, subtitle }) {
               </div>
               <div className="col-span-4 sm:col-span-3 text-right">
                 <p className={`font-bold ${profitCls}`}>
-                  {isEmpty ? "—" : `${Math.round(r.profit).toLocaleString()} EGP`}
+                  {isEmpty
+                    ? "—"
+                    : `${Math.round(r.profit).toLocaleString()} EGP`}
                 </p>
                 {r.incomplete > 0 && (
                   <p className="text-[9px] text-amber-600 dark:text-amber-400/70">
@@ -2227,7 +2359,9 @@ function StatCard({
         </p>
         <Icon size={14} className={accent} />
       </div>
-      <p className={`${small ? "text-base sm:text-lg" : "text-2xl"} font-bold ${accent} truncate`}>
+      <p
+        className={`${small ? "text-base sm:text-lg" : "text-2xl"} font-bold ${accent} truncate`}
+      >
         {value}
       </p>
       {hint && (
@@ -2243,16 +2377,42 @@ function StatCard({
 function OrderCard({ order, onClick, customerOrderInfo }) {
   const meta = STATUS_META[order.status] ?? STATUS_META.pending;
   const StatusIcon = meta.icon;
-  const itemsCount = Array.isArray(order.items)
-    ? order.items.reduce((sum, it) => sum + Number(it.quantity ?? 0), 0)
-    : 0;
-  const isReturning =
-    customerOrderInfo && customerOrderInfo.total > 1;
+  const items = Array.isArray(order.items) ? order.items : [];
+  const itemsCount = items.reduce(
+    (sum, it) => sum + Number(it.quantity ?? 0),
+    0,
+  );
+  const itemsSubtotal = items.reduce(
+    (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
+    0,
+  );
+  const discountAmount = Number(order.discount_amount ?? 0);
+  const hasDiscount = discountAmount > 0 || !!order.discount_code;
+  const shippingFee =
+    order.shipping_fee !== null && order.shipping_fee !== undefined
+      ? Number(order.shipping_fee)
+      : null;
+  const isReturning = customerOrderInfo && customerOrderInfo.total > 1;
+  const email = order.email?.toString().trim();
+  const paymentOnline = order.payment_method === "online";
+  const transferRef = order.transaction_reference?.toString().trim();
+  const proofUrl = order.payment_proof_url?.toString().trim();
+  const instapayOk = paymentOnline && Boolean(proofUrl);
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClick?.();
+    }
+  };
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="cursor-pointer text-left w-full p-5 rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/60 hover:bg-[#FF4DA3]/[0.04] dark:hover:bg-white/[0.07] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#FF4DA3]/10 transition-all space-y-3 group"
+      onKeyDown={handleKeyDown}
+      className="cursor-pointer text-left w-full p-5 rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/60 hover:bg-[#FF4DA3]/[0.04] dark:hover:bg-white/[0.07] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#FF4DA3]/10 transition-all space-y-3 group outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3]/50"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -2271,7 +2431,7 @@ function OrderCard({ order, onClick, customerOrderInfo }) {
         </div>
       </div>
 
-      <div className="space-y-1 pt-3 border-t border-black/5 dark:border-white/5">
+      <div className="space-y-1.5 pt-3 border-t border-black/5 dark:border-white/5">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium truncate">{order.customer_name}</p>
           {isReturning && (
@@ -2283,41 +2443,201 @@ function OrderCard({ order, onClick, customerOrderInfo }) {
             </span>
           )}
         </div>
-        <p className="text-xs text-black/50 dark:text-white/50 flex items-center gap-1.5">
-          <Phone size={11} />
-          {order.phone}
+        <p className="text-xs text-black/50 dark:text-white/50 flex items-center gap-1.5 min-w-0">
+          <Phone size={11} className="shrink-0" />
+          <a
+            href={`tel:${order.phone}`}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="truncate hover:text-[#FF4DA3] transition-colors"
+          >
+            {order.phone}
+          </a>
+        </p>
+        {email ? (
+          <p className="text-xs text-black/50 dark:text-white/50 flex items-center gap-1.5 min-w-0">
+            <Mail size={11} className="shrink-0" />
+            <a
+              href={`mailto:${email}`}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              className="truncate hover:text-[#FF4DA3] transition-colors"
+            >
+              {email}
+            </a>
+          </p>
+        ) : (
+          <p className="text-[10px] text-black/35 dark:text-white/35 flex items-center gap-1.5">
+            <Mail size={11} />
+            No email on file
+          </p>
+        )}
+        <p className="text-xs text-black/50 dark:text-white/50 flex items-start gap-1.5">
+          <MapPin size={11} className="shrink-0 mt-0.5" />
+          <span className="min-w-0">
+            <span className="font-medium text-black/65 dark:text-white/65">
+              {order.governorate ?? "—"}
+            </span>
+            {order.address ? (
+              <span className="block text-[11px] text-black/45 dark:text-white/45 leading-snug line-clamp-3 mt-0.5">
+                {order.address}
+              </span>
+            ) : null}
+          </span>
         </p>
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-black/5 dark:border-white/5">
-        <div className="flex items-center gap-1.5 text-xs text-black/50 dark:text-white/50">
-          <ShoppingBag size={12} />
-          {itemsCount} {itemsCount === 1 ? "item" : "items"}
+      <div className="pt-3 border-t border-black/5 dark:border-white/5 space-y-1.5">
+        <p className="text-[9px] uppercase tracking-[0.2em] text-black/40 dark:text-white/40 font-bold">
+          Payment
+        </p>
+        <div className="flex items-center gap-1.5 text-xs text-black/60 dark:text-white/55">
+          <CreditCard
+            size={12}
+            className="shrink-0 text-black/40 dark:text-white/40"
+          />
+          <span className="font-medium">
+            {paymentMethodLabel(order.payment_method)}
+          </span>
         </div>
-        <div className="text-base font-bold text-[#FF4DA3]">
-          {Number(order.total_price ?? 0).toLocaleString()} EGP
+        {paymentOnline && (
+          <div className="pl-0.5 space-y-1 text-[11px] text-black/55 dark:text-white/50">
+            <p>
+              <span className="text-black/40 dark:text-white/40 uppercase tracking-wider text-[9px]">
+                Transfer ref
+              </span>{" "}
+              <span className="font-mono break-all">{transferRef || "—"}</span>
+            </p>
+            {proofUrl ? (
+              <a
+                href={proofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-[#FF4DA3] font-semibold hover:underline"
+              >
+                <ExternalLink size={11} />
+                Payment proof
+              </a>
+            ) : (
+              <p className="text-black/35 dark:text-white/35">
+                No proof image URL
+              </p>
+            )}
+            <p className="flex items-center gap-1.5">
+              <span
+                className={
+                  instapayOk
+                    ? "text-emerald-600 dark:text-emerald-400 font-semibold"
+                    : "text-amber-600 dark:text-amber-400 font-semibold"
+                }
+              >
+                {instapayOk
+                  ? "Payment proof uploaded"
+                  : "Transfer not confirmed in checkout"}
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="pt-3 border-t border-black/5 dark:border-white/5 space-y-1 text-[11px] text-black/55 dark:text-white/50">
+        <div className="flex justify-between gap-2">
+          <span>Items subtotal</span>
+          <span className="font-mono shrink-0">
+            {itemsSubtotal.toLocaleString()} EGP
+          </span>
         </div>
+        {shippingFee !== null && !Number.isNaN(shippingFee) && (
+          <div className="flex justify-between gap-2">
+            <span>Shipping</span>
+            <span className="font-mono shrink-0">
+              {shippingFee.toLocaleString()} EGP
+            </span>
+          </div>
+        )}
+        {hasDiscount && (
+          <div className="flex justify-between gap-2 text-[#FF4DA3]">
+            <span className="truncate">
+              Discount{order.discount_code ? ` (${order.discount_code})` : ""}
+            </span>
+            <span className="font-mono shrink-0">
+              − {discountAmount.toLocaleString()} EGP
+            </span>
+          </div>
+        )}
+        <div className="flex justify-between gap-2 pt-1 border-t border-black/10 dark:border-white/10 text-sm font-bold text-[#FF4DA3]">
+          <span>Total</span>
+          <span className="font-mono shrink-0">
+            {Number(order.total_price ?? 0).toLocaleString()} EGP
+          </span>
+        </div>
+      </div>
+
+      <div className="pt-3 border-t border-black/5 dark:border-white/5">
+        <p className="text-[9px] uppercase tracking-[0.2em] text-black/40 dark:text-white/40 font-bold mb-1.5">
+          Items ({itemsCount})
+        </p>
+        <div className="space-y-0.5">
+          {items.slice(0, 4).map((it, idx) => {
+            const colorLabel =
+              typeof it.color === "object" ? it.color?.name : it.color;
+            const bits = [colorLabel, it.size ? `Size ${it.size}` : null]
+              .filter(Boolean)
+              .join(" · ");
+            return (
+              <p
+                key={`${it.id}-${idx}`}
+                className="text-[11px] text-black/60 dark:text-white/55 truncate"
+              >
+                <span className="font-bold text-black/70 dark:text-white/70">
+                  ×{it.quantity}
+                </span>{" "}
+                {it.name}
+                {bits ? (
+                  <span className="text-black/40 dark:text-white/40">
+                    {" "}
+                    · {bits}
+                  </span>
+                ) : null}
+              </p>
+            );
+          })}
+        </div>
+        {items.length > 4 ? (
+          <p className="text-[10px] text-black/40 dark:text-white/40 mt-1">
+            +{items.length - 4} more in details…
+          </p>
+        ) : null}
       </div>
 
       <div className="flex items-center justify-between pt-3 mt-1 border-t border-dashed border-black/10 dark:border-white/10">
         <span className="flex items-center gap-1.5 text-[10px] tracking-[0.25em] uppercase font-bold text-black/50 dark:text-white/50 group-hover:text-[#FF4DA3] transition-colors">
           <Eye size={12} />
-          View Details
+          Full details
         </span>
         <ChevronRight
           size={16}
           className="text-black/30 dark:text-white/30 group-hover:text-[#FF4DA3] group-hover:translate-x-1 transition-all"
         />
       </div>
-    </button>
+    </div>
   );
 }
 
-function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrderInfo }) {
+function OrderModal({
+  order,
+  onClose,
+  onUpdateStatus,
+  onDeleteOrder,
+  customerOrderInfo,
+}) {
   const meta = STATUS_META[order.status] ?? STATUS_META.pending;
   const StatusIcon = meta.icon;
   const actions = STATUS_ACTIONS[order.status] ?? [];
   const items = Array.isArray(order.items) ? order.items : [];
+  const proofUrl = order.payment_proof_url?.toString().trim();
   const [updating, setUpdating] = useState(null);
 
   const handleAction = async (newStatus) => {
@@ -2409,18 +2729,74 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
               }
               icon={Phone}
             />
-            <InfoRow label="Governorate" value={order.governorate ?? "—"} icon={MapPin} />
+            <InfoRow
+              label="Email"
+              value={
+                order.email ? (
+                  <a
+                    href={`mailto:${order.email}`}
+                    className="hover:text-[#FF4DA3] transition-colors break-all"
+                  >
+                    {order.email}
+                  </a>
+                ) : (
+                  "—"
+                )
+              }
+              icon={Mail}
+            />
+            <InfoRow
+              label="Governorate"
+              value={order.governorate ?? "—"}
+              icon={MapPin}
+            />
             <InfoRow
               label="Payment"
-              value={
-                order.payment_method === "online"
-                  ? "Instapay / Wallet"
-                  : order.payment_method === "cash"
-                  ? "Cash on Delivery"
-                  : order.payment_method ?? "—"
-              }
+              value={paymentMethodLabel(order.payment_method)}
               icon={CreditCard}
             />
+            {order.payment_method === "online" && (
+              <>
+                <InfoRow
+                  label="Transfer reference"
+                  value={order.transaction_reference?.toString().trim() || "—"}
+                />
+                <InfoRow
+                  label="Payment proof"
+                  value={
+                    proofUrl ? (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        Uploaded
+                      </span>
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-400">
+                        Not uploaded
+                      </span>
+                    )
+                  }
+                />
+                <div className="sm:col-span-2 p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
+                  <p className="text-[9px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40 mb-1 flex items-center gap-1">
+                    <ExternalLink size={10} />
+                    Payment proof
+                  </p>
+                  {order.payment_proof_url?.toString().trim() ? (
+                    <a
+                      href={order.payment_proof_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-[#FF4DA3] hover:underline break-all"
+                    >
+                      Open proof link
+                    </a>
+                  ) : (
+                    <p className="text-sm text-black/45 dark:text-white/45">
+                      —
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <div className="p-4 rounded-2xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10">
@@ -2454,9 +2830,13 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{it.name}</p>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {(typeof it.color === "object" ? it.color?.name : it.color) && (
+                      {(typeof it.color === "object"
+                        ? it.color?.name
+                        : it.color) && (
                         <span className="px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-[10px] uppercase tracking-wider text-black/60 dark:text-white/60">
-                          {typeof it.color === "object" ? it.color.name : it.color}
+                          {typeof it.color === "object"
+                            ? it.color.name
+                            : it.color}
                         </span>
                       )}
                       {it.size && (
@@ -2471,14 +2851,20 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold">
-                      {(Number(it.price) * Number(it.quantity)).toLocaleString()} EGP
+                      {(
+                        Number(it.price) * Number(it.quantity)
+                      ).toLocaleString()}{" "}
+                      EGP
                     </p>
                     <p className="text-[10px] text-black/40 dark:text-white/40 mt-0.5">
                       {Number(it.price).toLocaleString()} × {it.quantity}
                     </p>
                     {Number(it.cost ?? 0) > 0 && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400/70 mt-1">
-                        cost: {(Number(it.cost) * Number(it.quantity)).toLocaleString()}
+                        cost:{" "}
+                        {(
+                          Number(it.cost) * Number(it.quantity)
+                        ).toLocaleString()}
                       </p>
                     )}
                   </div>
@@ -2491,7 +2877,7 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
           {(() => {
             const itemsSubtotal = items.reduce(
               (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
-              0
+              0,
             );
             const discountAmount = Number(order.discount_amount ?? 0);
             const hasDiscount = discountAmount > 0 || !!order.discount_code;
@@ -2502,19 +2888,24 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
                   <span>Items subtotal</span>
                   <span>{itemsSubtotal.toLocaleString()} EGP</span>
                 </div>
-                {order.shipping_fee !== null && order.shipping_fee !== undefined && (
-                  <div className="flex justify-between text-xs text-black/50 dark:text-white/50">
-                    <span>Shipping</span>
-                    <span>{Number(order.shipping_fee).toLocaleString()} EGP</span>
-                  </div>
-                )}
+                {order.shipping_fee !== null &&
+                  order.shipping_fee !== undefined && (
+                    <div className="flex justify-between text-xs text-black/50 dark:text-white/50">
+                      <span>Shipping</span>
+                      <span>
+                        {Number(order.shipping_fee).toLocaleString()} EGP
+                      </span>
+                    </div>
+                  )}
                 {hasDiscount && (
                   <div className="flex justify-between text-xs text-[#FF4DA3]">
                     <span className="flex items-center gap-1.5">
                       <Tag size={11} />
                       Discount
                       {order.discount_code && (
-                        <span className="font-mono font-bold">({order.discount_code})</span>
+                        <span className="font-mono font-bold">
+                          ({order.discount_code})
+                        </span>
                       )}
                     </span>
                     <span>− {discountAmount.toLocaleString()} EGP</span>
@@ -2544,7 +2935,7 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
             // Shipping is intentionally excluded — it isn't ours to keep.
             const itemsSubtotal = items.reduce(
               (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
-              0
+              0,
             );
             const discountAmount = Number(order.discount_amount ?? 0);
             const totalCost = Number(order.total_cost ?? 0);
@@ -2565,21 +2956,30 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
 
                 {order.cost_complete === false && (
                   <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300 text-[11px] leading-relaxed">
-                    <AlertCircle size={14} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                    <AlertCircle
+                      size={14}
+                      strokeWidth={2.5}
+                      className="shrink-0 mt-0.5"
+                    />
                     <div>
-                      <p className="font-bold mb-0.5">Cost data is incomplete</p>
-                      <p className="text-black/60 dark:text-white/60">
-                        One or more items don&apos;t have a cost set in Sanity (or Sanity was unreachable). The profit shown is unreliable. Set the cost in Sanity and re-check.
+                      <p className="font-bold mb-0.5">
+                        Cost data is incomplete
                       </p>
-                      {Array.isArray(items) && items.some((it) => it.cost_known === false) && (
-                        <ul className="mt-1.5 space-y-0.5 text-black/50 dark:text-white/50">
-                          {items
-                            .filter((it) => it.cost_known === false)
-                            .map((it, i) => (
-                              <li key={`missing-${i}`}>• {it.name}</li>
-                            ))}
-                        </ul>
-                      )}
+                      <p className="text-black/60 dark:text-white/60">
+                        One or more items don&apos;t have a cost set in Sanity
+                        (or Sanity was unreachable). The profit shown is
+                        unreliable. Set the cost in Sanity and re-check.
+                      </p>
+                      {Array.isArray(items) &&
+                        items.some((it) => it.cost_known === false) && (
+                          <ul className="mt-1.5 space-y-0.5 text-black/50 dark:text-white/50">
+                            {items
+                              .filter((it) => it.cost_known === false)
+                              .map((it, i) => (
+                                <li key={`missing-${i}`}>• {it.name}</li>
+                              ))}
+                          </ul>
+                        )}
                     </div>
                   </div>
                 )}
@@ -2592,7 +2992,8 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
                   <div className="flex justify-between text-xs text-[#FF4DA3]">
                     <span className="flex items-center gap-1.5">
                       <Tag size={10} />
-                      Discount{order.discount_code ? ` (${order.discount_code})` : ""}
+                      Discount
+                      {order.discount_code ? ` (${order.discount_code})` : ""}
                     </span>
                     <span>− {discountAmount.toLocaleString()} EGP</span>
                   </div>
@@ -2620,8 +3021,8 @@ function OrderModal({ order, onClose, onUpdateStatus, onDeleteOrder, customerOrd
                       order.cost_complete === false
                         ? "text-black/40 dark:text-white/40 line-through"
                         : computedProfit >= 0
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-red-600 dark:text-red-400"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-red-600 dark:text-red-400"
                     }`}
                   >
                     {computedProfit.toLocaleString()} EGP

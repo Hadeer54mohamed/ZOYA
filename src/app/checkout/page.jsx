@@ -4,7 +4,20 @@ import { useCart } from "../context/CartContext";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ArrowLeft, Loader2, ShoppingBag, AlertCircle, Copy, Check, PackageSearch, ChevronDown, Tag, X, Search } from "lucide-react";
+import {
+  CheckCircle2,
+  ArrowLeft,
+  Loader2,
+  ShoppingBag,
+  AlertCircle,
+  Copy,
+  Check,
+  PackageSearch,
+  ChevronDown,
+  Tag,
+  X,
+  Search,
+} from "lucide-react";
 import Link from "next/link";
 import { validateCheckoutForm } from "../lib/validation";
 import {
@@ -12,7 +25,9 @@ import {
   discountAppliedSubtitle,
 } from "../lib/discountAmount";
 import ReturnPolicyNotice from "../components/ReturnPolicyNotice";
-import InstapayNotice, { INSTAPAY_NUMBER_ENV } from "../components/InstapayNotice";
+import InstapayNotice, {
+  INSTAPAY_NUMBER_ENV,
+} from "../components/InstapayNotice";
 
 const DISCOUNT_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -43,8 +58,10 @@ export default function CheckoutPage() {
   const [placedOrderId, setPlacedOrderId] = useState("");
   const [copied, setCopied] = useState(false);
   const [instapayCopied, setInstapayCopied] = useState(false);
-  const [instapayTransferConfirmed, setInstapayTransferConfirmed] = useState(false);
+  const [instapayTransferConfirmed, setInstapayTransferConfirmed] =
+    useState(false);
   const [instapayConfirmedAt, setInstapayConfirmedAt] = useState(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
   const [orderCelebrating, setOrderCelebrating] = useState(false);
   const [govOpen, setGovOpen] = useState(false);
   const [govQuery, setGovQuery] = useState("");
@@ -114,13 +131,19 @@ export default function CheckoutPage() {
     paymentMethod: "cash", // cash | online
     senderNumber: "",
     transactionReference: "",
-    paymentProof: null,
+    paymentProofUrl: null,
   });
 
   useEffect(() => {
     if (form.paymentMethod !== "online" || step !== 2) {
       setInstapayTransferConfirmed(false);
       setInstapayConfirmedAt(null);
+      setForm((prev) => ({
+        ...prev,
+        paymentProofUrl: null,
+        senderNumber: "",
+        transactionReference: "",
+      }));
     }
   }, [form.paymentMethod, step]);
 
@@ -150,7 +173,7 @@ export default function CheckoutPage() {
 
   const discountAmount = useMemo(
     () => computeDiscountAmountEgp(discount, cartTotal),
-    [discount, cartTotal]
+    [discount, cartTotal],
   );
 
   const finalTotal = shippingFeeInvalid
@@ -286,7 +309,7 @@ export default function CheckoutPage() {
 
   const { errors, isValid: isFormValid } = useMemo(
     () => validateCheckoutForm(form, shippingFees ?? {}),
-    [form, shippingFees]
+    [form, shippingFees],
   );
 
   const handleNext = () => {
@@ -294,7 +317,13 @@ export default function CheckoutPage() {
       setStep(2);
       return;
     }
-    setTouched({ name: true, phone: true, email: true, address: true, governorate: true });
+    setTouched({
+      name: true,
+      phone: true,
+      email: true,
+      address: true,
+      governorate: true,
+    });
   };
 
   const handleBlur = (field) => {
@@ -329,17 +358,15 @@ export default function CheckoutPage() {
     if (submittingRef.current) return;
     if (shippingFeeInvalid || finalTotal === null) {
       setSubmitError(
-        "Shipping for your governorate could not be loaded. Please go back and select a valid region."
+        "Shipping for your governorate could not be loaded. Please go back and select a valid region.",
       );
       return;
     }
     if (
       form.paymentMethod === "online" &&
-      (
-        !instapayTransferConfirmed ||
-        !form.senderNumber.trim()
-      )
-    ) return;
+      (!form.paymentProofUrl || !form.senderNumber.trim())
+    )
+      return;
 
     submittingRef.current = true;
     setLoading(true);
@@ -366,9 +393,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           name: form.name.trim(),
           phone: phoneForApi(form.phone),
-          email: form.email.trim()
-            ? form.email.trim().toLowerCase()
-            : null,
+          email: form.email.trim() ? form.email.trim().toLowerCase() : null,
           address: form.address.trim(),
           governorate: form.governorate,
           payment_method: form.paymentMethod,
@@ -379,11 +404,7 @@ export default function CheckoutPage() {
           sender_number: form.senderNumber || null,
           transaction_reference: form.transactionReference || null,
           payment_proof_url: form.paymentProofUrl || null,
-          instapay_transfer_confirmed:
-            form.paymentMethod === "online"
-              ? instapayTransferConfirmed
-              : false,
-        })
+        }),
       });
 
       let result = {};
@@ -397,13 +418,15 @@ export default function CheckoutPage() {
         const serverMsg = result?.error || "";
         console.error(
           "Order error:",
-          `status=${res.status} ${res.statusText} | message=${serverMsg || "(empty)"}`
+          `status=${res.status} ${res.statusText} | message=${serverMsg || "(empty)"}`,
         );
 
         // If the failure is about the discount code (already used / limit reached
         // / invalid), drop the applied code so the user can re-submit without it.
         const isDiscountIssue =
-          /already used|reached its limit|invalid discount code/i.test(serverMsg);
+          /already used|reached its limit|invalid discount code/i.test(
+            serverMsg,
+          );
 
         if (isDiscountIssue) {
           if (discount?.code) {
@@ -417,11 +440,11 @@ export default function CheckoutPage() {
           setCodeError("");
           setApplyingCode(false);
           setSubmitError(
-            `${serverMsg} The code was removed — please review your total and try again.`
+            `${serverMsg} The code was removed — please review your total and try again.`,
           );
         } else {
           setSubmitError(
-            serverMsg || `Order failed (${res.status}). Please try again.`
+            serverMsg || `Order failed (${res.status}). Please try again.`,
           );
         }
         return;
@@ -445,7 +468,7 @@ export default function CheckoutPage() {
       setOrderCelebrating(false);
       console.error("Unexpected order error:", err);
       setSubmitError(
-        err?.message || "An unexpected error occurred. Please try again."
+        err?.message || "An unexpected error occurred. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -467,11 +490,17 @@ export default function CheckoutPage() {
               transition={{ repeat: Infinity, duration: 3 }}
               className="absolute inset-0 bg-[#FF4DA3]/5 rounded-full"
             />
-            <ShoppingBag size={48} strokeWidth={1} className="text-black/20 dark:text-white/20" />
+            <ShoppingBag
+              size={48}
+              strokeWidth={1}
+              className="text-black/20 dark:text-white/20"
+            />
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-3xl font-serif italic tracking-tight">Your Wardrobe is Awaiting</h1>
+            <h1 className="text-3xl font-serif italic tracking-tight">
+              Your Wardrobe is Awaiting
+            </h1>
             <p className="text-sm text-black/40 dark:text-white/40 max-w-[280px] mx-auto leading-relaxed">
               It seems you haven't added any pieces to your collection yet.
             </p>
@@ -496,7 +525,11 @@ export default function CheckoutPage() {
 
   const showSummaryError =
     !isFormValid &&
-    (touched.name || touched.phone || touched.email || touched.address || touched.governorate);
+    (touched.name ||
+      touched.phone ||
+      touched.email ||
+      touched.address ||
+      touched.governorate);
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500 relative overflow-x-hidden">
@@ -521,7 +554,11 @@ export default function CheckoutPage() {
               className="relative z-10 flex flex-col items-center gap-3"
               initial={{ scale: 0.35, opacity: 0 }}
               animate={{ scale: [0.35, 1.12, 1], opacity: 1 }}
-              transition={{ duration: 0.55, times: [0, 0.55, 1], ease: [0.22, 1, 0.36, 1] }}
+              transition={{
+                duration: 0.55,
+                times: [0, 0.55, 1],
+                ease: [0.22, 1, 0.36, 1],
+              }}
             >
               <div className="relative">
                 <motion.div
@@ -550,17 +587,32 @@ export default function CheckoutPage() {
       </AnimatePresence>
       {/* STEP INDICATOR */}
       <div className="pt-24 sm:pt-32 pb-6 sm:pb-10 px-4 flex justify-center items-center gap-2 sm:gap-4 text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-medium">
-        <span className={`${step >= 1 ? "text-[#FF4DA3]" : "text-black/20 dark:text-white/20"} transition-colors`}>Information</span>
+        <span
+          className={`${step >= 1 ? "text-[#FF4DA3]" : "text-black/20 dark:text-white/20"} transition-colors`}
+        >
+          Information
+        </span>
         <div className="w-5 sm:w-8 h-[1px] bg-black/10 dark:bg-white/10" />
-        <span className={`${step >= 2 ? "text-[#FF4DA3]" : "text-black/20 dark:text-white/20"} transition-colors`}>Review</span>
+        <span
+          className={`${step >= 2 ? "text-[#FF4DA3]" : "text-black/20 dark:text-white/20"} transition-colors`}
+        >
+          Review
+        </span>
         <div className="w-5 sm:w-8 h-[1px] bg-black/10 dark:bg-white/10" />
-        <span className={`${step === 3 ? "text-[#FF4DA3]" : "text-black/20 dark:text-white/20"} transition-colors`}>Confirmation</span>
+        <span
+          className={`${step === 3 ? "text-[#FF4DA3]" : "text-black/20 dark:text-white/20"} transition-colors`}
+        >
+          Confirmation
+        </span>
       </div>
 
-      <section className={`px-4 sm:px-6 pb-12 max-w-6xl mx-auto grid gap-8 md:gap-16 ${step === 3 ? "md:grid-cols-1" : "md:grid-cols-12"}`}>
-
+      <section
+        className={`px-4 sm:px-6 pb-12 max-w-6xl mx-auto grid gap-8 md:gap-16 ${step === 3 ? "md:grid-cols-1" : "md:grid-cols-12"}`}
+      >
         {/* LEFT COLUMN: Forms (7 cols) / Full width on confirmation */}
-        <div className={step === 3 ? "w-full" : "md:col-span-7 order-2 md:order-1"}>
+        <div
+          className={step === 3 ? "w-full" : "md:col-span-7 order-2 md:order-1"}
+        >
           <AnimatePresence mode="wait">
             {step === 1 && (
               <motion.div
@@ -571,22 +623,31 @@ export default function CheckoutPage() {
                 className="space-y-8"
               >
                 <div>
-                  <h1 className="text-4xl sm:text-5xl font-serif italic mb-2">Shipping</h1>
-                  <p className="text-sm sm:text-base text-black/50 dark:text-white/40">Please enter your delivery details.</p>
+                  <h1 className="text-4xl sm:text-5xl font-serif italic mb-2">
+                    Shipping
+                  </h1>
+                  <p className="text-sm sm:text-base text-black/50 dark:text-white/40">
+                    Please enter your delivery details.
+                  </p>
                 </div>
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-xs uppercase tracking-widest ml-1">Full Name</label>
+                    <label className="text-xs uppercase tracking-widest ml-1">
+                      Full Name
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. full name"
-                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${touched.name && errors.name
-                        ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
-                        : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
-                        }`}
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${
+                        touched.name && errors.name
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                          : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                      }`}
                       value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, name: e.target.value })
+                      }
                       onBlur={() => handleBlur("name")}
                     />
                     <AnimatePresence>
@@ -605,18 +666,26 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs uppercase tracking-widest ml-1">Phone Number</label>
+                    <label className="text-xs uppercase tracking-widest ml-1">
+                      Phone Number
+                    </label>
                     <input
                       type="tel"
                       inputMode="numeric"
                       maxLength={11}
                       placeholder="01234567890"
-                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${touched.phone && errors.phone
-                        ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
-                        : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
-                        }`}
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${
+                        touched.phone && errors.phone
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                          : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                      }`}
                       value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          phone: e.target.value.replace(/\D/g, ""),
+                        })
+                      }
                       onBlur={() => handleBlur("phone")}
                     />
                     <AnimatePresence>
@@ -631,25 +700,30 @@ export default function CheckoutPage() {
                           {errors.phone}
                         </motion.p>
                       )}
-
                     </AnimatePresence>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-xs uppercase tracking-widest ml-1">
-                      Email <span className="normal-case tracking-normal text-black/40 dark:text-white/40">(optional — for updates)</span>
+                      Email{" "}
+                      <span className="normal-case tracking-normal text-black/40 dark:text-white/40">
+                        (optional — for updates)
+                      </span>
                     </label>
                     <input
                       type="email"
                       inputMode="email"
                       autoComplete="email"
                       placeholder="you@example.com"
-                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${touched.email && errors.email
-                        ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
-                        : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
-                        }`}
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all ${
+                        touched.email && errors.email
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                          : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                      }`}
                       value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, email: e.target.value })
+                      }
                       onBlur={() => handleBlur("email")}
                     />
                     <AnimatePresence>
@@ -668,16 +742,21 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs uppercase tracking-widest ml-1">Detailed Address</label>
+                    <label className="text-xs uppercase tracking-widest ml-1">
+                      Detailed Address
+                    </label>
                     <textarea
                       rows={3}
                       placeholder="Street, Building, Apartment..."
-                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all resize-none ${touched.address && errors.address
-                        ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
-                        : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
-                        }`}
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border outline-none transition-all resize-none ${
+                        touched.address && errors.address
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                          : "border-black/10 dark:border-white/10 focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
+                      }`}
                       value={form.address}
-                      onChange={(e) => setForm({ ...form, address: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, address: e.target.value })
+                      }
                       onBlur={() => handleBlur("address")}
                     />
                     <AnimatePresence>
@@ -707,7 +786,8 @@ export default function CheckoutPage() {
                   )}
                   {shippingFees && Object.keys(shippingFees).length === 0 && (
                     <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90 ml-1">
-                      No shipping regions configured. Check Sanity or contact support.
+                      No shipping regions configured. Check Sanity or contact
+                      support.
                     </p>
                   )}
 
@@ -717,14 +797,17 @@ export default function CheckoutPage() {
                       onClick={() => setGovOpen((o) => !o)}
                       aria-haspopup="listbox"
                       aria-expanded={govOpen}
-                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border outline-none transition-all flex items-center justify-between gap-3 text-left ${touched.governorate && errors.governorate
-                        ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
-                        : govOpen
-                          ? "border-[#FF4DA3] ring-1 ring-[#FF4DA3]/40"
-                          : "border-black/10 dark:border-white/15 hover:border-black/20 dark:hover:border-white/25"
-                        }`}
+                      className={`w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.04] border outline-none transition-all flex items-center justify-between gap-3 text-left ${
+                        touched.governorate && errors.governorate
+                          ? "border-red-500/60 focus:border-red-500 focus:ring-1 focus:ring-red-500/40"
+                          : govOpen
+                            ? "border-[#FF4DA3] ring-1 ring-[#FF4DA3]/40"
+                            : "border-black/10 dark:border-white/15 hover:border-black/20 dark:hover:border-white/25"
+                      }`}
                     >
-                      <span className={`text-sm ${form.governorate ? "text-black dark:text-white" : "text-black/40 dark:text-white/40"}`}>
+                      <span
+                        className={`text-sm ${form.governorate ? "text-black dark:text-white" : "text-black/40 dark:text-white/40"}`}
+                      >
                         {form.governorate || "Select your governorate"}
                       </span>
                       <ChevronDown
@@ -754,12 +837,18 @@ export default function CheckoutPage() {
                                 value={govQuery}
                                 onChange={(e) => setGovQuery(e.target.value)}
                                 onKeyDown={(e) => {
-                                  if (e.key === "Enter" && filteredGovernorates.length > 0) {
+                                  if (
+                                    e.key === "Enter" &&
+                                    filteredGovernorates.length > 0
+                                  ) {
                                     e.preventDefault();
                                     const gov = filteredGovernorates[0];
                                     setForm({ ...form, governorate: gov });
                                     setGovOpen(false);
-                                    setTouched((t) => ({ ...t, governorate: true }));
+                                    setTouched((t) => ({
+                                      ...t,
+                                      governorate: true,
+                                    }));
                                   }
                                 }}
                                 placeholder="Search governorate..."
@@ -793,7 +882,11 @@ export default function CheckoutPage() {
                               {filteredGovernorates.map((gov) => {
                                 const isSelected = form.governorate === gov;
                                 return (
-                                  <li key={gov} role="option" aria-selected={isSelected}>
+                                  <li
+                                    key={gov}
+                                    role="option"
+                                    aria-selected={isSelected}
+                                  >
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -801,12 +894,16 @@ export default function CheckoutPage() {
                                         setGovOpen(false);
                                         setGovQuery("");
                                         govSearchRef.current?.blur();
-                                        setTouched((t) => ({ ...t, governorate: true }));
+                                        setTouched((t) => ({
+                                          ...t,
+                                          governorate: true,
+                                        }));
                                       }}
-                                      className={`w-full px-4 py-3 flex items-center justify-between gap-3 text-sm transition-colors ${isSelected
-                                        ? "bg-[#FF4DA3]/15 dark:bg-[#FF4DA3]/20 text-[#FF4DA3] font-medium"
-                                        : "text-black/80 dark:text-white/85 hover:bg-black/[0.05] dark:hover:bg-white/[0.07]"
-                                        }`}
+                                      className={`w-full px-4 py-3 flex items-center justify-between gap-3 text-sm transition-colors ${
+                                        isSelected
+                                          ? "bg-[#FF4DA3]/15 dark:bg-[#FF4DA3]/20 text-[#FF4DA3] font-medium"
+                                          : "text-black/80 dark:text-white/85 hover:bg-black/[0.05] dark:hover:bg-white/[0.07]"
+                                      }`}
                                     >
                                       <span>{gov}</span>
                                       <span className="text-[10px] uppercase tracking-widest text-black/40 dark:text-white/40">
@@ -853,10 +950,11 @@ export default function CheckoutPage() {
                         onClick={() =>
                           setForm({ ...form, paymentMethod: method.key })
                         }
-                        className={`flex-1 p-4 rounded-2xl border text-xs font-bold uppercase tracking-widest transition-all ${form.paymentMethod === method.key
-                          ? "border-[#FF4DA3] bg-[#FF4DA3]/10 text-[#FF4DA3]"
-                          : "border-black/10 dark:border-white/10 text-black/50 dark:text-white/40"
-                          }`}
+                        className={`flex-1 p-4 rounded-2xl border text-xs font-bold uppercase tracking-widest transition-all ${
+                          form.paymentMethod === method.key
+                            ? "border-[#FF4DA3] bg-[#FF4DA3]/10 text-[#FF4DA3]"
+                            : "border-black/10 dark:border-white/10 text-black/50 dark:text-white/40"
+                        }`}
                       >
                         {method.label}
                       </button>
@@ -890,10 +988,18 @@ export default function CheckoutPage() {
                         exit={{ opacity: 0, y: -8, height: 0 }}
                         className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400"
                       >
-                        <AlertCircle size={18} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                        <AlertCircle
+                          size={18}
+                          strokeWidth={2.5}
+                          className="shrink-0 mt-0.5"
+                        />
                         <div className="text-sm leading-relaxed">
-                          <p className="font-semibold mb-0.5">Please fix the highlighted fields</p>
-                          <p className="text-xs opacity-80">All shipping details are required to continue.</p>
+                          <p className="font-semibold mb-0.5">
+                            Please fix the highlighted fields
+                          </p>
+                          <p className="text-xs opacity-80">
+                            All shipping details are required to continue.
+                          </p>
                         </div>
                       </motion.div>
                     )}
@@ -934,43 +1040,64 @@ export default function CheckoutPage() {
                 </button>
 
                 <div>
-                  <h1 className="text-4xl sm:text-5xl font-serif italic mb-2">Final Review</h1>
-                  <p className="text-sm sm:text-base text-black/50 dark:text-white/40">Check your details before confirming.</p>
+                  <h1 className="text-4xl sm:text-5xl font-serif italic mb-2">
+                    Final Review
+                  </h1>
+                  <p className="text-sm sm:text-base text-black/50 dark:text-white/40">
+                    Check your details before confirming.
+                  </p>
                 </div>
 
                 <div className="p-5 sm:p-8 rounded-2xl sm:rounded-3xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5 space-y-4">
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4">
-                    <span className="text-sm opacity-50 font-light">Deliver to</span>
+                    <span className="text-sm opacity-50 font-light">
+                      Deliver to
+                    </span>
                     <span className="text-sm font-medium">{form.name}</span>
                   </div>
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4">
-                    <span className="text-sm opacity-50 font-light">Contact</span>
+                    <span className="text-sm opacity-50 font-light">
+                      Contact
+                    </span>
                     <span className="text-sm font-medium">{form.phone}</span>
                   </div>
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4 gap-3">
-                    <span className="text-sm opacity-50 font-light shrink-0">Email</span>
+                    <span className="text-sm opacity-50 font-light shrink-0">
+                      Email
+                    </span>
                     <span className="text-sm font-medium truncate">
                       {form.email.trim() ? form.email.trim() : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4">
-                    <span className="text-sm opacity-50 font-light">Governorate</span>
-                    <span className="text-sm font-medium">{form.governorate}</span>
+                    <span className="text-sm opacity-50 font-light">
+                      Governorate
+                    </span>
+                    <span className="text-sm font-medium">
+                      {form.governorate}
+                    </span>
                   </div>
 
                   <div className="flex justify-between border-b border-black/5 dark:border-white/5 pb-4">
-                    <span className="text-sm opacity-50 font-light">Payment</span>
+                    <span className="text-sm opacity-50 font-light">
+                      Payment
+                    </span>
                     <span className="text-sm font-medium">
-                      {form.paymentMethod === "online" ? "Instapay / Wallet" : "Cash on Delivery"}
+                      {form.paymentMethod === "online"
+                        ? "Instapay / Wallet"
+                        : "Cash on Delivery"}
                     </span>
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <span className="text-sm opacity-50 font-light">Address</span>
-                    <span className="text-sm font-medium leading-relaxed">{form.address}</span>
+                    <span className="text-sm opacity-50 font-light">
+                      Address
+                    </span>
+                    <span className="text-sm font-medium leading-relaxed">
+                      {form.address}
+                    </span>
                   </div>
                 </div>
-
 
                 {form.paymentMethod === "online" && (
                   <>
@@ -1001,6 +1128,73 @@ export default function CheckoutPage() {
 
                       <div className="space-y-2">
                         <label className="text-xs uppercase tracking-widest ml-1">
+                          Payment Proof <span className="text-red-500">*</span>
+                        </label>
+
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+
+                            setUploadingProof(true);
+                            try {
+                              const formData = new FormData();
+                              formData.append("file", file);
+
+                              const res = await fetch(
+                                "/api/upload/payment-proof",
+                                {
+                                  method: "POST",
+                                  body: formData,
+                                },
+                              );
+
+                              if (!res.ok) {
+                                const errorData = await res
+                                  .json()
+                                  .catch(() => ({ error: "Upload failed" }));
+                                throw new Error(
+                                  errorData.error || "Upload failed",
+                                );
+                              }
+
+                              const result = await res.json();
+                              setForm({
+                                ...form,
+                                paymentProofUrl: result.url,
+                              });
+                            } catch (error) {
+                              console.error("Upload error:", error);
+                              alert(
+                                `Failed to upload payment proof: ${error.message}`,
+                              );
+                              e.target.value = "";
+                            } finally {
+                              setUploadingProof(false);
+                            }
+                          }}
+                          className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3] file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-[#FF4DA3] file:text-white hover:file:bg-[#FF4DA3]/90"
+                        />
+                        {uploadingProof && (
+                          <p className="text-[11px] text-blue-600 dark:text-blue-400 ml-1">
+                            Uploading...
+                          </p>
+                        )}
+                        {form.paymentProofUrl && (
+                          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 ml-1">
+                            ✓ Payment proof uploaded successfully
+                          </p>
+                        )}
+                        <p className="text-[11px] leading-relaxed text-pink/60 dark:text-white/55 ml-1">
+                          Upload a screenshot of your InstaPay transfer to
+                          confirm payment.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-widest ml-1">
                           Transaction reference{" "}
                           <span className="font-normal normal-case tracking-normal text-black/45 dark:text-white/45">
                             (optional)
@@ -1019,39 +1213,8 @@ export default function CheckoutPage() {
                           }
                           className="w-full p-4 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
                         />
-                        <p className="text-[11px] leading-relaxed text-pink/60 dark:text-white/55 ml-1">
-                          Please send a <span className="font-semibold text-[#FF4DA3]">screenshot</span> of the transfer to WhatsApp to confirm the order.
-                        </p>
                       </div>
                     </div>
-                    <label className="flex items-start gap-3 cursor-pointer rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-4 sm:p-4 transition-colors hover:border-[#FF4DA3]/35">
-                      <input
-                        type="checkbox"
-                        checked={instapayTransferConfirmed}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setInstapayTransferConfirmed(checked);
-                          setInstapayConfirmedAt(checked ? Date.now() : null);
-                        }}
-                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-black/25 text-[#FF4DA3] focus:ring-[#FF4DA3]/40"
-                      />
-                      <span className="text-sm leading-snug text-black/75 dark:text-white/75">
-                        I have completed the InstaPay transfer for{" "}
-                        <span className="font-semibold text-black dark:text-white">
-                          EGP{" "}
-                          {(finalTotal != null
-                            ? finalTotal
-                            : Math.max(0, cartTotal - discountAmount)
-                          ).toLocaleString()}
-                        </span>
-                        .
-                      </span>
-                    </label>
-                    {instapayConfirmedAt != null && (
-                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400/90 ml-1">
-                        Confirmation saved — you can place the order when ready.
-                      </p>
-                    )}
                   </>
                 )}
 
@@ -1063,9 +1226,15 @@ export default function CheckoutPage() {
                       exit={{ opacity: 0, y: -8, height: 0 }}
                       className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400"
                     >
-                      <AlertCircle size={18} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                      <AlertCircle
+                        size={18}
+                        strokeWidth={2.5}
+                        className="shrink-0 mt-0.5"
+                      />
                       <div className="text-sm leading-relaxed">
-                        <p className="font-semibold mb-0.5">Order could not be placed</p>
+                        <p className="font-semibold mb-0.5">
+                          Order could not be placed
+                        </p>
                         <p className="text-xs opacity-80">{submitError}</p>
                       </div>
                     </motion.div>
@@ -1080,18 +1249,16 @@ export default function CheckoutPage() {
                     loading ||
                     shippingFeeInvalid ||
                     finalTotal === null ||
-                    (
-                      form.paymentMethod === "online" &&
-                      (
-                        !instapayTransferConfirmed ||
-                        !form.senderNumber.trim()
-                      )
-                    )
+                    (form.paymentMethod === "online" &&
+                      (!form.paymentProofUrl || !form.senderNumber.trim()))
                   }
                   className="w-full py-5 rounded-2xl bg-black dark:bg-white text-white dark:text-black font-bold tracking-widest uppercase text-sm transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100"
                 >
                   {loading ? (
-                    <><Loader2 className="animate-spin" size={20} /> Processing Order...</>
+                    <>
+                      <Loader2 className="animate-spin" size={20} /> Processing
+                      Order...
+                    </>
                   ) : (
                     "Place Order Now"
                   )}
@@ -1113,10 +1280,16 @@ export default function CheckoutPage() {
                     animate={{ scale: 1.2 }}
                     className="absolute inset-0 bg-[#FF4DA3]/20 rounded-full blur-2xl"
                   />
-                  <CheckCircle2 size={80} className="text-[#FF4DA3] relative z-10" strokeWidth={1} />
+                  <CheckCircle2
+                    size={80}
+                    className="text-[#FF4DA3] relative z-10"
+                    strokeWidth={1}
+                  />
                 </div>
 
-                <h1 className="text-4xl sm:text-5xl font-serif italic px-4">Merci, {form.name?.trim()?.split(/\s+/)[0] || "there"}!</h1>
+                <h1 className="text-4xl sm:text-5xl font-serif italic px-4">
+                  Merci, {form.name?.trim()?.split(/\s+/)[0] || "there"}!
+                </h1>
                 <p className="text-sm sm:text-base text-black/50 dark:text-white/40 max-w-sm leading-relaxed px-4">
                   Your order has been received and is being prepared with care.
                   You will receive a confirmation call shortly.
@@ -1139,10 +1312,11 @@ export default function CheckoutPage() {
                       <button
                         onClick={handleCopyOrderId}
                         aria-label="Copy order ID"
-                        className={`flex-shrink-0 p-2.5 rounded-full transition-all ${copied
-                          ? "bg-emerald-500/15 text-emerald-500"
-                          : "bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:bg-[#FF4DA3]/15 hover:text-[#FF4DA3]"
-                          }`}
+                        className={`flex-shrink-0 p-2.5 rounded-full transition-all ${
+                          copied
+                            ? "bg-emerald-500/15 text-emerald-500"
+                            : "bg-black/5 dark:bg-white/5 text-black/60 dark:text-white/60 hover:bg-[#FF4DA3]/15 hover:text-[#FF4DA3]"
+                        }`}
                       >
                         {copied ? <Check size={16} /> : <Copy size={16} />}
                       </button>
@@ -1190,22 +1364,34 @@ export default function CheckoutPage() {
             <div className="md:sticky md:top-32 p-5 sm:p-8 rounded-2xl sm:rounded-[2rem] bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5">
               <div className="flex items-center gap-2 mb-5 sm:mb-8 border-b border-black/5 dark:border-white/5 pb-4">
                 <ShoppingBag size={18} className="text-[#FF4DA3]" />
-                <h2 className="text-base sm:text-lg font-medium tracking-tight">Order Summary</h2>
+                <h2 className="text-base sm:text-lg font-medium tracking-tight">
+                  Order Summary
+                </h2>
               </div>
 
               <div className="space-y-4 sm:space-y-6 max-h-[35vh] sm:max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                 {cart.map((item) => (
-                  <div key={`${item.id}-${item.color?.name || "default"}-${item.size}`} className="flex gap-3 sm:gap-4 items-center">
+                  <div
+                    key={`${item.id}-${item.color?.name || "default"}-${item.size}`}
+                    className="flex gap-3 sm:gap-4 items-center"
+                  >
                     <div className="w-14 h-16 sm:w-16 sm:h-20 bg-black/5 dark:bg-white/5 rounded-xl overflow-hidden flex-shrink-0">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="flex-1 min-w-0 text-sm">
                       <p className="font-medium truncate">{item.name}</p>
                       <p className="text-[10px] opacity-40 uppercase tracking-tighter mt-0.5">
-                        {item.color?.name || "default"} / {item.size} × {item.quantity}
+                        {item.color?.name || "default"} / {item.size} ×{" "}
+                        {item.quantity}
                       </p>
                     </div>
-                    <span className="text-xs sm:text-sm font-medium whitespace-nowrap">EGP {item.price * item.quantity}</span>
+                    <span className="text-xs sm:text-sm font-medium whitespace-nowrap">
+                      EGP {item.price * item.quantity}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1345,7 +1531,9 @@ export default function CheckoutPage() {
 
               <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10">
                 <div className="flex justify-between items-end gap-2">
-                  <span className="text-base sm:text-lg font-serif italic">Total</span>
+                  <span className="text-base sm:text-lg font-serif italic">
+                    Total
+                  </span>
                   <div className="text-right">
                     <motion.span
                       key={finalTotal ?? "pending"}
@@ -1366,7 +1554,6 @@ export default function CheckoutPage() {
             </div>
           </motion.div>
         )}
-
       </section>
     </main>
   );

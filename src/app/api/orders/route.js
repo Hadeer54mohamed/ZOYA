@@ -493,11 +493,12 @@ export async function POST(req) {
     }
 
     if (paymentMethod === "online") {
-      if (instapay_transfer_confirmed !== true) {
+      const proofUrl = payment_proof_url?.toString().trim();
+      if (!proofUrl) {
         return Response.json(
           {
             error:
-              "Please confirm you completed the InstaPay transfer before placing the order.",
+              "Payment proof is required for online (InstaPay) orders. Please upload a screenshot of your transfer.",
           },
           { status: 400 },
         );
@@ -708,7 +709,8 @@ export async function POST(req) {
           sender_number: sender_number || null,
           transaction_reference: transaction_reference || null,
           payment_proof_url: payment_proof_url || null,
-          payment_verified: paymentMethod === "online",
+          payment_verified:
+            paymentMethod === "online" && Boolean(payment_proof_url),
         },
       ])
       .select()
