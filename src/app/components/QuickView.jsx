@@ -50,6 +50,27 @@ export default function QuickView({
   const [rects, setRects] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(false);
+  const [hoveredSize, setHoveredSize] = useState(null);
+
+  const SIZE_FIT = {
+    S: "Slim fit",
+    M: "Regular fit",
+    L: "Oversized fit",
+    XL: "Very oversized",
+    XXL: "Extreme oversized",
+  };
+
+  const sizeGuideText = (() => {
+    const size = hoveredSize || selectedSize;
+    if (!size) return "";
+    if (Array.isArray(product?.sizeGuide)) {
+      const entry = product.sizeGuide.find((item) => item?.size === size);
+      if (entry?.description) {
+        return entry.description;
+      }
+    }
+    return SIZE_FIT[size] || "";
+  })();
 
   const modalImageRef = useRef(null);
 
@@ -409,14 +430,35 @@ export default function QuickView({
 
                 {/* SIZES */}
                 <div className="mb-2 sm:mb-8">
-                  <p className="text-[10px] text-black/50 dark:text-white/30 tracking-[0.2em] uppercase font-bold mb-3 sm:mb-4">
-                    Select Size
+                  <p className="text-[10px] text-black/50 dark:text-white/30 tracking-[0.2em] uppercase font-bold mb-3 sm:mb-4 flex items-center justify-between gap-3">
+                    <span>
+                      Select Size{" "}
+                      <AnimatePresence mode="wait">
+                        {sizeGuideText && (
+                          <motion.span
+                            key={hoveredSize || selectedSize}
+                            initial={{ opacity: 0, x: -4 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -4 }}
+                            transition={{ duration: 0.2 }}
+                            className="normal-case tracking-normal ml-2 text-[#FF4DA3] font-bold"
+                          >
+                            · {sizeGuideText}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </span>
+                    <button className="normal-case tracking-normal text-[10px] text-[#FF4DA3] hover:underline">
+                      Size guide
+                    </button>
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     {sizesList.map((s) => (
                       <button
                         key={s}
                         onClick={() => setSelectedSize(s)}
+                        onMouseEnter={() => setHoveredSize(s)}
+                        onMouseLeave={() => setHoveredSize(null)}
                         className={`h-11 sm:h-12 min-w-[3rem] sm:min-w-[3.5rem] px-3 sm:px-4 rounded-xl sm:rounded-2xl text-xs font-bold transition-all duration-300 ${
                           selectedSize === s
                             ? "bg-black dark:bg-white text-white dark:text-black"
