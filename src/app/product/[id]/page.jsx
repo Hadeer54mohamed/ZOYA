@@ -14,5 +14,5 @@ export default async function ProductPage({ params }) {
     getRelatedProducts(id, 4),
   ]);
 
-  return <ProductDetailClient id={id} product={product} related={related} />;
+  return <ProductDetailClient key={id} id={id} product={product} related={related} />;
 }

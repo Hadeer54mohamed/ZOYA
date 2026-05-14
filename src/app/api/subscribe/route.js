@@ -7,7 +7,7 @@ import { Redis } from "@upstash/redis";
 // 1. إعداد Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
 // 2. إعداد Resend
@@ -18,8 +18,8 @@ const resend = process.env.RESEND_API_KEY
 // 3. إعداد الـ Rate Limiter (العسكري اللي على الباب)
 const ratelimit = new Ratelimit({
   redis: Redis.fromEnv(),
-  // يسمح بـ 3 محاولات فقط كل 24 ساعة لكل IP
-  limiter: Ratelimit.slidingWindow(3, "1440 m"), 
+  // يسمح بـ 5 محاولات فقط كل 24 ساعة لكل IP
+  limiter: Ratelimit.slidingWindow(5, "1440 m"),
   analytics: true,
 });
 
@@ -53,13 +53,14 @@ export async function POST(req) {
     if (!limitSuccess) {
       return Response.json(
         { error: "Too many attempts. Please try again tomorrow." },
-        { status: 429 } // 429 يعني Too Many Requests
+        { status: 429 }, // 429 يعني Too Many Requests
       );
     }
 
     // --- [ثانياً: استلام وفحص البيانات] ---
     const { email } = await req.json();
-    const normalized = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalized =
+      typeof email === "string" ? email.trim().toLowerCase() : "";
 
     if (!EMAIL_REGEX.test(normalized)) {
       return Response.json({ error: "Invalid email" }, { status: 400 });
@@ -72,12 +73,17 @@ export async function POST(req) {
 
     if (dbError) {
       const isDuplicate = dbError.code === "23505";
-      if (!isDuplicate) {
-        console.error("[subscribe] Database error:", dbError);
-        return Response.json({ error: "Failed to save subscriber" }, { status: 500 });
+      if (isDuplicate) {
+        return Response.json(
+          { error: "Email already registered" },
+          { status: 409 },
+        );
       }
-      // لو مسجل قبل كدة، بنكمل عادي عشان نبعتله إيميل الترحيب كنوع من التذكير
-      console.warn("[subscribe] Already subscribed — re-sending welcome email.");
+      console.error("[subscribe] Database error:", dbError);
+      return Response.json(
+        { error: "Failed to save subscriber" },
+        { status: 500 },
+      );
     }
 
     // --- [رابعاً: إرسال إيميل الترحيب عبر Resend] ---
@@ -130,7 +136,7 @@ export async function POST(req) {
           </tr>
         </table>
       </div>
-      `
+      `,
     });
 
     if (emailError) {
@@ -142,12 +148,11 @@ export async function POST(req) {
       });
     }
 
-    return Response.json({ 
-      success: true, 
-      emailSent: true, 
-      id: emailData?.id 
+    return Response.json({
+      success: true,
+      emailSent: true,
+      id: emailData?.id,
     });
-
   } catch (err) {
     console.error("[subscribe] Unexpected crash:", err);
     return Response.json({ error: "Internal server error" }, { status: 500 });

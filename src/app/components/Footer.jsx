@@ -3,7 +3,17 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { ArrowUpRight, Mail, ArrowUp, Check, Heart, Sparkles, Eye, AlertCircle, X } from "lucide-react";
+import {
+  ArrowUpRight,
+  Mail,
+  ArrowUp,
+  Check,
+  Heart,
+  Sparkles,
+  Eye,
+  AlertCircle,
+  X,
+} from "lucide-react";
 
 const shopLinks = [
   { label: "All Products", href: "/products" },
@@ -16,16 +26,14 @@ const aboutLinks = [
   { label: "Lookbook", href: "/products" },
 ];
 
-const helpLinks = [
-  { label: "Contact", href: "/#contact" },
-];
+const helpLinks = [{ label: "Contact", href: "/#contact" }];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
-  const [toast, setToast] = useState(null); 
+  const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
 
   const showToast = (variant, message) => {
@@ -60,12 +68,12 @@ export default function Footer() {
       if (res.ok) {
         setSubscribed(true);
         setEmail("");
-        showToast("success", "You\u2019re in \uD83D\uDD25");
+        showToast("success", "Welcome! You’re subscribed.");
         setTimeout(() => setSubscribed(false), 3500);
       } else if (res.status === 409) {
-        showToast("info", "You already joined \uD83D\uDC40");
+        showToast("info", "This email is already registered.");
       } else {
-        showToast("error", data?.error || "Couldn\u2019t subscribe. Try again.");
+        showToast("error", data?.error || "Couldn’t subscribe. Try again.");
       }
     } catch {
       showToast("error", "Network error. Please try again.");
@@ -242,13 +250,22 @@ export default function Footer() {
             <span className="hidden md:inline text-black/20 dark:text-white/20">
               /
             </span>
-            <Link href="/privacy" className="hover:text-[#FF4DA3] transition-colors">
+            <Link
+              href="/privacy"
+              className="hover:text-[#FF4DA3] transition-colors"
+            >
               Privacy
             </Link>
-            <Link href="/terms" className="hover:text-[#FF4DA3] transition-colors">
+            <Link
+              href="/terms"
+              className="hover:text-[#FF4DA3] transition-colors"
+            >
               Terms
             </Link>
-            <Link href="/cookies" className="hover:text-[#FF4DA3] transition-colors">
+            <Link
+              href="/cookies"
+              className="hover:text-[#FF4DA3] transition-colors"
+            >
               Cookies
             </Link>
           </div>
@@ -294,7 +311,9 @@ export default function Footer() {
 
       {/* Toast */}
       <AnimatePresence>
-        {toast && <FooterToast toast={toast} onDismiss={() => setToast(null)} />}
+        {toast && (
+          <FooterToast toast={toast} onDismiss={() => setToast(null)} />
+        )}
       </AnimatePresence>
     </footer>
   );

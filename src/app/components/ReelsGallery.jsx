@@ -20,7 +20,12 @@ const InstagramIcon = (props) => (
   </svg>
 );
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, EffectCoverflow, Pagination, Autoplay } from "swiper/modules";
+import {
+  Navigation,
+  EffectCoverflow,
+  Pagination,
+  Autoplay,
+} from "swiper/modules";
 
 import "swiper/css";
 import "swiper/css/navigation";
@@ -86,7 +91,8 @@ export default function ReelsGallery({ reels = [] }) {
   useEffect(() => setMounted(true), []);
 
   const hasReels = Array.isArray(reels) && reels.length > 0;
-  const enableLoop = reels.length >= 4;
+  const enableLoop = reels.length > 1;
+  const slidesPerViewCap = Math.min(reels.length || 1, 4);
 
   const closeModal = useCallback(() => {
     setIsModalClosing(true);
@@ -172,7 +178,7 @@ export default function ReelsGallery({ reels = [] }) {
               </a>
             )}
           </div>,
-          document.body
+          document.body,
         )
       : null;
 
@@ -226,12 +232,12 @@ export default function ReelsGallery({ reels = [] }) {
                 enableLoop
                   ? {
                       delay: 4500,
-                      disableOnInteraction: true,
+                      disableOnInteraction: false,
                       pauseOnMouseEnter: true,
                     }
                   : false
               }
-              slidesPerView={1.3}
+              slidesPerView={Math.min(slidesPerViewCap, 1.3)}
               spaceBetween={12}
               coverflowEffect={{
                 rotate: 0,
@@ -242,29 +248,59 @@ export default function ReelsGallery({ reels = [] }) {
               }}
               breakpoints={{
                 480: {
-                  slidesPerView: 1.6,
+                  slidesPerView: Math.min(slidesPerViewCap, 1.6),
                   spaceBetween: 14,
-                  coverflowEffect: { rotate: 0, stretch: 0, depth: 70, modifier: 1, slideShadows: false },
+                  coverflowEffect: {
+                    rotate: 0,
+                    stretch: 0,
+                    depth: 70,
+                    modifier: 1,
+                    slideShadows: false,
+                  },
                 },
                 640: {
-                  slidesPerView: 2.2,
+                  slidesPerView: Math.min(slidesPerViewCap, 2.2),
                   spaceBetween: 18,
-                  coverflowEffect: { rotate: 0, stretch: 0, depth: 90, modifier: 1.2, slideShadows: false },
+                  coverflowEffect: {
+                    rotate: 0,
+                    stretch: 0,
+                    depth: 90,
+                    modifier: 1.2,
+                    slideShadows: false,
+                  },
                 },
                 768: {
-                  slidesPerView: 3,
+                  slidesPerView: Math.min(slidesPerViewCap, 3),
                   spaceBetween: 20,
-                  coverflowEffect: { rotate: 0, stretch: 0, depth: 100, modifier: 1.3, slideShadows: false },
+                  coverflowEffect: {
+                    rotate: 0,
+                    stretch: 0,
+                    depth: 100,
+                    modifier: 1.3,
+                    slideShadows: false,
+                  },
                 },
                 1024: {
-                  slidesPerView: 3.5,
+                  slidesPerView: Math.min(slidesPerViewCap, 3.5),
                   spaceBetween: 24,
-                  coverflowEffect: { rotate: 0, stretch: 0, depth: 120, modifier: 1.4, slideShadows: false },
+                  coverflowEffect: {
+                    rotate: 0,
+                    stretch: 0,
+                    depth: 120,
+                    modifier: 1.4,
+                    slideShadows: false,
+                  },
                 },
                 1280: {
-                  slidesPerView: 4,
+                  slidesPerView: slidesPerViewCap,
                   spaceBetween: 24,
-                  coverflowEffect: { rotate: 0, stretch: 0, depth: 130, modifier: 1.5, slideShadows: false },
+                  coverflowEffect: {
+                    rotate: 0,
+                    stretch: 0,
+                    depth: 130,
+                    modifier: 1.5,
+                    slideShadows: false,
+                  },
                 },
               }}
               navigation={{ prevEl: ".ig-prev", nextEl: ".ig-next" }}
@@ -366,7 +402,10 @@ export default function ReelsGallery({ reels = [] }) {
           margin: 0 3px !important;
           transition: all 0.3s ease;
         }
-        :global(.dark) .reels-swiper-wrap .reels-pagination .swiper-pagination-bullet {
+        :global(.dark)
+          .reels-swiper-wrap
+          .reels-pagination
+          .swiper-pagination-bullet {
           background: rgba(255, 255, 255, 0.2);
         }
         .reels-swiper-wrap .reels-pagination .swiper-pagination-bullet-active {

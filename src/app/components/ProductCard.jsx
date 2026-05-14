@@ -1,11 +1,14 @@
 "use client";
 
 import { motion, useMotionValue, useSpring } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
 import Skeleton from "./Skeleton";
 import Image from "next/image";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { colorImageList } from "../lib/colorImages";
+
 const FALLBACK_COLOR = {
   name: "Default",
   value: "#0a0a0a",
@@ -21,7 +24,19 @@ export default function ProductCard({ product }) {
       : [FALLBACK_COLOR];
   const [activeColor, setActiveColor] = useState(colors[0]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [imgIdx, setImgIdx] = useState(0);
   const imgWrapRef = useRef(null);
+  const touchStartX = useRef(null);
+
+  const galleryImages = useMemo(
+    () => colorImageList(activeColor, FALLBACK_COLOR.images[0]),
+    [activeColor],
+  );
+  const slideCount = galleryImages.length;
+  const safeIdx =
+    slideCount > 0
+      ? Math.min(Math.max(0, imgIdx), slideCount - 1)
+      : 0;
 
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
@@ -38,6 +53,12 @@ export default function ProductCard({ product }) {
     ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
     : 0;
 
+  const selectActiveColor = useCallback((c) => {
+    setActiveColor(c);
+    setImgIdx(0);
+    setIsLoaded(false);
+  }, []);
+
   const stop = (e) => e.stopPropagation();
   const openQuickView = () => setIsOpen(true);
   const stopAndOpenQuickView = (e) => {
@@ -45,13 +66,29 @@ export default function ProductCard({ product }) {
     setIsOpen(true);
   };
 
-  useEffect(() => {
-    setIsLoaded(false);
-    const el = imgWrapRef.current?.querySelector("img");
-    if (el && el.complete && el.naturalWidth > 0) {
-      setIsLoaded(true);
-    }
-  }, [activeColor]);
+  const goPrevImg = useCallback(
+    (e) => {
+      e?.stopPropagation();
+      if (slideCount <= 1) return;
+      setImgIdx((i) => {
+        const cur = Math.min(Math.max(0, i), slideCount - 1);
+        return (cur - 1 + slideCount) % slideCount;
+      });
+    },
+    [slideCount],
+  );
+
+  const goNextImg = useCallback(
+    (e) => {
+      e?.stopPropagation();
+      if (slideCount <= 1) return;
+      setImgIdx((i) => {
+        const cur = Math.min(Math.max(0, i), slideCount - 1);
+        return (cur + 1) % slideCount;
+      });
+    },
+    [slideCount],
+  );
 
   const goToProduct = () => {
     router.push(`/product/${product.id}`);
@@ -87,23 +124,92 @@ export default function ProductCard({ product }) {
           onClick={openQuickView}
           role="button"
           tabIndex={0}
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(e) => {
+            if (touchStartX.current == null || slideCount <= 1) return;
+            const x = e.changedTouches[0]?.clientX;
+            if (x == null) return;
+            const dx = x - touchStartX.current;
+            if (dx < -48) goNextImg();
+            else if (dx > 48) goPrevImg();
+            touchStartX.current = null;
+          }}
           className="relative aspect-[3/4] overflow-hidden bg-black/5 dark:bg-white/5 cursor-pointer"
         >
           {!isLoaded && (
             <Skeleton className="absolute inset-0 z-10 h-full w-full" />
           )}
 
-          <Image
-            src={activeColor.images?.[0] || FALLBACK_COLOR.images[0]}
-            alt={product.name}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            onLoad={() => setIsLoaded(true)}
-            className={`object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:rotate-[0.5deg] ${isLoaded ? "opacity-100" : "opacity-0"}`}
+          <div
+            className="absolute inset-0 flex h-full w-full transition-transform duration-300 ease-out"
             style={{
-              transform: `translateZ(40px) scale(1.05)`,
+              width: `${slideCount * 100}%`,
+              transform: `translateX(-${(100 / slideCount) * safeIdx}%)`,
             }}
-          />
+          >
+            {galleryImages.map((src, i) => (
+              <div
+                key={`${src}-${i}`}
+                className="relative h-full shrink-0"
+                style={{ width: `${100 / slideCount}%` }}
+              >
+                <Image
+                  src={src}
+                  alt={`${product.name} — ${activeColor.name} (${i + 1})`}
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  onLoad={() => {
+                    if (i === safeIdx) setIsLoaded(true);
+                  }}
+                  className="object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:rotate-[0.5deg] opacity-100"
+                  style={{
+                    transform: `translateZ(40px) scale(1.05)`,
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {slideCount > 1 && (
+            <>
+              <div className="absolute bottom-2 left-1/2 z-[5] flex -translate-x-1/2 gap-1.5">
+                {galleryImages.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={(e) => {
+                      stop(e);
+                      setImgIdx(i);
+                    }}
+                    aria-label={`Photo ${i + 1} of ${slideCount}`}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      i === safeIdx
+                        ? "w-4 bg-[#FF4DA3]"
+                        : "w-1.5 bg-white/70 dark:bg-white/40 hover:bg-white"
+                    }`}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={goPrevImg}
+                aria-label="Previous photo"
+                className="hidden sm:grid absolute left-2 top-1/2 z-[6] -translate-y-1/2 h-8 w-8 place-items-center rounded-full bg-black/55 text-white opacity-0 transition hover:bg-black/80 group-hover:opacity-100"
+              >
+                <ChevronLeft size={16} strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={goNextImg}
+                aria-label="Next photo"
+                className="hidden sm:grid absolute right-2 top-1/2 z-[6] -translate-y-1/2 h-8 w-8 place-items-center rounded-full bg-black/55 text-white opacity-0 transition hover:bg-black/80 group-hover:opacity-100"
+              >
+                <ChevronRight size={16} strokeWidth={2.5} />
+              </button>
+            </>
+          )}
 
           {/* View Details pill on hover (top right) — navigates to full page */}
           <button
@@ -277,10 +383,10 @@ export default function ProductCard({ product }) {
                   key={c.name}
                   type="button"
                   data-no-open
-                  onMouseEnter={() => setActiveColor(c)}
+                  onMouseEnter={() => selectActiveColor(c)}
                   onClick={(e) => {
                     stop(e);
-                    setActiveColor(c);
+                    selectActiveColor(c);
                   }}
                   aria-label={c.name}
                   aria-pressed={activeColor.name === c.name}
@@ -311,6 +417,7 @@ export default function ProductCard({ product }) {
         <QuickView
           product={product}
           initialColor={activeColor}
+          initialImageIndex={safeIdx}
           onClose={() => setIsOpen(false)}
         />
       )}

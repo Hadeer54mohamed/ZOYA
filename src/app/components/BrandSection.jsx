@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 
 const images = [
-  "/images/photo (6).jpeg",
-  "/images/photo (5).jpeg",
-  "/images/photo (4).jpeg",
+  "/images/Team.jpg",
+  "/images/Team1.jpg",
+  "/images/Team2.jpg",
+  "/images/Team3.jpg",
 ];
 
 export default function BrandSection() {
@@ -65,7 +66,7 @@ export default function BrandSection() {
             ))}
 
             {/* overlay */}
-            <div className="absolute inset-0 bg-black/20 dark:bg-black/30" />
+            <div className="absolute inset-0 " />
           </div>
 
           {/* Dots */}

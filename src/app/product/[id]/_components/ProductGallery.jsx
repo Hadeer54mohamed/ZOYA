@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Image from "next/image";
+import { colorImageList, colorPrimaryImage } from "../../../lib/colorImages";
 
 const hexToRgb = (hex) => {
   if (!hex) return { r: 0, g: 0, b: 0 };
@@ -29,16 +30,24 @@ export default function ProductGallery({
 }) {
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
-  const activeImage = selectedColor.images[activeIndex];
+  const slides = useMemo(
+    () => colorImageList(selectedColor),
+    [selectedColor],
+  );
+  const safeIndex =
+    slides.length > 0
+      ? ((activeIndex % slides.length) + slides.length) % slides.length
+      : 0;
+  const activeImage = slides[safeIndex] ?? slides[0];
 
   const { r, g, b } = hexToRgb(selectedColor.value);
   const toneGradient = `radial-gradient(circle at 30% 20%, rgba(${r},${g},${b},0.22), transparent 55%), radial-gradient(circle at 80% 90%, rgba(${r},${g},${b},0.12), transparent 50%)`;
 
   const goNext = () =>
-    setActiveIndex((i) => (i + 1) % selectedColor.images.length);
+    setActiveIndex((i) => (i + 1) % slides.length);
   const goPrev = () =>
     setActiveIndex(
-      (i) => (i - 1 + selectedColor.images.length) % selectedColor.images.length
+      (i) => (i - 1 + slides.length) % slides.length,
     );
 
   return (
@@ -61,7 +70,7 @@ export default function ProductGallery({
                   }`}
                 >
                   <Image
-                    src={color.images[0]}
+                    src={colorPrimaryImage(color)}
                     alt={color.name}
                     fill
                     sizes="80px"
@@ -85,6 +94,8 @@ export default function ProductGallery({
             })}
           </div>
 
+          {/* Main gallery + per-color image strip */}
+          <div className="flex-1 flex flex-col gap-3 min-w-0">
           {/* Main Image */}
           <div
             ref={imageRef}
@@ -107,7 +118,7 @@ export default function ProductGallery({
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.18}
               onDragEnd={(_, info) => {
-                if (selectedColor.images.length <= 1) return;
+                if (slides.length <= 1) return;
                 if (info.offset.x < -70 || info.velocity.x < -500) goNext();
                 else if (info.offset.x > 70 || info.velocity.x > 500) goPrev();
               }}
@@ -189,7 +200,7 @@ export default function ProductGallery({
             </AnimatePresence>
 
             {/* Arrows + counter (only if multi-image) */}
-            {selectedColor.images.length > 1 && (
+            {slides.length > 1 && (
               <>
                 <button
                   onClick={goPrev}
@@ -206,13 +217,41 @@ export default function ProductGallery({
                   <ChevronRight size={18} />
                 </button>
                 <div className="absolute bottom-4 right-4 z-[4] px-3 py-1 rounded-full bg-black/50 dark:bg-black/60 backdrop-blur-md text-white text-[10px] font-bold tracking-widest">
-                  {activeIndex + 1} / {selectedColor.images.length}
+                  {safeIndex + 1} / {slides.length}
                 </div>
                 <div className="md:hidden absolute bottom-4 left-4 z-[4] px-3 py-1 rounded-full bg-black/50 backdrop-blur-md text-white/90 text-[9px] tracking-widest uppercase">
                   ← swipe →
                 </div>
               </>
             )}
+          </div>
+
+          {slides.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {slides.map((src, i) => (
+                <button
+                  key={`${src}-${i}`}
+                  type="button"
+                  onClick={() => setActiveIndex(i)}
+                  aria-label={`View image ${i + 1}`}
+                  aria-current={i === safeIndex ? "true" : undefined}
+                  className={`relative shrink-0 h-20 w-16 sm:h-24 sm:w-[4.5rem] overflow-hidden rounded-xl border-2 transition-all duration-300 ${
+                    i === safeIndex
+                      ? "border-[#FF4DA3] ring-2 ring-[#FF4DA3]/30 scale-[1.02]"
+                      : "border-black/10 dark:border-white/10 opacity-70 hover:opacity-100 hover:border-black/30 dark:hover:border-white/30"
+                  }`}
+                >
+                  <Image
+                    src={src}
+                    alt=""
+                    fill
+                    sizes="72px"
+                    className="object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
           </div>
         </div>
       </div>

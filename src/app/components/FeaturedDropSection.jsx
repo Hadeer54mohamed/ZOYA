@@ -4,6 +4,10 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
 
+const BG_DESKTOP = "/images/Team0.jpg";
+/** صورة مخصصة للموبايل (عمودية/تكوين يناسب الشاشة الضيقة) — غيّر المسار لملفك */
+const BG_MOBILE = "/images/Team0 - Copy.jpg";
+
 export default function FeaturedDropSection() {
   const ref = useRef(null);
   const router = useRouter();
@@ -19,12 +23,22 @@ export default function FeaturedDropSection() {
   const opacity = useTransform(scrollYProgress, [0, 0.3, 1], [0, 1, 1]);
 
   return (
-    <section ref={ref} className="relative h-[100vh] overflow-hidden">
+    <section
+      ref={ref}
+      className="relative h-[min(68svh,560px)] md:h-[100svh] overflow-hidden"
+    >
       
-      {/* Background Image (Parallax) */}
+      {/* Background: صورة منفصلة للموبايل vs الديسكتوب */}
       <motion.img
-        src="/images/image.png"
-        className="absolute inset-0 w-full h-full object-cover"
+        src={BG_MOBILE}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover object-center md:hidden"
+        style={{ scale, y }}
+      />
+      <motion.img
+        src={BG_DESKTOP}
+        alt=""
+        className="absolute inset-0 hidden h-full w-full object-cover object-center md:block"
         style={{ scale, y }}
       />
 

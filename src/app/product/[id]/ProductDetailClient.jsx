@@ -12,6 +12,7 @@ import ProductGallery from "./_components/ProductGallery";
 import ProductInfo from "./_components/ProductInfo";
 import StickyBar from "./_components/StickyBar";
 import Toast from "./_components/Toast";
+import { colorImageList, colorPrimaryImage } from "../../lib/colorImages";
 
 export default function ProductDetailClient({ id, product, related = [] }) {
 
@@ -58,22 +59,6 @@ export default function ProductDetailClient({ id, product, related = [] }) {
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }, [id]);
 
-  // Reset selection on product change
-  useEffect(() => {
-    if (product) {
-      setSelectedColorName(product.colors[0].name);
-      setPrevColorName(null);
-      setActiveIndex(0);
-      setSelectedSize(null);
-      setQuantity(1);
-    }
-  }, [id, product]);
-
-  // Reset gallery index on color change
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [selectedColorName]);
-
   // Show sticky bar when user scrolls past the main CTA block
   useEffect(() => {
     const onScroll = () => {
@@ -114,7 +99,14 @@ export default function ProductDetailClient({ id, product, related = [] }) {
   const selectedColor =
     product.colors.find((c) => c.name === selectedColorName) ||
     product.colors[0];
-  const activeImage = selectedColor.images[activeIndex];
+  const galleryImages = colorImageList(selectedColor);
+  const activeImage =
+    galleryImages[
+      Math.min(
+        Math.max(0, activeIndex),
+        Math.max(0, galleryImages.length - 1),
+      )
+    ] ?? galleryImages[0];
   const originalPrice =
     typeof product.originalPrice === "number" &&
     product.originalPrice > product.price
@@ -127,6 +119,7 @@ export default function ProductDetailClient({ id, product, related = [] }) {
     if (name === selectedColorName) return;
     setPrevColorName(selectedColorName);
     setSelectedColorName(name);
+    setActiveIndex(0);
     setShowColorLabel(true);
     setTimeout(() => setShowColorLabel(false), 1600);
   };
@@ -154,7 +147,7 @@ export default function ProductDetailClient({ id, product, related = [] }) {
       const colorForCart = {
         name: selectedColor.name,
         value: selectedColor.value,
-        image: selectedColor.images[0],
+        image: colorPrimaryImage(selectedColor),
       };
       addToCart(
         { id: product.id, name: product.name, price: product.price },
