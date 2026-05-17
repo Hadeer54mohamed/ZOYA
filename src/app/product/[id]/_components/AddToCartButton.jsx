@@ -27,7 +27,7 @@ export default function AddToCartButton({
       <button
         onClick={onClick}
         disabled={disabled}
-        className={`group relative w-full py-5 rounded-full font-bold uppercase tracking-[0.25em] text-sm overflow-hidden transition-all duration-500 ${
+        className={`group relative w-full py-4 sm:py-5 rounded-full font-bold uppercase tracking-[0.2em] sm:tracking-[0.25em] text-xs sm:text-sm overflow-hidden transition-all duration-500 ${
           isDisabledIdle
             ? "bg-black/5 dark:bg-white/5 text-black/30 dark:text-white/20 cursor-not-allowed"
             : isAdded
@@ -75,7 +75,10 @@ export default function AddToCartButton({
               exit={{ y: 20, opacity: 0 }}
               className="flex items-center justify-center gap-2"
             >
-              <ShoppingBag size={18} /> Add to Bag • {priceLabel}
+              <ShoppingBag size={18} />
+              <span className="truncate">
+                Add to Bag • {priceLabel}
+              </span>
             </motion.div>
           )}
         </AnimatePresence>

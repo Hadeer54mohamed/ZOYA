@@ -13,7 +13,7 @@ export default function AdminFooter() {
     <footer className="relative overflow-hidden bg-white dark:bg-black text-black dark:text-white transition-colors duration-500 border-t border-black/5 dark:border-white/5">
       
       {/* Noise texture */}
-      <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.png')] opacity-[0.03] dark:opacity-[0.05]" />
+      <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.webp')] opacity-[0.03] dark:opacity-[0.05]" />
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 py-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -21,7 +21,7 @@ export default function AdminFooter() {
           {/* Brand - No color filter */}
           <div className="shrink-0">
             <Image
-              src="/images/LOGO2.png"
+              src="/images/LOGO2.webp"
               alt="ZØYA"
               width={100}
               height={32}

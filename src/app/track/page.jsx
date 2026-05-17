@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import {
   PackageSearch,
   Loader2,
@@ -36,15 +36,35 @@ const SUPPORT = {
 const buildSupportMessage = (mode, query) => {
   const label = mode === "phone" ? "phone number" : "order ID";
   return encodeURIComponent(
-    `Hello Zoya support team 👋\n\nI'm trying to track an order but it can't be found.\n${label}: ${query || "(not provided)"}\n\nCould you please help me?`
+    `Hello Zoya support team 👋\n\nI'm trying to track an order but it can't be found.\n${label}: ${query || "(not provided)"}\n\nCould you please help me?`,
   );
 };
 
 const STATUS_FLOW = [
-  { key: "pending", label: "Pending", icon: Clock, description: "Awaiting confirmation" },
-  { key: "confirmed", label: "Confirmed", icon: CheckCircle2, description: "Preparing your items" },
-  { key: "shipped", label: "Shipped", icon: Truck, description: "On the way to you" },
-  { key: "delivered", label: "Delivered", icon: PackageCheck, description: "Order completed" },
+  {
+    key: "pending",
+    label: "Pending",
+    icon: Clock,
+    description: "Awaiting confirmation",
+  },
+  {
+    key: "confirmed",
+    label: "Confirmed",
+    icon: CheckCircle2,
+    description: "Preparing your items",
+  },
+  {
+    key: "shipped",
+    label: "Shipped",
+    icon: Truck,
+    description: "On the way to you",
+  },
+  {
+    key: "delivered",
+    label: "Delivered",
+    icon: PackageCheck,
+    description: "Order completed",
+  },
 ];
 
 function getStatusIndex(status) {
@@ -157,11 +177,11 @@ function TrackContent() {
 
   const editTotal = editItems.reduce(
     (sum, it) => sum + Number(it.price ?? 0) * Number(it.quantity ?? 0),
-    0
+    0,
   );
 
   const itemKey = (it, idx) =>
-    `${it.id}-${typeof it.color === "object" ? it.color?.name ?? "" : it.color ?? ""}-${it.size ?? ""}-${idx}`;
+    `${it.id}-${typeof it.color === "object" ? (it.color?.name ?? "") : (it.color ?? "")}-${it.size ?? ""}-${idx}`;
 
   const lookupById = useCallback(async (id) => {
     const trimmed = id.trim();
@@ -175,7 +195,9 @@ function TrackContent() {
     setOrder(null);
     setOrderList(null);
     try {
-      const res = await fetch(`/api/orders/track?id=${encodeURIComponent(trimmed)}`);
+      const res = await fetch(
+        `/api/orders/track?id=${encodeURIComponent(trimmed)}`,
+      );
       const result = await res.json();
       if (!res.ok || !result?.success) {
         if (res.status === 404) {
@@ -210,7 +232,7 @@ function TrackContent() {
     setOrderList(null);
     try {
       const res = await fetch(
-        `/api/orders/track?phone=${encodeURIComponent(trimmed)}`
+        `/api/orders/track?phone=${encodeURIComponent(trimmed)}`,
       );
       const result = await res.json();
       if (!res.ok || !result?.success) {
@@ -279,9 +301,7 @@ function TrackContent() {
       verify_phone: "",
     });
     setEditItems(
-      Array.isArray(order?.items)
-        ? order.items.map((it) => ({ ...it }))
-        : []
+      Array.isArray(order?.items) ? order.items.map((it) => ({ ...it })) : [],
     );
     setEditError("");
     setEditSuccess(false);
@@ -303,13 +323,13 @@ function TrackContent() {
           it.id === product.id &&
           (typeof it.color === "object" ? it.color?.name : it.color) ===
             (firstColor?.name ?? null) &&
-          (it.size ?? null) === (firstSize ?? null)
+          (it.size ?? null) === (firstSize ?? null),
       );
       if (existingIdx !== -1) {
         return prev.map((it, i) =>
           i === existingIdx
             ? { ...it, quantity: (Number(it.quantity) || 1) + 1 }
-            : it
+            : it,
         );
       }
       return [
@@ -319,7 +339,11 @@ function TrackContent() {
           name: product.name,
           image: firstColor?.image ?? product.image ?? null,
           color: firstColor
-            ? { name: firstColor.name, value: firstColor.value, image: firstColor.image }
+            ? {
+                name: firstColor.name,
+                value: firstColor.value,
+                image: firstColor.image,
+              }
             : null,
           size: firstSize,
           price: Number(product.price) || 0,
@@ -342,7 +366,7 @@ function TrackContent() {
 
   const updateItemAt = (idx, patch) => {
     setEditItems((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, ...patch } : it))
+      prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)),
     );
   };
 
@@ -351,8 +375,8 @@ function TrackContent() {
       prev.map((it, i) =>
         i === idx
           ? { ...it, color: newColor, image: newColor?.image ?? it.image }
-          : it
-      )
+          : it,
+      ),
     );
   };
 
@@ -362,7 +386,7 @@ function TrackContent() {
         if (i !== idx) return it;
         const next = Math.max(1, (Number(it.quantity) || 1) + delta);
         return { ...it, quantity: next };
-      })
+      }),
     );
   };
 
@@ -377,7 +401,8 @@ function TrackContent() {
       const orig = order.items[i];
       if (!orig) return true;
       const colorA = typeof it.color === "object" ? it.color?.name : it.color;
-      const colorB = typeof orig.color === "object" ? orig.color?.name : orig.color;
+      const colorB =
+        typeof orig.color === "object" ? orig.color?.name : orig.color;
       return (
         colorA !== colorB ||
         it.size !== orig.size ||
@@ -393,8 +418,12 @@ function TrackContent() {
     setEditError("");
     setEditLoading(true);
 
-    const payload = { id: order.order_id, verify_phone: editForm.verify_phone.trim() };
-    if (editForm.customer_name.trim()) payload.customer_name = editForm.customer_name.trim();
+    const payload = {
+      id: order.order_id,
+      verify_phone: editForm.verify_phone.trim(),
+    };
+    if (editForm.customer_name.trim())
+      payload.customer_name = editForm.customer_name.trim();
     if (editForm.phone.trim()) payload.phone = editForm.phone.trim();
     if (editForm.address.trim()) payload.address = editForm.address.trim();
     if (editForm.governorate && editForm.governorate !== order?.governorate) {
@@ -480,7 +509,9 @@ function TrackContent() {
       });
       const result = await res.json();
       if (!res.ok || !result?.success) {
-        setCancelError(result?.error || "Cancellation failed. Please try again.");
+        setCancelError(
+          result?.error || "Cancellation failed. Please try again.",
+        );
         return;
       }
       setCancelSuccess(true);
@@ -498,28 +529,21 @@ function TrackContent() {
   const canEdit = order?.status === "pending";
 
   return (
-    <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white">
-      <section className="max-w-3xl mx-auto px-5 sm:px-6 pt-28 sm:pt-32 pb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-3 mb-10"
-        >
+    <main className="min-h-screen overflow-x-hidden bg-white dark:bg-[#050505] text-black dark:text-white">
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-24 sm:pt-32 pb-24">
+        <div className="animate-ui-fade-in-up text-center space-y-3 mb-10">
           <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-[#FF4DA3] font-bold">
             <PackageSearch size={14} /> Order Tracking
           </span>
-          <h1 className="text-4xl sm:text-5xl font-serif italic">Track Your Order</h1>
+          <h1 className="text-4xl sm:text-5xl font-serif italic">
+            Track Your Order
+          </h1>
           <p className="text-sm text-black/50 dark:text-white/40 max-w-md mx-auto">
             Search by your order ID or the phone number you used at checkout.
           </p>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="flex justify-center mb-4"
-        >
+        <div className="animate-ui-fade-in-up flex justify-center mb-4">
           <div className="inline-flex p-1 rounded-full bg-black/[0.04] dark:bg-white/[0.04] border border-black/10 dark:border-white/10">
             {[
               { key: "id", label: "Order ID" },
@@ -542,14 +566,11 @@ function TrackContent() {
               </button>
             ))}
           </div>
-        </motion.div>
+        </div>
 
-        <motion.form
+        <form
           onSubmit={handleSubmit}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="flex flex-col sm:flex-row gap-3"
+          className="animate-ui-fade-in-up flex flex-col sm:flex-row gap-3"
         >
           {searchMode === "phone" ? (
             <input
@@ -577,48 +598,50 @@ function TrackContent() {
             disabled={loading}
             className="px-8 py-4 rounded-2xl bg-[#FF4DA3] text-white font-bold tracking-widest uppercase text-xs hover:shadow-lg hover:shadow-pink-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : <PackageSearch size={16} />}
+            {loading ? (
+              <Loader2 className="animate-spin" size={18} />
+            ) : (
+              <PackageSearch size={16} />
+            )}
             {loading ? "Searching" : "Track"}
           </button>
-        </motion.form>
+        </form>
 
-        <AnimatePresence mode="wait">
-          {error && !loading && (
-            <motion.div
+        {error && !loading && (
+            <div
               key="err"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="mt-6 flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400"
+              className="animate-ui-fade-in-up mt-6 flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400"
             >
-              <AlertCircle size={18} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+              <AlertCircle
+                size={18}
+                strokeWidth={2.5}
+                className="shrink-0 mt-0.5"
+              />
               <p className="text-sm">{error}</p>
-            </motion.div>
+            </div>
           )}
 
           {notFound && !loading && (
-            <motion.div
+            <div
               key="not-found"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="mt-8 p-6 sm:p-8 rounded-2xl sm:rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10"
+              className="animate-ui-fade-in-up mt-8 p-6 sm:p-8 rounded-2xl sm:rounded-3xl bg-black/[0.02] dark:bg-white/[0.02] border border-black/10 dark:border-white/10"
             >
               <div className="flex flex-col items-center text-center space-y-4 pb-6 border-b border-black/5 dark:border-white/5">
                 <div className="relative w-20 h-20 flex items-center justify-center">
-                  <motion.div
-                    animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.2, 0.4] }}
-                    transition={{ repeat: Infinity, duration: 3 }}
-                    className="absolute inset-0 bg-[#FF4DA3]/15 rounded-full blur-xl"
+                  <div className="absolute inset-0 bg-[#FF4DA3]/15 rounded-full blur-xl animate-404-glow-a" />
+                  <SearchX
+                    size={40}
+                    strokeWidth={1.5}
+                    className="text-[#FF4DA3] relative z-10"
                   />
-                  <SearchX size={40} strokeWidth={1.5} className="text-[#FF4DA3] relative z-10" />
                 </div>
                 <div className="space-y-1.5">
                   <h3 className="text-2xl sm:text-3xl font-serif italic">
                     No orders found
                   </h3>
                   <p className="text-sm text-black/60 dark:text-white/50 max-w-sm leading-relaxed">
-                    We couldn&apos;t find anything matching this {notFound.mode === "phone" ? "phone number" : "order ID"}:
+                    We couldn&apos;t find anything matching this{" "}
+                    {notFound.mode === "phone" ? "phone number" : "order ID"}:
                   </p>
                   <p className="font-mono text-sm font-bold text-[#FF4DA3] tracking-wider break-all px-4 mt-2">
                     {notFound.query}
@@ -645,7 +668,10 @@ function TrackContent() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-[#FF4DA3] mt-1">•</span>
-                    <span>If you just placed the order, give it a moment and try again.</span>
+                    <span>
+                      If you just placed the order, give it a moment and try
+                      again.
+                    </span>
                   </li>
                 </ul>
               </div>
@@ -692,19 +718,17 @@ function TrackContent() {
                   Try a different search
                 </button>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {orderList && !loading && !order && (
-            <motion.div
+            <div
               key="list"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              className="mt-8 space-y-3"
+              className="animate-ui-fade-in-up mt-8 space-y-3"
             >
               <p className="text-xs uppercase tracking-[0.25em] text-black/50 dark:text-white/40 mb-2">
-                {orderList.length} {orderList.length === 1 ? "order" : "orders"} found
+                {orderList.length} {orderList.length === 1 ? "order" : "orders"}{" "}
+                found
               </p>
               {orderList.map((o) => {
                 const stage = STATUS_FLOW.find((s) => s.key === o.status);
@@ -735,26 +759,23 @@ function TrackContent() {
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] uppercase tracking-widest text-black/40 dark:text-white/40 mb-0.5">
-                        {cancelled ? "Cancelled" : stage?.label ?? o.status}
+                        {cancelled ? "Cancelled" : (stage?.label ?? o.status)}
                       </p>
                       <p className="text-sm font-bold">
-                        {o.currency} {Number(o.total_price ?? 0).toLocaleString()}
+                        {o.currency}{" "}
+                        {Number(o.total_price ?? 0).toLocaleString()}
                       </p>
                     </div>
                   </button>
                 );
               })}
-            </motion.div>
+            </div>
           )}
 
           {order && !loading && (
-            <motion.div
+            <div
               key={order.order_id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
-              transition={{ duration: 0.4 }}
-              className="mt-10 space-y-8"
+              className="animate-ui-fade-in-up mt-10 space-y-8"
             >
               <div className="p-6 sm:p-8 rounded-3xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -771,7 +792,8 @@ function TrackContent() {
                       Total
                     </p>
                     <p className="text-lg sm:text-xl font-bold mt-1">
-                      {order.currency} {Number(order.total_price ?? 0).toLocaleString()}
+                      {order.currency}{" "}
+                      {Number(order.total_price ?? 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -787,14 +809,18 @@ function TrackContent() {
                     <p className="text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40 mb-1">
                       Placed on
                     </p>
-                    <p className="font-medium">{formatDate(order.created_at)}</p>
+                    <p className="font-medium">
+                      {formatDate(order.created_at)}
+                    </p>
                   </div>
                   {order.updated_at && (
                     <div>
                       <p className="text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40 mb-1">
                         Last update
                       </p>
-                      <p className="font-medium">{formatDate(order.updated_at)}</p>
+                      <p className="font-medium">
+                        {formatDate(order.updated_at)}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -807,7 +833,9 @@ function TrackContent() {
                     <ul className="divide-y divide-black/5 dark:divide-white/5">
                       {order.items.map((it, i) => {
                         const colorName =
-                          typeof it.color === "object" ? it.color?.name : it.color;
+                          typeof it.color === "object"
+                            ? it.color?.name
+                            : it.color;
                         const colorValue =
                           typeof it.color === "object" ? it.color?.value : null;
                         return (
@@ -816,11 +844,13 @@ function TrackContent() {
                             className="flex gap-3 py-3 items-center"
                           >
                             {it.image && (
-                              <div className="w-14 h-16 rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0">
-                                <img
+                              <div className="w-14 h-16 rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0 relative">
+                                <Image
                                   src={it.image}
                                   alt={it.name}
-                                  className="w-full h-full object-cover"
+                                  fill
+                                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                  className="object-cover"
                                 />
                               </div>
                             )}
@@ -840,7 +870,9 @@ function TrackContent() {
                             </div>
                             <span className="text-sm font-medium whitespace-nowrap">
                               {order.currency}{" "}
-                              {(Number(it.price) * Number(it.quantity)).toLocaleString()}
+                              {(
+                                Number(it.price) * Number(it.quantity)
+                              ).toLocaleString()}
                             </span>
                           </li>
                         );
@@ -884,7 +916,9 @@ function TrackContent() {
                   <div className="flex items-center gap-4 p-4 rounded-2xl bg-red-500/10 border border-red-500/20">
                     <XCircle size={28} className="text-red-500 shrink-0" />
                     <div>
-                      <p className="font-bold text-red-600 dark:text-red-400">Order Cancelled</p>
+                      <p className="font-bold text-red-600 dark:text-red-400">
+                        Order Cancelled
+                      </p>
                       <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-0.5">
                         This order is no longer being processed.
                       </p>
@@ -897,7 +931,10 @@ function TrackContent() {
                       const reached = idx <= currentIdx;
                       const active = idx === currentIdx;
                       return (
-                        <li key={stage.key} className="flex gap-4 items-start relative">
+                        <li
+                          key={stage.key}
+                          className="flex gap-4 items-start relative"
+                        >
                           {idx < STATUS_FLOW.length - 1 && (
                             <span
                               aria-hidden
@@ -920,14 +957,18 @@ function TrackContent() {
                           <div className="flex-1 pt-1">
                             <p
                               className={`font-semibold text-sm ${
-                                reached ? "text-black dark:text-white" : "text-black/40 dark:text-white/30"
+                                reached
+                                  ? "text-black dark:text-white"
+                                  : "text-black/40 dark:text-white/30"
                               }`}
                             >
                               {stage.label}
                             </p>
                             <p
                               className={`text-xs mt-0.5 ${
-                                reached ? "text-black/60 dark:text-white/50" : "text-black/30 dark:text-white/25"
+                                reached
+                                  ? "text-black/60 dark:text-white/50"
+                                  : "text-black/30 dark:text-white/25"
                               }`}
                             >
                               {stage.description}
@@ -941,29 +982,21 @@ function TrackContent() {
               </div>
 
               <p className="text-center text-xs text-black/40 dark:text-white/30">
-                Need help? Reach out to our support team and mention your order ID.
+                Need help? Reach out to our support team and mention your order
+                ID.
               </p>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
-      </section>
+</section>
 
-      <AnimatePresence>
-        {editOpen && (
+      {editOpen && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
               onClick={() => !editLoading && setEditOpen(false)}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[80]"
+              className="animate-ui-fade-in fixed inset-0 bg-black/50 backdrop-blur-sm z-[80]"
             />
-            <motion.div
-              initial={{ opacity: 0, y: 24, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 24, scale: 0.97 }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed inset-x-3 sm:inset-x-0 bottom-3 sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:w-full bg-white dark:bg-[#0A0A0A] border border-black/10 dark:border-white/10 rounded-3xl shadow-2xl z-[81] overflow-hidden"
+            <div
+              className="animate-ui-scale-in fixed inset-x-3 sm:inset-x-0 bottom-3 sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:w-full bg-white dark:bg-[#0A0A0A] border border-black/10 dark:border-white/10 rounded-3xl shadow-2xl z-[81] overflow-hidden"
             >
               <div className="p-6 border-b border-black/10 dark:border-white/5 flex items-center justify-between">
                 <div>
@@ -981,10 +1014,14 @@ function TrackContent() {
                 </button>
               </div>
 
-              <form onSubmit={submitEdit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <form
+                onSubmit={submitEdit}
+                className="p-6 space-y-4 max-h-[70vh] overflow-y-auto"
+              >
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-[0.25em] text-black/50 dark:text-white/40">
-                    Verify your original phone <span className="text-red-500">*</span>
+                    Verify your original phone{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
@@ -1008,20 +1045,27 @@ function TrackContent() {
                   </p>
 
                   <div className="space-y-2">
-                    <label className="text-xs text-black/60 dark:text-white/50">New full name</label>
+                    <label className="text-xs text-black/60 dark:text-white/50">
+                      New full name
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. full name"
                       value={editForm.customer_name}
                       onChange={(e) =>
-                        setEditForm((f) => ({ ...f, customer_name: e.target.value }))
+                        setEditForm((f) => ({
+                          ...f,
+                          customer_name: e.target.value,
+                        }))
                       }
                       className="w-full p-3.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/10 dark:border-white/10 outline-none focus:border-[#FF4DA3] focus:ring-1 focus:ring-[#FF4DA3]"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs text-black/60 dark:text-white/50">New phone</label>
+                    <label className="text-xs text-black/60 dark:text-white/50">
+                      New phone
+                    </label>
                     <input
                       type="tel"
                       inputMode="numeric"
@@ -1038,19 +1082,24 @@ function TrackContent() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs text-black/60 dark:text-white/50">New governorate</label>
+                    <label className="text-xs text-black/60 dark:text-white/50">
+                      New governorate
+                    </label>
                     <div className="relative" ref={govRef}>
                       <button
                         type="button"
                         onClick={() => setGovOpen((o) => !o)}
                         aria-haspopup="listbox"
                         aria-expanded={govOpen}
-                        className={`w-full p-3.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border outline-none transition-all flex items-center justify-between gap-3 text-left ${govOpen
-                          ? "border-[#FF4DA3] ring-1 ring-[#FF4DA3]/40"
-                          : "border-black/10 dark:border-white/15 hover:border-black/20 dark:hover:border-white/25"
-                          }`}
+                        className={`w-full p-3.5 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border outline-none transition-all flex items-center justify-between gap-3 text-left ${
+                          govOpen
+                            ? "border-[#FF4DA3] ring-1 ring-[#FF4DA3]/40"
+                            : "border-black/10 dark:border-white/15 hover:border-black/20 dark:hover:border-white/25"
+                        }`}
                       >
-                        <span className={`text-sm ${editForm.governorate ? "text-black dark:text-white" : "text-black/40 dark:text-white/40"}`}>
+                        <span
+                          className={`text-sm ${editForm.governorate ? "text-black dark:text-white" : "text-black/40 dark:text-white/40"}`}
+                        >
                           {editForm.governorate || "Select your governorate"}
                         </span>
                         <ChevronDown
@@ -1059,33 +1108,39 @@ function TrackContent() {
                         />
                       </button>
 
-                      <AnimatePresence>
-                        {govOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute z-30 mt-2 w-full rounded-xl border border-black/10 dark:border-white/20 bg-white dark:bg-[#161616] shadow-xl shadow-black/10 dark:shadow-black/60 overflow-hidden ring-1 ring-black/5 dark:ring-white/10"
+                      {govOpen && (
+                          <div
+                            className="animate-ui-scale-in absolute z-30 mt-2 w-full rounded-xl border border-black/10 dark:border-white/20 bg-white dark:bg-[#161616] shadow-xl shadow-black/10 dark:shadow-black/60 overflow-hidden ring-1 ring-black/5 dark:ring-white/10"
                           >
                             <ul
                               role="listbox"
                               className="max-h-60 overflow-y-auto py-1 custom-scrollbar"
                             >
-                              {(shippingFees ? Object.keys(shippingFees) : []).map((gov) => {
+                              {(shippingFees
+                                ? Object.keys(shippingFees)
+                                : []
+                              ).map((gov) => {
                                 const isSelected = editForm.governorate === gov;
                                 return (
-                                  <li key={gov} role="option" aria-selected={isSelected}>
+                                  <li
+                                    key={gov}
+                                    role="option"
+                                    aria-selected={isSelected}
+                                  >
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setEditForm((f) => ({ ...f, governorate: gov }));
+                                        setEditForm((f) => ({
+                                          ...f,
+                                          governorate: gov,
+                                        }));
                                         setGovOpen(false);
                                       }}
-                                      className={`w-full px-4 py-3 flex items-center justify-between gap-3 text-sm transition-colors ${isSelected
-                                        ? "bg-[#FF4DA3]/15 dark:bg-[#FF4DA3]/20 text-[#FF4DA3] font-medium"
-                                        : "text-black/80 dark:text-white/85 hover:bg-black/[0.05] dark:hover:bg-white/[0.07]"
-                                        }`}
+                                      className={`w-full px-4 py-3 flex items-center justify-between gap-3 text-sm transition-colors ${
+                                        isSelected
+                                          ? "bg-[#FF4DA3]/15 dark:bg-[#FF4DA3]/20 text-[#FF4DA3] font-medium"
+                                          : "text-black/80 dark:text-white/85 hover:bg-black/[0.05] dark:hover:bg-white/[0.07]"
+                                      }`}
                                     >
                                       <span>{gov}</span>
                                       <span className="text-[10px] uppercase tracking-widest text-black/40 dark:text-white/40">
@@ -1096,14 +1151,15 @@ function TrackContent() {
                                 );
                               })}
                             </ul>
-                          </motion.div>
+                          </div>
                         )}
-                      </AnimatePresence>
-                    </div>
+</div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs text-black/60 dark:text-white/50">New address</label>
+                    <label className="text-xs text-black/60 dark:text-white/50">
+                      New address
+                    </label>
                     <textarea
                       rows={3}
                       placeholder="Street, Building, Apartment..."
@@ -1147,7 +1203,9 @@ function TrackContent() {
                           ? it.availableSizes
                           : [];
                         const currentColorName =
-                          typeof it.color === "object" ? it.color?.name : it.color;
+                          typeof it.color === "object"
+                            ? it.color?.name
+                            : it.color;
                         return (
                           <li
                             key={itemKey(it, idx)}
@@ -1155,23 +1213,29 @@ function TrackContent() {
                           >
                             <div className="flex gap-3">
                               {it.image && (
-                                <div className="w-14 h-16 rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0">
-                                  <img
+                                <div className="w-14 h-16 rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 flex-shrink-0 relative">
+                                  <Image
                                     src={it.image}
                                     alt={it.name}
-                                    className="w-full h-full object-cover"
+                                    fill
+                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                    className="object-cover"
                                   />
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{it.name}</p>
+                                <p className="text-sm font-medium truncate">
+                                  {it.name}
+                                </p>
                                 <p className="text-[10px] uppercase tracking-wider text-black/40 dark:text-white/40 mt-0.5">
                                   {currentColorName ?? "—"}
                                   {it.size ? ` • ${it.size}` : ""}
                                 </p>
                                 <p className="text-xs mt-1">
                                   {order?.currency}{" "}
-                                  {(Number(it.price) * Number(it.quantity)).toLocaleString()}
+                                  {(
+                                    Number(it.price) * Number(it.quantity)
+                                  ).toLocaleString()}
                                 </p>
                               </div>
 
@@ -1250,7 +1314,9 @@ function TrackContent() {
                                       <button
                                         type="button"
                                         key={s}
-                                        onClick={() => updateItemAt(idx, { size: s })}
+                                        onClick={() =>
+                                          updateItemAt(idx, { size: s })
+                                        }
                                         className={`min-w-[2rem] h-8 px-2 rounded-md border text-[11px] font-bold transition-all ${
                                           active
                                             ? "bg-black dark:bg-white text-white dark:text-black border-black dark:border-white"
@@ -1288,7 +1354,10 @@ function TrackContent() {
                   ) : (
                     <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] overflow-hidden">
                       <div className="flex items-center gap-2 p-3 border-b border-black/5 dark:border-white/5">
-                        <Search size={14} className="text-black/40 dark:text-white/40 shrink-0" />
+                        <Search
+                          size={14}
+                          className="text-black/40 dark:text-white/40 shrink-0"
+                        />
                         <input
                           type="text"
                           value={productQuery}
@@ -1320,85 +1389,91 @@ function TrackContent() {
 
                         {!catalogLoading && catalogError && (
                           <div className="flex items-start gap-2 p-3 text-xs text-red-600 dark:text-red-400">
-                            <AlertCircle size={14} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                            <AlertCircle
+                              size={14}
+                              strokeWidth={2.5}
+                              className="shrink-0 mt-0.5"
+                            />
                             <span>{catalogError}</span>
                           </div>
                         )}
 
-                        {!catalogLoading && !catalogError && filteredCatalog.length === 0 && (
-                          <p className="p-4 text-xs text-black/40 dark:text-white/40 italic">
-                            No products match your search.
-                          </p>
-                        )}
+                        {!catalogLoading &&
+                          !catalogError &&
+                          filteredCatalog.length === 0 && (
+                            <p className="p-4 text-xs text-black/40 dark:text-white/40 italic">
+                              No products match your search.
+                            </p>
+                          )}
 
-                        {!catalogLoading && !catalogError && filteredCatalog.length > 0 && (
-                          <ul className="divide-y divide-black/5 dark:divide-white/5">
-                            {filteredCatalog.map((p) => (
-                              <li key={p.id}>
-                                <button
-                                  type="button"
-                                  onClick={() => addProductToOrder(p)}
-                                  className="w-full flex items-center gap-3 p-3 hover:bg-[#FF4DA3]/5 transition-colors text-left"
-                                >
-                                  {p.image ? (
-                                    <div className="w-10 h-12 rounded-md overflow-hidden bg-black/5 dark:bg-white/5 shrink-0">
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img
-                                        src={p.image}
-                                        alt={p.name}
-                                        className="w-full h-full object-cover"
-                                      />
+                        {!catalogLoading &&
+                          !catalogError &&
+                          filteredCatalog.length > 0 && (
+                            <ul className="divide-y divide-black/5 dark:divide-white/5">
+                              {filteredCatalog.map((p) => (
+                                <li key={p.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => addProductToOrder(p)}
+                                    className="w-full flex items-center gap-3 p-3 hover:bg-[#FF4DA3]/5 transition-colors text-left"
+                                  >
+                                    {p.image ? (
+                                      <div className="w-10 h-12 rounded-md overflow-hidden bg-black/5 dark:bg-white/5 shrink-0 relative">
+                                        <Image
+                                          src={p.image}
+                                          alt={p.name}
+                                          fill
+                                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                          className="object-cover"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div className="w-10 h-12 rounded-md bg-black/5 dark:bg-white/5 shrink-0" />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">
+                                        {p.name}
+                                      </p>
+                                      <p className="text-[10px] text-black/40 dark:text-white/40 mt-0.5">
+                                        {order?.currency ?? "EGP"}{" "}
+                                        {Number(p.price ?? 0).toLocaleString()}
+                                      </p>
                                     </div>
-                                  ) : (
-                                    <div className="w-10 h-12 rounded-md bg-black/5 dark:bg-white/5 shrink-0" />
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{p.name}</p>
-                                    <p className="text-[10px] text-black/40 dark:text-white/40 mt-0.5">
-                                      {order?.currency ?? "EGP"}{" "}
-                                      {Number(p.price ?? 0).toLocaleString()}
-                                    </p>
-                                  </div>
-                                  <Plus
-                                    size={14}
-                                    className="text-black/30 dark:text-white/30 shrink-0"
-                                  />
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                                    <Plus
+                                      size={14}
+                                      className="text-black/30 dark:text-white/30 shrink-0"
+                                    />
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                <AnimatePresence>
-                  {editError && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs"
+                {editError && (
+                    <div
+                      className="animate-ui-fade-in-down flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs"
                     >
-                      <AlertCircle size={14} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                      <AlertCircle
+                        size={14}
+                        strokeWidth={2.5}
+                        className="shrink-0 mt-0.5"
+                      />
                       <span>{editError}</span>
-                    </motion.div>
+                    </div>
                   )}
                   {editSuccess && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs"
+                    <div
+                      className="animate-ui-fade-in-down flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs"
                     >
                       <CheckCircle2 size={14} strokeWidth={2.5} />
                       <span>Order updated successfully.</span>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
-
-                <button
+<button
                   type="submit"
                   disabled={editLoading || editSuccess}
                   className="w-full py-3.5 rounded-xl bg-[#FF4DA3] text-white font-bold tracking-widest uppercase text-xs hover:shadow-lg hover:shadow-pink-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
@@ -1414,28 +1489,18 @@ function TrackContent() {
                   )}
                 </button>
               </form>
-            </motion.div>
+            </div>
           </>
         )}
-      </AnimatePresence>
-
-      {/* Cancel confirmation modal */}
-      <AnimatePresence>
-        {cancelOpen && (
+{/* Cancel confirmation modal */}
+      {cancelOpen && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
               onClick={() => !cancelLoading && setCancelOpen(false)}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              className="animate-ui-fade-in fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
             />
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 30, scale: 0.97 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed left-1/2 top-1/2 z-50 w-[92%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-[#0c0c0c] border border-black/10 dark:border-white/10 shadow-2xl shadow-black/30 overflow-hidden"
+            <div
+              className="animate-ui-scale-in fixed left-1/2 top-1/2 z-50 w-[92%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-white dark:bg-[#0c0c0c] border border-black/10 dark:border-white/10 shadow-2xl shadow-black/30 overflow-hidden"
             >
               <div className="flex items-start justify-between gap-3 p-6 border-b border-black/5 dark:border-white/5">
                 <div className="flex items-start gap-3">
@@ -1464,7 +1529,9 @@ function TrackContent() {
                   <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
                     <CheckCircle2 size={24} />
                   </div>
-                  <p className="text-sm font-medium">Your order has been cancelled.</p>
+                  <p className="text-sm font-medium">
+                    Your order has been cancelled.
+                  </p>
                 </div>
               ) : (
                 <form onSubmit={submitCancel} className="p-6 space-y-4">
@@ -1473,7 +1540,8 @@ function TrackContent() {
                     <span className="font-mono font-bold text-[#FF4DA3]">
                       {order?.order_id}
                     </span>
-                    ? Please confirm by entering the phone number you used at checkout.
+                    ? Please confirm by entering the phone number you used at
+                    checkout.
                   </p>
 
                   <div>
@@ -1492,21 +1560,15 @@ function TrackContent() {
                     />
                   </div>
 
-                  <AnimatePresence>
-                    {cancelError && (
-                      <motion.p
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="flex items-center gap-2 text-xs text-red-500"
+                  {cancelError && (
+                      <p
+                        className="animate-ui-fade-in-down flex items-center gap-2 text-xs text-red-500"
                       >
                         <AlertCircle size={13} />
                         {cancelError}
-                      </motion.p>
+                      </p>
                     )}
-                  </AnimatePresence>
-
-                  <div className="flex gap-2 pt-2">
+<div className="flex gap-2 pt-2">
                     <button
                       type="button"
                       onClick={() => setCancelOpen(false)}
@@ -1530,11 +1592,10 @@ function TrackContent() {
                   </div>
                 </form>
               )}
-            </motion.div>
+            </div>
           </>
         )}
-      </AnimatePresence>
-    </main>
+</main>
   );
 }
 

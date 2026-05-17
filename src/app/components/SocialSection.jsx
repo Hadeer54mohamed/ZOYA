@@ -1,7 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
-
 const iconProps = (props) => ({
   viewBox: "0 0 24 24",
   fill: "currentColor",
@@ -67,67 +65,47 @@ const socials = [
 
 export default function SocialSection() {
   return (
-    <section
-      id="contact"
-      className="relative py-8 md:py-12 overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500"
-    >
-      {/* Dynamic Background Blurs */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#FF4DA3]/10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#FF4DA3]/10 blur-[120px] rounded-full" />
+    <section className="relative overflow-hidden bg-[#fafafa] py-8 transition-colors duration-500 md:py-12 dark:bg-[#050505]">
+      <div className="pointer-events-none absolute top-0 left-1/2 h-full w-full -translate-x-1/2">
+        <div className="absolute top-[-10%] left-[-10%] h-[50%] w-[50%] rounded-full bg-[#FF4DA3]/10 blur-[120px]" />
+        <div className="absolute right-[-10%] bottom-[-10%] h-[50%] w-[50%] rounded-full bg-[#FF4DA3]/10 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6">
-        {/* Header Section */}
-        <div className="text-center mb-16 md:mb-24">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            className="inline-block px-4 py-1.5 rounded-full border border-[#FF4DA3]/20 bg-[#FF4DA3]/5 text-[#FF4DA3] text-[10px] tracking-[0.3em] font-bold uppercase mb-6"
-          >
+      <div className="relative z-10 mx-auto max-w-6xl px-6">
+        <div className="fade-in-view mb-16 text-center md:mb-24">
+          <div className="mb-6 inline-block rounded-full border border-[#FF4DA3]/20 bg-[#FF4DA3]/5 px-4 py-1.5 text-[10px] font-bold tracking-[0.3em] text-[#FF4DA3] uppercase">
             ● Stay Connected
-          </motion.div>
+          </div>
 
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-6xl font-black text-black dark:text-white mb-6 leading-none"
-          >
+          <h2 className="mb-6 text-4xl leading-none font-black text-black md:text-6xl dark:text-white">
             The <span className="text-[#FF4DA3]">Zoya </span>Circle
-          </motion.h2>
+          </h2>
 
-          <p className="text-black/60 dark:text-white/50 max-w-lg mx-auto text-sm md:text-base">
+          <p className="mx-auto max-w-lg text-sm text-black/60 md:text-base dark:text-white/50">
             Be the first to see our latest drops and exclusive stories across
             our digital spaces.
           </p>
         </div>
 
-        {/* Responsive Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
-          {socials.map((social, i) => {
+        <div className="grid grid-cols-2 gap-4 md:gap-8 lg:grid-cols-4">
+          {socials.map((social) => {
             const Icon = social.icon;
 
             return (
-              <motion.a
+              <a
                 key={social.name}
                 href={social.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                whileHover={{ y: -10 }}
-                className="group relative flex flex-col items-center text-center p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] bg-white dark:bg-white/[0.03] border border-black/10 dark:border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-[#FF4DA3]/10"
+                className="group relative flex flex-col items-center rounded-[2rem] border border-black/10 bg-white p-6 text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#FF4DA3]/10 md:rounded-[3rem] md:p-8 dark:border-white/10 dark:bg-white/[0.03]"
               >
-                {/* Hover Glow Effect */}
                 <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-10 dark:group-hover:opacity-20 transition-opacity duration-500 blur-xl rounded-[3rem]"
+                  className="absolute inset-0 rounded-[3rem] opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-10 dark:group-hover:opacity-20"
                   style={{ backgroundColor: social.color }}
                 />
 
-                {/* Icon Wrapper */}
                 <div
-                  className={`relative z-10 w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-3xl flex items-center justify-center mb-6 transition-transform duration-500 group-hover:rotate-[10deg] shadow-sm ${social.name === "WhatsApp" ? "pl-0.5" : ""}`}
+                  className={`relative z-10 mb-6 flex h-14 w-14 items-center justify-center rounded-2xl shadow-sm transition-transform duration-500 group-hover:rotate-[10deg] md:h-16 md:w-16 md:rounded-3xl ${social.name === "WhatsApp" ? "pl-0.5" : ""}`}
                   style={{
                     backgroundColor:
                       social.name === "TikTok" ? "#111" : `${social.color}15`,
@@ -140,21 +118,19 @@ export default function SocialSection() {
                   <Icon size={30} />
                 </div>
 
-                {/* Text Content */}
                 <div className="relative z-10">
-                  <h3 className="text-black dark:text-white font-black text-sm md:text-lg uppercase tracking-wider">
+                  <h3 className="text-sm font-black tracking-wider text-black uppercase md:text-lg dark:text-white">
                     {social.name}
                   </h3>
-                  <p className="hidden md:block text-black/50 dark:text-white/40 text-xs mt-2 font-medium">
+                  <p className="mt-2 hidden text-xs font-medium text-black/50 md:block dark:text-white/40">
                     {social.desc}
                   </p>
                 </div>
 
-                {/* Subtle Indicator */}
-                <div className="absolute bottom-6 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#FF4DA3]" />
+                <div className="absolute bottom-6 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#FF4DA3]" />
                 </div>
-              </motion.a>
+              </a>
             );
           })}
         </div>

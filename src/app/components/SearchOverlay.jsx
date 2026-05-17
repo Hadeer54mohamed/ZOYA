@@ -249,7 +249,7 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
                 </p>
                 <button
                   onClick={handleSubmit}
-                  className="px-4 py-2 rounded-full bg-[#FF4DA3] text-black text-[10px] font-bold tracking-widest uppercase hover:shadow-[0_0_20px_-5px_#FF4DA3] transition"
+                  className="px-4 py-2 rounded-full bg-[#FF4DA3] text-white text-[10px] font-bold tracking-widest uppercase hover:shadow-[0_0_20px_-5px_#FF4DA3] transition"
                 >
                   View All Results
                 </button>

@@ -17,7 +17,7 @@ export default function StudioPage() {
     >
       <div className="studio-route-shell flex h-dvh max-h-dvh flex-col overflow-hidden bg-white dark:bg-black">
         <header className="shrink-0 z-30 w-full border-b border-black/5 dark:border-white/5 bg-white/70 dark:bg-black/70 backdrop-blur-md transition-colors duration-500">
-          <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.png')] opacity-[0.03] dark:opacity-[0.05]" />
+          <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.webp')] opacity-[0.03] dark:opacity-[0.05]" />
 
           <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 h-20 flex items-center justify-between gap-4">
             {/* Left: brand */}
@@ -28,7 +28,7 @@ export default function StudioPage() {
                 className="shrink-0 transition-opacity hover:opacity-70 active:scale-95"
               >
                 <Image
-                  src="/images/LOGO2.png"
+                  src="/images/LOGO2.webp"
                   alt="ZØYA"
                   width={90}
                   height={28}

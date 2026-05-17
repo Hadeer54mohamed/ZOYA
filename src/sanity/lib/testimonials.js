@@ -35,7 +35,7 @@ export async function getAllTestimonials() {
     const data = await client.fetch(
       TESTIMONIALS_QUERY,
       {},
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 300 } }
     );
     return (data || []).map(mapTestimonial).filter(Boolean);
   } catch (err) {

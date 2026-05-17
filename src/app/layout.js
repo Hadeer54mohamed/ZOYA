@@ -1,25 +1,28 @@
 import { cookies } from "next/headers";
 import Script from "next/script";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./context/CartContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import LayoutShell from "./components/LayoutShell";
-import { getAllProducts } from "../sanity/lib/products";
+import { getNavbarSearchProducts } from "../sanity/lib/products";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
+  preload: true,
 });
 
 export const metadata = {
   title: "ZOYA",
   description: "ZØYA - Wear Your Identity",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 const THEME_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var m=document.cookie.match(/(?:^|; )zoya-theme=([^;]*)/);var v=m?decodeURIComponent(m[1]):'';var mode=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=mode==='dark'||(mode==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(mode==='light')dark=false;if(dark){d.classList.add('dark');d.style.colorScheme='dark';}else{d.classList.remove('dark');d.style.colorScheme='light';}}catch(e){}})();`;
@@ -33,12 +36,12 @@ export default async function RootLayout({ children }) {
       : "system";
   const isDark = theme === "dark";
 
-  const products = await getAllProducts();
+  const products = await getNavbarSearchProducts();
 
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased ${
+      className={`${geistSans.variable} h-full antialiased ${
         isDark ? "dark" : ""
       }`}
       style={{

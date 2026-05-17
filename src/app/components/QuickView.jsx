@@ -32,7 +32,7 @@ export default function QuickView({
       : {
           name: "Default",
           value: "#0a0a0a",
-          images: ["/images/placeholder.jpg"],
+          images: ["/images/placeholder.webp"],
         });
 
   const [selectedColor, setSelectedColor] = useState(defaultColor);
@@ -195,17 +195,14 @@ export default function QuickView({
           className="fixed inset-0 z-[90] bg-white/80 dark:bg-black/90 backdrop-blur-xl flex items-end sm:items-center justify-center sm:p-4 md:p-6"
         >
           {flying && rects && (
-            <motion.img
-              src={currentSlideSrc}
+            <motion.div
               initial={{
-                position: "fixed",
                 top: rects.startRect.top,
                 left: rects.startRect.left,
                 width: rects.startRect.width,
                 height: rects.startRect.height,
-                borderRadius: 24,
-                zIndex: 9999,
-                objectFit: "cover",
+                opacity: 1,
+                rotate: 0,
               }}
               animate={{
                 top: rects.endRect.top + rects.endRect.height / 2 - 20,
@@ -218,12 +215,26 @@ export default function QuickView({
                 duration: 0.7,
                 ease: [0.22, 1, 0.36, 1],
               }}
+              style={{
+                position: "fixed",
+                zIndex: 9999,
+                borderRadius: 24,
+                overflow: "hidden",
+              }}
               onAnimationComplete={() => {
                 setFlying(false);
                 onClose();
                 setIsCartOpen(true);
               }}
-            />
+            >
+              <Image
+                src={currentSlideSrc}
+                alt={`${product.name} — ${selectedColor.name}`}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                className="object-cover"
+              />
+            </motion.div>
           )}
 
           <motion.div
@@ -284,7 +295,7 @@ export default function QuickView({
                     src={currentSlideSrc}
                     alt={`${product.name} — ${selectedColor.name}`}
                     fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 50vw"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     priority
                     onLoad={() => setImageLoaded(true)}
                     className="object-cover object-center transition-transform duration-700 group-hover:scale-105"
@@ -356,7 +367,7 @@ export default function QuickView({
               )}
 
               <div className="absolute top-3 left-3 sm:top-6 sm:left-6 z-20 flex flex-col gap-1.5 sm:gap-2 pointer-events-none">
-                <span className="px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full bg-[#FF4DA3] text-black text-[9px] sm:text-[10px] font-black tracking-[0.2em] uppercase shadow-xl">
+                <span className="px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full bg-[#FF4DA3] text-white text-[9px] sm:text-[10px] font-black tracking-[0.2em] uppercase shadow-xl">
                   NEW DROP
                 </span>
                 {discount > 0 && (

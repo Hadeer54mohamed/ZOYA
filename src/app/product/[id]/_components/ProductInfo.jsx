@@ -1,7 +1,6 @@
 "use client";
 
 import { forwardRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Minus, Plus, Truck, ShieldCheck, RotateCcw } from "lucide-react";
 import AddToCartButton from "./AddToCartButton";
 import ReturnPolicyNotice from "../../../components/ReturnPolicyNotice";
@@ -47,27 +46,20 @@ const ProductInfo = forwardRef(function ProductInfo(
   })();
 
   return (
-    <div ref={ref} className="flex flex-col lg:pl-6 space-y-10">
-      {/* Header */}
+    <div ref={ref} className="flex flex-col lg:pl-6 space-y-6 sm:space-y-8 lg:space-y-10 min-w-0">
       <header>
-        <motion.span
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="inline-block text-[#FF4DA3] tracking-[0.4em] text-[10px] font-bold uppercase"
-        >
+        <span className="animate-ui-fade-in-up inline-block text-[#FF4DA3] tracking-[0.4em] text-[10px] font-bold uppercase">
           ● {product.category}
-        </motion.span>
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="text-5xl md:text-6xl font-serif mt-3 tracking-tighter italic leading-[1]"
+        </span>
+        <h1
+          className="animate-ui-fade-in-up text-3xl sm:text-5xl md:text-6xl font-serif mt-2 sm:mt-3 tracking-tighter italic leading-[1.05] break-words"
+          style={{ animationDelay: "0.1s" }}
         >
           {product.name}
-        </motion.h1>
+        </h1>
 
-        <div className="flex items-baseline gap-4 mt-5 flex-wrap">
-          <p className="text-4xl font-extralight tracking-tight text-black dark:text-white/90">
+        <div className="flex items-baseline gap-3 sm:gap-4 mt-4 sm:mt-5 flex-wrap">
+          <p className="text-2xl sm:text-4xl font-extralight tracking-tight text-black dark:text-white/90">
             EGP {product.price.toLocaleString()}
           </p>
           {originalPrice != null && (
@@ -83,23 +75,19 @@ const ProductInfo = forwardRef(function ProductInfo(
         </div>
       </header>
 
-      {/* Description */}
       <p className="text-black/60 dark:text-white/50 text-sm leading-relaxed italic max-w-md">
         &ldquo;{product.description}&rdquo;
       </p>
 
-      {/* Colors */}
       <div className="space-y-4">
         <p className="text-[10px] uppercase tracking-widest text-black/50 dark:text-white/40">
           Color:{" "}
-          <motion.span
+          <span
             key={selectedColor.name}
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-black dark:text-white font-bold inline-block"
+            className="animate-ui-fade-in text-black dark:text-white font-bold inline-block"
           >
             {selectedColor.name}
-          </motion.span>
+          </span>
         </p>
         <div className="flex gap-4 flex-wrap">
           {product.colors.map((color) => (
@@ -122,8 +110,7 @@ const ProductInfo = forwardRef(function ProductInfo(
         </div>
       </div>
 
-      {/* Quantity & Size */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
         <div className="space-y-4">
           <p className="text-[10px] uppercase tracking-widest text-black/50 dark:text-white/40">
             Quantity
@@ -150,23 +137,17 @@ const ProductInfo = forwardRef(function ProductInfo(
         </div>
 
         <div className="space-y-4">
-          <p className="text-[10px] uppercase tracking-widest text-black/50 dark:text-white/40 flex items-center justify-between gap-3">
-            <span>
+          <p className="text-[10px] uppercase tracking-widest text-black/50 dark:text-white/40 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <span className="min-w-0">
               Size{" "}
-              <AnimatePresence mode="wait">
-                {sizeGuideText && (
-                  <motion.span
-                    key={hoveredSize || selectedSize}
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -4 }}
-                    transition={{ duration: 0.2 }}
-                    className="normal-case tracking-normal ml-2 text-[#FF4DA3] font-bold"
-                  >
-                    · {sizeGuideText}
-                  </motion.span>
-                )}
-              </AnimatePresence>
+              {sizeGuideText && (
+                <span
+                  key={hoveredSize || selectedSize}
+                  className="animate-ui-fade-in normal-case tracking-normal ml-2 text-[#FF4DA3] font-bold"
+                >
+                  · {sizeGuideText}
+                </span>
+              )}
             </span>
             <button className="normal-case tracking-normal text-[10px] text-[#FF4DA3] hover:underline">
               Size guide
@@ -192,7 +173,6 @@ const ProductInfo = forwardRef(function ProductInfo(
         </div>
       </div>
 
-      {/* Add to Cart */}
       <AddToCartButton
         disabled={!selectedSize || isAdded || isAdding}
         isAdding={isAdding}
@@ -204,19 +184,18 @@ const ProductInfo = forwardRef(function ProductInfo(
 
       <ReturnPolicyNotice className="mt-2" />
 
-      {/* Perks */}
       <div className="pt-8 border-t border-black/10 dark:border-white/5">
-        <div className="grid grid-cols-3 gap-4 text-[11px] tracking-tight text-black/60 dark:text-white/40 uppercase">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <Truck size={18} className="text-[#FF4DA3]" />
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 text-[9px] sm:text-[11px] tracking-tight text-black/60 dark:text-white/40 uppercase">
+          <div className="flex flex-col items-center gap-1.5 sm:gap-2 text-center">
+            <Truck size={16} className="text-[#FF4DA3]" />
             <span>Express Delivery</span>
           </div>
-          <div className="flex flex-col items-center gap-2 text-center">
-            <ShieldCheck size={18} className="text-[#FF4DA3]" />
+          <div className="flex flex-col items-center gap-1.5 sm:gap-2 text-center">
+            <ShieldCheck size={16} className="text-[#FF4DA3]" />
             <span>Secure Payment</span>
           </div>
-          <div className="flex flex-col items-center gap-2 text-center">
-            <RotateCcw size={18} className="text-[#FF4DA3]" />
+          <div className="flex flex-col items-center gap-1.5 sm:gap-2 text-center">
+            <RotateCcw size={16} className="text-[#FF4DA3]" />
             <span>Easy Returns</span>
           </div>
         </div>

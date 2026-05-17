@@ -1,24 +1,50 @@
 "use client";
 
 import { useEffect } from "react";
-
-const NAV_OFFSET = -100;
+import { usePathname } from "next/navigation";
+import {
+  consumePendingSection,
+  getHashId,
+  repairMalformedHash,
+  scrollToSection,
+  setSectionHash,
+} from "../lib/navScroll";
 
 export default function HashScroller() {
+  const pathname = usePathname();
+
   useEffect(() => {
-    const hash = window.location.hash?.replace("#", "");
-    if (!hash) return;
+    if (pathname !== "/") return;
 
-    const timer = setTimeout(() => {
-      const el = document.getElementById(hash);
-      if (!el) return;
-      const y =
-        el.getBoundingClientRect().top + window.pageYOffset + NAV_OFFSET;
-      window.scrollTo({ top: y, behavior: "smooth" });
-    }, 150);
+    repairMalformedHash();
 
-    return () => clearTimeout(timer);
-  }, []);
+    let timerId;
+
+    const run = () => {
+      const id = consumePendingSection() || getHashId();
+      if (!id) return;
+      setSectionHash(id);
+      scrollToSection(id);
+    };
+
+    timerId = window.setTimeout(run, 80);
+
+    const onHashChange = () => {
+      if (timerId) window.clearTimeout(timerId);
+      repairMalformedHash();
+      const id = getHashId();
+      if (!id) return;
+      setSectionHash(id);
+      scrollToSection(id);
+    };
+
+    window.addEventListener("hashchange", onHashChange);
+
+    return () => {
+      if (timerId) window.clearTimeout(timerId);
+      window.removeEventListener("hashchange", onHashChange);
+    };
+  }, [pathname]);
 
   return null;
 }

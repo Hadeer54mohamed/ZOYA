@@ -16,7 +16,7 @@ export async function getAllReels() {
     const data = await client.fetch(
       REELS_QUERY,
       {},
-      { next: { revalidate: 0 } }
+      { next: { revalidate: 300 } }
     );
 
     return (data || [])

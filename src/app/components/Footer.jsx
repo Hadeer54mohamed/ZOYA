@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { navigateToSection } from "../lib/navScroll";
 import {
   ArrowUpRight,
   Mail,
@@ -16,21 +18,54 @@ import {
 } from "lucide-react";
 
 const shopLinks = [
-  { label: "All Products", href: "/products" },
-  { label: "New Drops", href: "/#products" },
-  { label: "Limited Edition", href: "/#collections" },
+  { label: "All Products", href: "/products", type: "route" },
+  { label: "New Drops", section: "products", type: "section" },
+  { label: "Limited Edition", section: "collections", type: "section" },
 ];
 
 const aboutLinks = [
-  { label: "Our Story", href: "/#about" },
-  { label: "Lookbook", href: "/products" },
+  { label: "Our Story", section: "about", type: "section" },
+  { label: "Lookbook", href: "/products", type: "route" },
 ];
 
-const helpLinks = [{ label: "Contact", href: "/#contact" }];
+const helpLinks = [{ label: "Contact", section: "contact", type: "section" }];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function FooterLink({ link, onSection }) {
+  const linkClass =
+    "group inline-flex items-center gap-1 text-[13px] sm:text-sm text-black/70 dark:text-white/60 hover:text-[#FF4DA3] transition-colors cursor-pointer";
+
+  if (link.type === "section") {
+    return (
+      <button
+        type="button"
+        onClick={() => onSection(link.section)}
+        className={linkClass}
+      >
+        {link.label}
+        <ArrowUpRight
+          size={13}
+          className="hidden sm:inline opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all"
+        />
+      </button>
+    );
+  }
+
+  return (
+    <Link href={link.href} className={linkClass}>
+      {link.label}
+      <ArrowUpRight
+        size={13}
+        className="hidden sm:inline opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all"
+      />
+    </Link>
+  );
+}
+
 export default function Footer() {
+  const pathname = usePathname();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
   const [toast, setToast] = useState(null);
@@ -84,6 +119,10 @@ export default function Footer() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleSection = (sectionId) => {
+    navigateToSection(sectionId, pathname, router);
+  };
+
   return (
     <footer className="relative overflow-hidden bg-white dark:bg-black text-black dark:text-white transition-colors duration-500 border-t border-black/5 dark:border-white/5">
       {/* Ambient pink glow (top) */}
@@ -91,17 +130,11 @@ export default function Footer() {
       <div className="pointer-events-none absolute bottom-0 right-0 h-[300px] w-[300px] rounded-full bg-[#FF4DA3]/10 blur-[120px]" />
 
       {/* Noise texture */}
-      <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.png')] opacity-[0.04] dark:opacity-[0.07]" />
+      <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.webp')] opacity-[0.04] dark:opacity-[0.07]" />
 
       <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 pt-16 sm:pt-20 pb-8 sm:pb-10">
         {/* Big CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="pb-10 sm:pb-14 border-b border-black/10 dark:border-white/10"
-        >
+        <div className="fade-in-view pb-10 sm:pb-14 border-b border-black/10 dark:border-white/10">
           <p className="text-[#FF4DA3] text-[10px] tracking-[0.4em] uppercase font-bold">
             ● Join The Drop
           </p>
@@ -147,16 +180,17 @@ export default function Footer() {
               )}
             </button>
           </form>
-        </motion.div>
+        </div>
 
         {/* Links grid */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-6 py-10 sm:py-14">
+        <div className="fade-in-view grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-6 py-10 sm:py-14">
           {/* Brand column */}
           <div className="md:col-span-2 space-y-5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/LOGO2.png"
+            <Image
+              src="/images/LOGO2.webp"
               alt="ZØYA"
+              width={140}
+              height={40}
               className="h-9 sm:h-10 w-auto object-contain"
             />
             <p className="text-sm text-black/60 dark:text-white/50 leading-relaxed max-w-xs">
@@ -175,16 +209,7 @@ export default function Footer() {
               <ul className="space-y-2.5 sm:space-y-3">
                 {shopLinks.map((l) => (
                   <li key={l.label}>
-                    <Link
-                      href={l.href}
-                      className="group inline-flex items-center gap-1 text-[13px] sm:text-sm text-black/70 dark:text-white/60 hover:text-[#FF4DA3] transition-colors"
-                    >
-                      {l.label}
-                      <ArrowUpRight
-                        size={13}
-                        className="hidden sm:inline opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all"
-                      />
-                    </Link>
+                    <FooterLink link={l} onSection={handleSection} />
                   </li>
                 ))}
               </ul>
@@ -198,16 +223,7 @@ export default function Footer() {
               <ul className="space-y-2.5 sm:space-y-3">
                 {aboutLinks.map((l) => (
                   <li key={l.label}>
-                    <Link
-                      href={l.href}
-                      className="group inline-flex items-center gap-1 text-[13px] sm:text-sm text-black/70 dark:text-white/60 hover:text-[#FF4DA3] transition-colors"
-                    >
-                      {l.label}
-                      <ArrowUpRight
-                        size={13}
-                        className="hidden sm:inline opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all"
-                      />
-                    </Link>
+                    <FooterLink link={l} onSection={handleSection} />
                   </li>
                 ))}
               </ul>
@@ -221,18 +237,7 @@ export default function Footer() {
               <ul className="space-y-2.5 sm:space-y-3">
                 {helpLinks.map((l) => (
                   <li key={l.label}>
-                    <a
-                      href={l.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group inline-flex items-center gap-1 text-[13px] sm:text-sm text-black/70 dark:text-white/60 hover:text-[#FF4DA3] transition-colors"
-                    >
-                      {l.label}
-                      <ArrowUpRight
-                        size={13}
-                        className="hidden sm:inline opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all"
-                      />
-                    </a>
+                    <FooterLink link={l} onSection={handleSection} />
                   </li>
                 ))}
               </ul>
@@ -280,7 +285,7 @@ export default function Footer() {
               <span className="text-[9px] tracking-[0.2em] normal-case flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-black/60 dark:text-white/60 leading-snug">
                 <span className="uppercase">Designed &amp; Developed by</span>
                 <a
-                  href="https://wa.me/201062801851"
+                  href="https://hadeer-elboghdady.vercel.app/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-black dark:text-white font-bold hover:text-[#FF4DA3] transition-colors whitespace-nowrap inline-flex items-center gap-1"
@@ -310,11 +315,9 @@ export default function Footer() {
       </div>
 
       {/* Toast */}
-      <AnimatePresence>
-        {toast && (
-          <FooterToast toast={toast} onDismiss={() => setToast(null)} />
-        )}
-      </AnimatePresence>
+      {toast && (
+        <FooterToast toast={toast} onDismiss={() => setToast(null)} />
+      )}
     </footer>
   );
 }
@@ -344,15 +347,10 @@ function FooterToast({ toast, onDismiss }) {
   const Icon = v.icon;
 
   return (
-    <motion.div
-      key="footer-toast"
-      initial={{ y: 80, opacity: 0, scale: 0.92 }}
-      animate={{ y: 0, opacity: 1, scale: 1 }}
-      exit={{ y: 80, opacity: 0 }}
-      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+    <div
       role="status"
       aria-live="polite"
-      className="fixed left-1/2 -translate-x-1/2 bottom-6 z-[80] w-[92%] max-w-sm pointer-events-auto"
+      className="animate-ui-toast fixed left-1/2 -translate-x-1/2 bottom-6 z-[80] w-[92%] max-w-sm pointer-events-auto"
     >
       <div
         className={`flex items-center gap-3 p-3 pr-4 rounded-2xl bg-white/90 dark:bg-black/80 backdrop-blur-xl border border-black/10 dark:border-white/10 ring-1 ${v.ring} ${v.glow}`}
@@ -371,6 +369,6 @@ function FooterToast({ toast, onDismiss }) {
           <X size={14} />
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 }

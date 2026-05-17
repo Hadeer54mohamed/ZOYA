@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import QuickView from "./QuickView";
 import Image from "next/image";
+import { colorImageList } from "../lib/colorImages";
 
 function getHomeSliderEntries(product) {
   const colors = Array.isArray(product?.colors) ? product.colors : [];
@@ -38,13 +38,29 @@ function getHomeSliderEntries(product) {
   return entries;
 }
 
+function findColorByName(product, colorName) {
+  const colors = Array.isArray(product?.colors) ? product.colors : [];
+  const name = String(colorName ?? "").trim();
+  if (!name) return colors[0] ?? null;
+  return (
+    colors.find((c) => String(c?.name ?? "").trim() === name) ?? colors[0] ?? null
+  );
+}
+
+function imageIndexForColor(color, imageUrl) {
+  if (!color || !imageUrl) return 0;
+  const images = colorImageList(color);
+  const idx = images.findIndex((url) => url === imageUrl);
+  return idx >= 0 ? idx : 0;
+}
+
 export default function HorizontalProductSection({ products = [] }) {
   const router = useRouter();
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [progress, setProgress] = useState(12);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [quickView, setQuickView] = useState(null);
 
   const limitedProducts = useMemo(
     () =>
@@ -102,18 +118,28 @@ export default function HorizontalProductSection({ products = [] }) {
 
   if (sliderItems.length === 0) return null;
 
-  const handleCardClick = (product) => {
-    setSelectedProduct(product);
+  const openQuickView = (product, colorName, imageUrl) => {
+    const color = findColorByName(product, colorName);
+    if (!color) return;
+    setQuickView({
+      product,
+      initialColor: color,
+      initialImageIndex: imageIndexForColor(color, imageUrl),
+      colorKey: String(colorName || color.name || "default").trim(),
+    });
   };
 
-  const handleGoToProduct = (e, product) => {
+  const handleGoToProduct = (e, product, colorName) => {
     e.stopPropagation();
-    router.push(`/product/${product.id}`);
+    const name = String(colorName ?? "").trim();
+    const query = name
+      ? `?color=${encodeURIComponent(name)}`
+      : "";
+    router.push(`/product/${product.id}${query}`);
   };
 
   return (
     <section
-      id="collections"
       className="relative  bg-[#fafafa] dark:bg-[#050505] overflow-hidden transition-colors duration-500"
     >
       {/* Background accents */}
@@ -123,23 +149,15 @@ export default function HorizontalProductSection({ products = [] }) {
       {/* Header */}
       <div className="relative max-w-6xl mx-auto px-6 mb-10 flex items-end justify-between gap-6">
         <div>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-[#FF4DA3] text-[10px] tracking-[0.4em] uppercase"
-          >
+          <p className="fade-in-view text-[#FF4DA3] text-[10px] tracking-[0.4em] uppercase">
             ● Selected Pieces
-          </motion.p>
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="text-black dark:text-white text-3xl md:text-5xl font-bold mt-2"
+          </p>
+          <h2
+            className="fade-in-view text-black dark:text-white text-3xl md:text-5xl font-bold mt-2"
+            style={{ animationDelay: "0.1s" }}
           >
             Wear the Moment
-          </motion.h2>
+          </h2>
         </div>
 
         {/* Nav arrows */}
@@ -176,23 +194,19 @@ export default function HorizontalProductSection({ products = [] }) {
         >
           {sliderItems.map(
             ({ key, product: p, imageUrl: sliderImg, colorName }, i) => (
-              <motion.div
+              <div
                 key={key}
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ delay: Math.min(i * 0.05, 0.4), duration: 0.6 }}
-                whileHover={{ y: -6 }}
-                onClick={() => handleCardClick(p)}
+                className="fade-in-view shrink-0 snap-start w-[260px] sm:w-[300px] md:w-[340px] group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] rounded-2xl transition-transform duration-300 hover:-translate-y-1.5"
+                style={{ animationDelay: `${Math.min(i * 0.05, 0.4)}s` }}
+                onClick={() => openQuickView(p, colorName, sliderImg)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    setSelectedProduct(p);
+                    openQuickView(p, colorName, sliderImg);
                   }
                 }}
-                className="shrink-0 snap-start w-[260px] sm:w-[300px] md:w-[340px] group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] rounded-2xl"
               >
                 <div className="relative overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
                   <Image
@@ -223,7 +237,7 @@ export default function HorizontalProductSection({ products = [] }) {
                   {/* Details pill — always visible on mobile, hover-only on desktop */}
                   <button
                     type="button"
-                    onClick={(e) => handleGoToProduct(e, p)}
+                    onClick={(e) => handleGoToProduct(e, p, colorName)}
                     aria-label="View full details"
                     className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 hover:bg-black backdrop-blur-md text-white text-[9px] font-bold tracking-widest uppercase shadow opacity-100 md:opacity-0 md:group-hover:opacity-100 transition"
                   >
@@ -258,7 +272,7 @@ export default function HorizontalProductSection({ products = [] }) {
                     </div>
                     <button
                       aria-label="View full details"
-                      onClick={(e) => handleGoToProduct(e, p)}
+                      onClick={(e) => handleGoToProduct(e, p, colorName)}
                       className="h-10 w-10 grid place-items-center rounded-full bg-[#FF4DA3] text-black md:translate-y-2 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 transition-all duration-300 hover:scale-105"
                     >
                       <svg
@@ -277,7 +291,7 @@ export default function HorizontalProductSection({ products = [] }) {
                     </button>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ),
           )}
         </div>
@@ -286,10 +300,9 @@ export default function HorizontalProductSection({ products = [] }) {
       {/* Progress bar */}
       <div className="max-w-6xl mx-auto px-6 mt-8 flex items-center gap-4">
         <div className="flex-1 h-[2px] bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
-          <motion.div
-            animate={{ width: `${progress}%` }}
-            transition={{ type: "spring", stiffness: 120, damping: 20 }}
-            className="h-full bg-[#FF4DA3] rounded-full"
+          <div
+            className="h-full bg-[#FF4DA3] rounded-full transition-[width] duration-300 ease-out"
+            style={{ width: `${progress}%` }}
           />
         </div>
         <span className="text-[10px] text-black/40 dark:text-white/40 tracking-[0.3em] uppercase font-bold shrink-0">
@@ -298,11 +311,13 @@ export default function HorizontalProductSection({ products = [] }) {
       </div>
 
       {/* Quick View Modal */}
-      {selectedProduct && (
+      {quickView && (
         <QuickView
-          key={selectedProduct.id}
-          product={selectedProduct}
-          onClose={() => setSelectedProduct(null)}
+          key={`${quickView.product.id}-${quickView.colorKey}`}
+          product={quickView.product}
+          initialColor={quickView.initialColor}
+          initialImageIndex={quickView.initialImageIndex}
+          onClose={() => setQuickView(null)}
         />
       )}
     </section>

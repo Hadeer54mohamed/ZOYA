@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,6 +16,7 @@ import Toast from "./_components/Toast";
 import { colorImageList, colorPrimaryImage } from "../../lib/colorImages";
 
 export default function ProductDetailClient({ id, product, related = [] }) {
+  const searchParams = useSearchParams();
 
   // Selection state
   const [selectedColorName, setSelectedColorName] = useState(
@@ -59,6 +61,19 @@ export default function ProductDetailClient({ id, product, related = [] }) {
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   }, [id]);
 
+  // Open color from ?color= query (e.g. collections slider → product page)
+  useEffect(() => {
+    const param = searchParams.get("color")?.trim();
+    if (!param || !Array.isArray(product?.colors)) return;
+    const match = product.colors.find(
+      (c) => String(c?.name ?? "").trim() === param,
+    );
+    if (match) {
+      setSelectedColorName(match.name);
+      setActiveIndex(0);
+    }
+  }, [searchParams, product, id]);
+
   // Show sticky bar when user scrolls past the main CTA block
   useEffect(() => {
     const onScroll = () => {
@@ -74,7 +89,7 @@ export default function ProductDetailClient({ id, product, related = [] }) {
   // ---------- Not Found ----------
   if (!product) {
     return (
-      <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
+      <main className="min-h-screen overflow-x-hidden bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
         <div className="min-h-[70vh] flex flex-col items-center justify-center px-6 text-center">
           <p className="text-[#FF4DA3] tracking-[0.4em] text-[10px] font-bold uppercase mb-4">
             ● 404
@@ -172,7 +187,7 @@ export default function ProductDetailClient({ id, product, related = [] }) {
   };
 
   return (
-    <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
+    <main className="min-h-screen overflow-x-hidden bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500">
       {/* Floating fly-to-cart image */}
       <AnimatePresence>
         {fly && (
@@ -217,17 +232,20 @@ export default function ProductDetailClient({ id, product, related = [] }) {
         shifted={showStickyBar}
       />
 
-      <section className="px-6 pt-28 pb-16">
+      <section className="px-4 sm:px-6 pt-20 sm:pt-24 lg:pt-28 pb-28 sm:pb-20 lg:pb-16">
         {/* Breadcrumb */}
-        <div className="max-w-7xl mx-auto mb-8 flex items-center justify-between gap-4 flex-wrap">
+        <div className="max-w-7xl mx-auto mb-6 sm:mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] uppercase text-black/50 dark:text-white/40 hover:text-[#FF4DA3] transition"
+            className="inline-flex items-center gap-2 text-[11px] tracking-[0.3em] uppercase text-black/50 dark:text-white/40 hover:text-[#FF4DA3] transition shrink-0"
           >
             <ArrowLeft size={14} />
             Back to Shop
           </Link>
-          <nav className="text-[11px] tracking-[0.25em] uppercase text-black/40 dark:text-white/30">
+          <nav
+            aria-label="Breadcrumb"
+            className="hidden sm:block text-[11px] tracking-[0.25em] uppercase text-black/40 dark:text-white/30 truncate"
+          >
             <Link href="/" className="hover:text-[#FF4DA3]">
               Shop
             </Link>
@@ -238,9 +256,12 @@ export default function ProductDetailClient({ id, product, related = [] }) {
               {product.name}
             </span>
           </nav>
+          <p className="sm:hidden text-[10px] tracking-[0.2em] uppercase text-black/40 dark:text-white/30 truncate">
+            {product.category} · {product.name}
+          </p>
         </div>
 
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-start">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
           <ProductGallery
             product={product}
             selectedColor={selectedColor}
@@ -276,7 +297,7 @@ export default function ProductDetailClient({ id, product, related = [] }) {
 
       {/* RELATED PRODUCTS */}
       {related.length > 0 && (
-        <section className="relative px-6 pb-40 sm:pb-28 pt-8 bg-white dark:bg-black overflow-hidden transition-colors duration-500">
+        <section className="relative px-4 sm:px-6 pb-36 sm:pb-28 pt-8 bg-white dark:bg-black overflow-hidden transition-colors duration-500">
           <div className="pointer-events-none absolute top-20 -right-40 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/5 blur-[140px]" />
           <div className="relative max-w-7xl mx-auto">
             <div className="flex items-end justify-between gap-6 mb-10">
@@ -321,24 +342,20 @@ export default function ProductDetailClient({ id, product, related = [] }) {
                   hoveredRelated !== null &&
                   hoveredRelated !== p.id;
                 return (
-                  <motion.div
+                  <div
                     key={p.id}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, margin: "-50px" }}
-                    transition={{ duration: 0.5, delay: i * 0.08 }}
                     onMouseEnter={
                       hoverCapable ? () => setHoveredRelated(p.id) : undefined
                     }
-                    animate={{
-                      opacity: isDimmed ? 0.45 : 1,
-                      filter: isDimmed ? "blur(2px)" : "blur(0px)",
-                      scale: isDimmed ? 0.98 : 1,
-                    }}
-                    className="transition-[filter,opacity,transform] duration-300"
+                    className={`fade-in-view transition-[filter,opacity,transform] duration-300 ${
+                      isDimmed
+                        ? "opacity-45 blur-[2px] scale-[0.98]"
+                        : "opacity-100 blur-0 scale-100"
+                    }`}
+                    style={{ animationDelay: `${i * 0.08}s` }}
                   >
-                    <ProductCard product={p} />
-                  </motion.div>
+                    <ProductCard product={p} lite />
+                  </div>
                 );
               })}
             </div>
