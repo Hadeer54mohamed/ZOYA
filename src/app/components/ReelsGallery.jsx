@@ -3,6 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Play, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { Swiper, SwiperSlide } from "swiper/react";
+import {
+  Navigation,
+  Pagination,
+  Autoplay,
+  EffectCoverflow,
+} from "swiper/modules";
+
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination";
+import "swiper/css/effect-coverflow";
 
 const InstagramIcon = (props) => (
   <svg
@@ -19,23 +31,23 @@ const InstagramIcon = (props) => (
     <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
   </svg>
 );
-import { Swiper, SwiperSlide } from "swiper/react";
-import {
-  Navigation,
-  EffectCoverflow,
-  Pagination,
-  Autoplay,
-} from "swiper/modules";
-
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/effect-coverflow";
-import "swiper/css/pagination";
 
 function getEmbedUrl(link) {
   if (!link) return null;
-  const match = link.match(/\/reel\/([^/]+)/);
-  return match ? `https://www.instagram.com/reel/${match[1]}/embed/` : null;
+  const match = link.match(/\/(?:reel|reels)\/([A-Za-z0-9_-]+)/);
+  return match
+    ? `https://www.instagram.com/reel/${match[1]}/embed/?autoplay=1`
+    : null;
+}
+
+function openReelFromTap(swiper, reels, openReel) {
+  if (!swiper.allowClick) return;
+  const slide = swiper.clickedSlide;
+  if (!slide) return;
+  const idx = slide.getAttribute("data-swiper-slide-index");
+  if (idx == null) return;
+  const reel = reels[Number(idx)];
+  if (reel) openReel(reel);
 }
 
 function ReelPreview({ reel }) {
@@ -45,8 +57,10 @@ function ReelPreview({ reel }) {
       <img
         src={reel.thumbnail}
         alt={reel.title || "Reel"}
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 h-full w-full object-cover pointer-events-none"
         loading="lazy"
+        decoding="async"
+        draggable={false}
       />
     );
   }
@@ -55,7 +69,7 @@ function ReelPreview({ reel }) {
     return (
       <video
         src={reel.videoUrl}
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        className="absolute inset-0 h-full w-full object-cover pointer-events-none"
         muted
         playsInline
         preload="metadata"
@@ -68,7 +82,7 @@ function ReelPreview({ reel }) {
     return (
       <iframe
         src={embed}
-        className="absolute inset-0 w-full h-full pointer-events-none"
+        className="absolute inset-0 h-full w-full pointer-events-none"
         loading="lazy"
         title={reel.title || "Reel"}
       />
@@ -82,13 +96,68 @@ function ReelPreview({ reel }) {
   );
 }
 
+function ReelSlideCard({ reel, onOpen }) {
+  return (
+    <div className="group relative h-full w-full">
+      <div className="reel-card relative aspect-[9/16] overflow-hidden rounded-[1.5rem] border border-black/10 bg-black transition-all duration-500 sm:rounded-[1.75rem] dark:border-white/10">
+        <ReelPreview reel={reel} />
+
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+
+        <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/40 px-2.5 py-1 backdrop-blur-md">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#FF4DA3]" />
+          <span className="text-[8px] font-bold tracking-[0.2em] text-white uppercase">
+            Reel
+          </span>
+        </div>
+
+        {reel.title && (
+          <div className="reel-slide-title pointer-events-none absolute right-4 bottom-4 left-4">
+            <p className="line-clamp-2 text-xs font-semibold text-white drop-shadow-lg sm:text-sm">
+              {reel.title}
+            </p>
+          </div>
+        )}
+
+        {/* Play button only — rest of card stays draggable for Swiper */}
+        <button
+          type="button"
+          className="swiper-no-swiping absolute top-1/2 left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 md:h-16 md:w-16"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen(reel);
+          }}
+          aria-label={reel.title ? `Play ${reel.title}` : "Play reel"}
+        >
+          <span className="reel-play-icon flex h-12 w-12 items-center justify-center rounded-full border border-white/25 bg-white/15 backdrop-blur-md transition-transform duration-300 md:h-14 md:w-14">
+            <Play className="ml-0.5 h-4 w-4 fill-white text-white md:h-5 md:w-5" />
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ReelsGallery({ reels = [] }) {
   const [selectedReel, setSelectedReel] = useState(null);
   const [isModalClosing, setIsModalClosing] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [inView, setInView] = useState(false);
   const videoRef = useRef(null);
+  const sectionRef = useRef(null);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { threshold: 0.12, rootMargin: "80px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const hasReels = Array.isArray(reels) && reels.length > 0;
   const enableLoop = reels.length > 1;
@@ -100,6 +169,12 @@ export default function ReelsGallery({ reels = [] }) {
       setSelectedReel(null);
       setIsModalClosing(false);
     }, 250);
+  }, []);
+
+  const openReel = useCallback((reel) => {
+    if (!reel) return;
+    setIsModalClosing(false);
+    setSelectedReel(reel);
   }, []);
 
   useEffect(() => {
@@ -118,49 +193,81 @@ export default function ReelsGallery({ reels = [] }) {
     };
   }, [selectedReel, closeModal]);
 
+  useEffect(() => {
+    if (!selectedReel?.videoUrl || isModalClosing) return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.currentTime = 0;
+    const playPromise = video.play();
+    if (playPromise?.catch) {
+      playPromise.catch(() => {});
+    }
+
+    return () => {
+      video.pause();
+    };
+  }, [selectedReel, isModalClosing]);
+
   const modalEmbed = selectedReel ? getEmbedUrl(selectedReel.link) : null;
 
   const modal =
     selectedReel && mounted
       ? createPortal(
           <div
-            className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-md transition-opacity duration-300 p-4 sm:p-6 ${
+            className={`fixed inset-0 z-[10000] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md transition-opacity duration-300 sm:p-6 ${
               isModalClosing ? "opacity-0" : "opacity-100"
             }`}
             onClick={closeModal}
           >
             <button
+              type="button"
               onClick={closeModal}
-              className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md text-white border border-white/15 hover:bg-[#FF4DA3]/80 hover:border-[#FF4DA3] hover:scale-110 transition"
+              className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white backdrop-blur-md transition hover:scale-110 hover:border-[#FF4DA3] hover:bg-[#FF4DA3]/80 sm:top-6 sm:right-6"
               aria-label="Close"
             >
               <X size={20} />
             </button>
 
             <div
-              className="relative w-full max-w-[380px] aspect-[9/16] bg-black rounded-[1.75rem] sm:rounded-[2rem] overflow-hidden shadow-[0_30px_80px_-20px_rgba(255,77,163,0.4)] border border-white/10"
+              className="relative aspect-[9/16] w-full max-w-[380px] overflow-hidden rounded-[1.75rem] border border-white/10 bg-black shadow-[0_30px_80px_-20px_rgba(255,77,163,0.4)] sm:rounded-[2rem]"
               onClick={(e) => e.stopPropagation()}
             >
               {selectedReel.videoUrl ? (
                 <video
+                  key={selectedReel.id}
                   ref={videoRef}
                   src={selectedReel.videoUrl}
                   poster={selectedReel.thumbnail || undefined}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  className="absolute inset-0 h-full w-full object-cover"
                   controls
                   autoPlay
                   playsInline
+                  preload="auto"
                 />
               ) : modalEmbed ? (
                 <iframe
+                  key={modalEmbed}
                   src={modalEmbed}
-                  className="absolute inset-0 w-full h-full"
+                  className="absolute inset-0 h-full w-full"
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
                   allowFullScreen
                   title="Instagram Reel"
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-white/50 text-xs">
-                  No preview available
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center text-xs text-white/60">
+                  <p>No video file uploaded for this reel.</p>
+                  {selectedReel.link && (
+                    <a
+                      href={selectedReel.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full bg-[#FF4DA3] px-4 py-2 text-[10px] font-bold tracking-widest text-white uppercase"
+                    >
+                      Watch on Instagram
+                    </a>
+                  )}
                 </div>
               )}
             </div>
@@ -171,9 +278,9 @@ export default function ReelsGallery({ reels = [] }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="absolute bottom-6 sm:bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 backdrop-blur-md text-white text-[10px] sm:text-xs font-bold tracking-[0.2em] uppercase border border-white/20 hover:bg-[#FF4DA3] hover:border-[#FF4DA3] transition whitespace-nowrap"
+                className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-[10px] font-bold tracking-[0.2em] text-white uppercase backdrop-blur-md transition hover:border-[#FF4DA3] hover:bg-[#FF4DA3] sm:bottom-10 sm:text-xs"
               >
-                <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 View on Instagram
               </a>
             )}
@@ -183,44 +290,44 @@ export default function ReelsGallery({ reels = [] }) {
       : null;
 
   return (
-    <section className="relative py-8 md:py-12 bg-white dark:bg-black overflow-hidden transition-colors duration-500">
-      {/* Background pink glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-[#FF4DA3]/[0.04] dark:bg-[#FF4DA3]/[0.06] blur-[120px] pointer-events-none" />
+    <section
+      ref={sectionRef}
+      className="relative overflow-hidden bg-white py-8 transition-colors duration-500 md:py-12 dark:bg-black"
+    >
+      <div className="pointer-events-none absolute top-1/2 left-1/2 h-[400px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#FF4DA3]/[0.04] blur-[120px] dark:bg-[#FF4DA3]/[0.06]" />
 
-      <div className="relative max-w-7xl mx-auto">
-        {/* === HEADING === */}
-        <div className="text-center mb-10 sm:mb-14 px-6">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <span className="w-8 h-px bg-[#FF4DA3]/50" />
-            <p className="text-[10px] tracking-[0.4em] uppercase text-[#FF4DA3] font-bold flex items-center gap-1.5">
-              <InstagramIcon className="w-3 h-3" />
+      <div className="relative z-10 mx-auto max-w-7xl">
+        <div className="mb-10 px-6 text-center sm:mb-14">
+          <div className="mb-4 inline-flex items-center gap-3">
+            <span className="h-px w-8 bg-[#FF4DA3]/50" />
+            <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.4em] text-[#FF4DA3] uppercase">
+              <InstagramIcon className="h-3 w-3" />
               @ZOYA.STUDIO
             </p>
-            <span className="w-8 h-px bg-[#FF4DA3]/50" />
+            <span className="h-px w-8 bg-[#FF4DA3]/50" />
           </div>
 
-          <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-black dark:text-white tracking-tighter leading-tight">
+          <h2 className="text-4xl font-black tracking-tighter text-black sm:text-5xl md:text-6xl lg:text-7xl dark:text-white">
             Style in{" "}
-            <span className="italic text-transparent bg-clip-text bg-gradient-to-r from-[#FF4DA3] via-[#ff7eb6] to-[#FF4DA3]">
+            <span className="bg-gradient-to-r from-[#FF4DA3] via-[#ff7eb6] to-[#FF4DA3] bg-clip-text italic text-transparent">
               Motion
             </span>
           </h2>
 
-          <p className="mt-4 text-black/50 dark:text-white/40 text-xs sm:text-sm max-w-md mx-auto">
+          <p className="mx-auto mt-4 max-w-md text-xs text-black/50 sm:text-sm dark:text-white/40">
             Behind the scenes, drops & street looks — straight from our feed.
           </p>
         </div>
 
-        {/* === EMPTY STATE === */}
         {!hasReels ? (
-          <div className="text-center py-20 text-black/50 dark:text-white/50 px-6">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center">
-              <Play className="w-6 h-6 opacity-40" />
+          <div className="px-6 py-20 text-center text-black/50 dark:text-white/50">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-black/5 dark:bg-white/5">
+              <Play className="h-6 w-6 opacity-40" />
             </div>
             <p className="text-sm">No reels available yet</p>
           </div>
         ) : (
-          <div className="relative reels-swiper-wrap">
+          <div className="reels-swiper-wrap relative px-2">
             <Swiper
               modules={[Navigation, EffectCoverflow, Pagination, Autoplay]}
               effect="coverflow"
@@ -228,17 +335,19 @@ export default function ReelsGallery({ reels = [] }) {
               loop={enableLoop}
               grabCursor
               watchSlidesProgress
-              autoplay={
-                enableLoop
-                  ? {
-                      delay: 4500,
-                      disableOnInteraction: false,
-                      pauseOnMouseEnter: true,
-                    }
-                  : false
-              }
+              simulateTouch
+              allowTouchMove
+              touchRatio={1}
+              threshold={10}
+              longSwipesMs={280}
               slidesPerView={Math.min(slidesPerViewCap, 1.3)}
               spaceBetween={12}
+              speed={450}
+              touchStartPreventDefault={false}
+              preventClicks={false}
+              preventClicksPropagation={false}
+              onTap={(swiper) => openReelFromTap(swiper, reels, openReel)}
+              onClick={(swiper) => openReelFromTap(swiper, reels, openReel)}
               coverflowEffect={{
                 rotate: 0,
                 stretch: 0,
@@ -303,6 +412,15 @@ export default function ReelsGallery({ reels = [] }) {
                   },
                 },
               }}
+              autoplay={
+                enableLoop && inView
+                  ? {
+                      delay: 4500,
+                      disableOnInteraction: false,
+                      pauseOnMouseEnter: true,
+                    }
+                  : false
+              }
               navigation={{ prevEl: ".ig-prev", nextEl: ".ig-next" }}
               pagination={{
                 el: ".reels-pagination",
@@ -310,78 +428,31 @@ export default function ReelsGallery({ reels = [] }) {
                 dynamicBullets: true,
                 dynamicMainBullets: 4,
               }}
-              className="!py-6 sm:!py-8 !px-4 sm:!px-6"
+              className="!px-4 !py-6 sm:!px-6 sm:!py-8"
             >
               {reels.map((reel) => (
                 <SwiperSlide key={reel.id} className="!h-auto">
-                  {({ isActive }) => (
-                    <div
-                      onClick={() => isActive && setSelectedReel(reel)}
-                      className={`relative aspect-[9/16] rounded-[1.5rem] sm:rounded-[1.75rem] overflow-hidden cursor-pointer border bg-black transition-all duration-500 group ${
-                        isActive
-                          ? "scale-100 opacity-100 border-[#FF4DA3]/40 shadow-[0_20px_50px_-15px_rgba(255,77,163,0.45)]"
-                          : "scale-[0.94] opacity-50 border-black/10 dark:border-white/10"
-                      }`}
-                    >
-                      <ReelPreview reel={reel} />
-
-                      {/* Gradient overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent pointer-events-none" />
-
-                      {/* Top badge */}
-                      <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10 pointer-events-none">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#FF4DA3] animate-pulse" />
-                        <span className="text-[8px] font-bold text-white tracking-[0.2em] uppercase">
-                          Reel
-                        </span>
-                      </div>
-
-                      {/* Title */}
-                      {reel.title && isActive && (
-                        <div className="absolute bottom-4 left-4 right-4 pointer-events-none">
-                          <p className="text-white text-xs sm:text-sm font-semibold line-clamp-2 drop-shadow-lg">
-                            {reel.title}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Hover play overlay (desktop only) */}
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden md:flex items-center justify-center">
-                        <div className="w-14 h-14 rounded-full bg-[#FF4DA3] flex items-center justify-center shadow-[0_0_30px_rgba(255,77,163,0.6)] scale-90 group-hover:scale-100 transition-transform duration-300">
-                          <Play className="w-5 h-5 text-white fill-white ml-0.5" />
-                        </div>
-                      </div>
-
-                      {/* Mobile play indicator (visible on active only) */}
-                      {isActive && (
-                        <div className="absolute inset-0 flex items-center justify-center md:hidden pointer-events-none">
-                          <div className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/25">
-                            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <ReelSlideCard reel={reel} onOpen={openReel} />
                 </SwiperSlide>
               ))}
             </Swiper>
 
-            {/* Desktop Navigation */}
             <button
-              className="ig-prev absolute left-2 lg:left-6 top-1/2 -translate-y-1/2 w-11 h-11 z-20 rounded-full bg-white/80 dark:bg-black/60 backdrop-blur-md border border-black/10 dark:border-white/10 hidden md:flex items-center justify-center hover:bg-[#FF4DA3] hover:border-[#FF4DA3] hover:text-white transition-all duration-300 text-black dark:text-white shadow-lg"
+              type="button"
+              className="ig-prev absolute top-1/2 left-2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black shadow-lg backdrop-blur-md transition hover:border-[#FF4DA3] hover:bg-[#FF4DA3] hover:text-white md:flex lg:left-6 dark:border-white/10 dark:bg-black/60 dark:text-white"
               aria-label="Previous"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="h-5 w-5" />
             </button>
 
             <button
-              className="ig-next absolute right-2 lg:right-6 top-1/2 -translate-y-1/2 w-11 h-11 z-20 rounded-full bg-white/80 dark:bg-black/60 backdrop-blur-md border border-black/10 dark:border-white/10 hidden md:flex items-center justify-center hover:bg-[#FF4DA3] hover:border-[#FF4DA3] hover:text-white transition-all duration-300 text-black dark:text-white shadow-lg"
+              type="button"
+              className="ig-next absolute top-1/2 right-2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black shadow-lg backdrop-blur-md transition hover:border-[#FF4DA3] hover:bg-[#FF4DA3] hover:text-white md:flex lg:right-6 dark:border-white/10 dark:bg-black/60 dark:text-white"
               aria-label="Next"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="h-5 w-5" />
             </button>
 
-            {/* Mobile pagination */}
             <div className="reels-pagination !relative !bottom-0 !mt-4 flex justify-center md:hidden" />
           </div>
         )}
@@ -389,10 +460,40 @@ export default function ReelsGallery({ reels = [] }) {
 
       {modal}
 
-      {/* Custom pagination styles */}
       <style jsx global>{`
         .reels-swiper-wrap .swiper {
           overflow: visible;
+        }
+        .reels-swiper-wrap .swiper-slide {
+          pointer-events: auto !important;
+          height: auto;
+        }
+        .reels-swiper-wrap .swiper {
+          touch-action: pan-y pinch-zoom;
+        }
+        .reels-swiper-wrap .swiper-slide-active .reel-card {
+          border-color: rgba(255, 77, 163, 0.4);
+          box-shadow: 0 20px 50px -15px rgba(255, 77, 163, 0.45);
+          opacity: 1;
+          transform: scale(1);
+        }
+        .reels-swiper-wrap .swiper-slide:not(.swiper-slide-active) .reel-card {
+          opacity: 0.5;
+          transform: scale(0.94);
+        }
+        .reels-swiper-wrap
+          .swiper-slide:not(.swiper-slide-active)
+          .reel-slide-title {
+          opacity: 0;
+        }
+        .reels-swiper-wrap .swiper-slide-active .reel-play-icon {
+          transform: scale(1);
+        }
+        .reels-swiper-wrap
+          .swiper-slide:not(.swiper-slide-active)
+          .reel-play-icon {
+          transform: scale(0.9);
+          opacity: 0.85;
         }
         .reels-swiper-wrap .reels-pagination .swiper-pagination-bullet {
           background: rgba(0, 0, 0, 0.2);

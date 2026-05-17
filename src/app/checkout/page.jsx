@@ -2,7 +2,6 @@
 
 import { useCart } from "../context/CartContext";
 import { useState, useMemo, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
@@ -18,6 +17,7 @@ import {
   X,
   Search,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { validateCheckoutForm } from "../lib/validation";
 import {
@@ -479,17 +479,9 @@ export default function CheckoutPage() {
   if (cart.length === 0 && step !== 3) {
     return (
       <main className="min-h-screen bg-white dark:bg-[#050505] flex flex-col items-center justify-center p-6 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-8"
-        >
+        <div className="animate-ui-fade-in-up space-y-8">
           <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ repeat: Infinity, duration: 3 }}
-              className="absolute inset-0 bg-[#FF4DA3]/5 rounded-full"
-            />
+            <div className="absolute inset-0 bg-[#FF4DA3]/5 rounded-full animate-404-glow-a" />
             <ShoppingBag
               size={48}
               strokeWidth={1}
@@ -511,14 +503,9 @@ export default function CheckoutPage() {
             className="group relative px-12 py-4 bg-black dark:bg-white text-white dark:text-black text-xs font-bold uppercase tracking-[0.2em] overflow-hidden transition-all"
           >
             <span className="relative z-10">Explore Collection</span>
-            <motion.div
-              className="absolute inset-0 bg-[#FF4DA3]"
-              initial={{ x: "-100%" }}
-              whileHover={{ x: 0 }}
-              transition={{ type: "tween" }}
-            />
+            <div className="absolute inset-0 bg-[#FF4DA3] -translate-x-full group-hover:translate-x-0 transition-transform duration-300 ease-out" />
           </button>
-        </motion.div>
+        </div>
       </main>
     );
   }
@@ -533,39 +520,19 @@ export default function CheckoutPage() {
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#050505] text-black dark:text-white transition-colors duration-500 relative overflow-x-hidden">
-      <AnimatePresence>
-        {orderCelebrating && (
-          <motion.div
+      {orderCelebrating && (
+          <div
             key="checkout-success-burst"
-            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none animate-ui-fade-in"
           >
-            <motion.div
+            <div
               className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#FF4DA3]/30"
               style={{ width: "min(90vw, 420px)", height: "min(90vw, 420px)" }}
-              initial={{ scale: 0.15, opacity: 0.85 }}
-              animate={{ scale: 2.8, opacity: 0 }}
-              transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
             />
-            <motion.div
-              className="relative z-10 flex flex-col items-center gap-3"
-              initial={{ scale: 0.35, opacity: 0 }}
-              animate={{ scale: [0.35, 1.12, 1], opacity: 1 }}
-              transition={{
-                duration: 0.55,
-                times: [0, 0.55, 1],
-                ease: [0.22, 1, 0.36, 1],
-              }}
-            >
+            <div className="relative z-10 flex flex-col items-center gap-3 animate-ui-scale-in">
               <div className="relative">
-                <motion.div
+                <div
                   className="absolute inset-0 rounded-full bg-[#FF4DA3]/50 blur-2xl scale-[1.4]"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [0, 1, 0.45] }}
-                  transition={{ duration: 0.5 }}
                 />
                 <CheckCircle2
                   size={76}
@@ -573,19 +540,13 @@ export default function CheckoutPage() {
                   strokeWidth={1.15}
                 />
               </div>
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.12, duration: 0.35 }}
-                className="text-[11px] font-bold uppercase tracking-[0.28em] text-black/65 dark:text-white/70"
-              >
+              <p className="animate-ui-fade-in-up text-[11px] font-bold uppercase tracking-[0.28em] text-black/65 dark:text-white/70">
                 Order received
-              </motion.p>
-            </motion.div>
-          </motion.div>
+              </p>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
-      {/* STEP INDICATOR */}
+{/* STEP INDICATOR */}
       <div className="pt-24 sm:pt-32 pb-6 sm:pb-10 px-4 flex justify-center items-center gap-2 sm:gap-4 text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-medium">
         <span
           className={`${step >= 1 ? "text-[#FF4DA3]" : "text-black/20 dark:text-white/20"} transition-colors`}
@@ -611,17 +572,10 @@ export default function CheckoutPage() {
       >
         {/* LEFT COLUMN: Forms (7 cols) / Full width on confirmation */}
         <div
-          className={step === 3 ? "w-full" : "md:col-span-7 order-2 md:order-1"}
+          className={step === 3 ? "w-full" : "md:col-span-7 order-1"}
         >
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="space-y-8"
-              >
+          {step === 1 && (
+              <div key="step1" className="animate-ui-fade-in-up space-y-8">
                 <div>
                   <h1 className="text-4xl sm:text-5xl font-serif italic mb-2">
                     Shipping
@@ -650,20 +604,15 @@ export default function CheckoutPage() {
                       }
                       onBlur={() => handleBlur("name")}
                     />
-                    <AnimatePresence>
-                      {touched.name && errors.name && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
+                    {touched.name && errors.name && (
+                        <p
+                          className="animate-ui-fade-in-down flex items-center gap-1.5 text-xs text-red-500 ml-1"
                         >
                           <AlertCircle size={13} strokeWidth={2.5} />
                           {errors.name}
-                        </motion.p>
+                        </p>
                       )}
-                    </AnimatePresence>
-                  </div>
+</div>
 
                   <div className="space-y-2">
                     <label className="text-xs uppercase tracking-widest ml-1">
@@ -688,20 +637,15 @@ export default function CheckoutPage() {
                       }
                       onBlur={() => handleBlur("phone")}
                     />
-                    <AnimatePresence>
-                      {touched.phone && errors.phone && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
+                    {touched.phone && errors.phone && (
+                        <p
+                          className="animate-ui-fade-in-down flex items-center gap-1.5 text-xs text-red-500 ml-1"
                         >
                           <AlertCircle size={13} strokeWidth={2.5} />
                           {errors.phone}
-                        </motion.p>
+                        </p>
                       )}
-                    </AnimatePresence>
-                  </div>
+</div>
 
                   <div className="space-y-2">
                     <label className="text-xs uppercase tracking-widest ml-1">
@@ -726,20 +670,15 @@ export default function CheckoutPage() {
                       }
                       onBlur={() => handleBlur("email")}
                     />
-                    <AnimatePresence>
-                      {touched.email && errors.email && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
+                    {touched.email && errors.email && (
+                        <p
+                          className="animate-ui-fade-in-down flex items-center gap-1.5 text-xs text-red-500 ml-1"
                         >
                           <AlertCircle size={13} strokeWidth={2.5} />
                           {errors.email}
-                        </motion.p>
+                        </p>
                       )}
-                    </AnimatePresence>
-                  </div>
+</div>
 
                   <div className="space-y-2">
                     <label className="text-xs uppercase tracking-widest ml-1">
@@ -759,20 +698,15 @@ export default function CheckoutPage() {
                       }
                       onBlur={() => handleBlur("address")}
                     />
-                    <AnimatePresence>
-                      {touched.address && errors.address && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -4 }}
-                          className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
+                    {touched.address && errors.address && (
+                        <p
+                          className="animate-ui-fade-in-down flex items-center gap-1.5 text-xs text-red-500 ml-1"
                         >
                           <AlertCircle size={13} strokeWidth={2.5} />
                           {errors.address}
-                        </motion.p>
+                        </p>
                       )}
-                    </AnimatePresence>
-                  </div>
+</div>
                 </div>
 
                 <div className="space-y-2">
@@ -816,14 +750,9 @@ export default function CheckoutPage() {
                       />
                     </button>
 
-                    <AnimatePresence>
-                      {govOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                          transition={{ duration: 0.15 }}
-                          className="absolute z-30 mt-2 w-full rounded-2xl border border-black/10 dark:border-white/20 bg-white dark:bg-[#161616] shadow-xl shadow-black/10 dark:shadow-black/60 overflow-hidden ring-1 ring-black/5 dark:ring-white/10"
+                    {govOpen && (
+                        <div
+                          className="animate-ui-scale-in absolute z-30 mt-2 w-full rounded-2xl border border-black/10 dark:border-white/20 bg-white dark:bg-[#161616] shadow-xl shadow-black/10 dark:shadow-black/60 overflow-hidden ring-1 ring-black/5 dark:ring-white/10"
                         >
                           <div className="p-2 border-b border-black/5 dark:border-white/10">
                             <div className="relative">
@@ -915,25 +844,19 @@ export default function CheckoutPage() {
                               })}
                             </ul>
                           )}
-                        </motion.div>
+                        </div>
                       )}
-                    </AnimatePresence>
-                  </div>
+</div>
 
-                  <AnimatePresence>
-                    {touched.governorate && errors.governorate && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
+                  {touched.governorate && errors.governorate && (
+                      <p
                         className="flex items-center gap-1.5 text-xs text-red-500 ml-1"
                       >
                         <AlertCircle size={13} strokeWidth={2.5} />
                         {errors.governorate}
-                      </motion.p>
+                      </p>
                     )}
-                  </AnimatePresence>
-                </div>
+</div>
                 <div className="space-y-2">
                   <label className="text-xs uppercase tracking-widest ml-1">
                     Payment Method
@@ -961,13 +884,9 @@ export default function CheckoutPage() {
                     ))}
                   </div>
 
-                  <AnimatePresence>
-                    {form.paymentMethod === "online" && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8, height: 0 }}
-                        animate={{ opacity: 1, y: 0, height: "auto" }}
-                        exit={{ opacity: 0, y: -8, height: 0 }}
-                        className="overflow-hidden"
+                  {form.paymentMethod === "online" && (
+                      <div
+                        className="animate-ui-fade-in-up overflow-hidden"
                       >
                         <div className="mt-3">
                           <InstapayNotice
@@ -975,18 +894,13 @@ export default function CheckoutPage() {
                             onCopy={handleCopyInstapay}
                           />
                         </div>
-                      </motion.div>
+                      </div>
                     )}
-                  </AnimatePresence>
-                </div>
+</div>
                 <div className="space-y-4">
-                  <AnimatePresence>
-                    {showSummaryError && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8, height: 0 }}
-                        animate={{ opacity: 1, y: 0, height: "auto" }}
-                        exit={{ opacity: 0, y: -8, height: 0 }}
-                        className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400"
+                  {showSummaryError && (
+                      <div
+                        className="animate-ui-fade-in-up flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400"
                       >
                         <AlertCircle
                           size={18}
@@ -1001,11 +915,9 @@ export default function CheckoutPage() {
                             All shipping details are required to continue.
                           </p>
                         </div>
-                      </motion.div>
+                      </div>
                     )}
-                  </AnimatePresence>
-
-                  <ReturnPolicyNotice variant="checkout" className="mt-1" />
+<ReturnPolicyNotice variant="checkout" className="mt-1" />
 
                   <button
                     onClick={handleNext}
@@ -1015,22 +927,13 @@ export default function CheckoutPage() {
                     Continue to Review
                   </button>
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {step === 2 && (
-              <motion.div
+              <div
                 key="step2"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{
-                  opacity: orderCelebrating ? 0.12 : 1,
-                  x: 0,
-                  filter: orderCelebrating ? "blur(4px)" : "blur(0px)",
-                  pointerEvents: orderCelebrating ? "none" : "auto",
-                }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.35 }}
-                className="space-y-8"
+                className={`animate-ui-fade-in-up space-y-8 transition-all duration-350 ${orderCelebrating ? "opacity-[0.12] blur-[4px] pointer-events-none" : ""}`}
               >
                 <button
                   onClick={() => setStep(1)}
@@ -1218,12 +1121,8 @@ export default function CheckoutPage() {
                   </>
                 )}
 
-                <AnimatePresence>
-                  {submitError && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8, height: 0 }}
-                      animate={{ opacity: 1, y: 0, height: "auto" }}
-                      exit={{ opacity: 0, y: -8, height: 0 }}
+                {submitError && (
+                    <div
                       className="flex items-start gap-3 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400"
                     >
                       <AlertCircle
@@ -1237,11 +1136,9 @@ export default function CheckoutPage() {
                         </p>
                         <p className="text-xs opacity-80">{submitError}</p>
                       </div>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
-
-                <ReturnPolicyNotice variant="checkout" className="mt-1" />
+<ReturnPolicyNotice variant="checkout" className="mt-1" />
 
                 <button
                   onClick={handleOrder}
@@ -1263,22 +1160,17 @@ export default function CheckoutPage() {
                     "Place Order Now"
                   )}
                 </button>
-              </motion.div>
+              </div>
             )}
 
             {step === 3 && (
-              <motion.div
+              <div
                 key="step3"
-                initial={{ opacity: 0, y: 32, scale: 0.94 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                className="min-h-[60vh] w-full max-w-2xl mx-auto flex flex-col items-center justify-center text-center py-16 space-y-6"
+                className="animate-ui-scale-in min-h-[60vh] w-full max-w-2xl mx-auto flex flex-col items-center justify-center text-center py-16 space-y-6"
               >
                 <div className="relative">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1.2 }}
-                    className="absolute inset-0 bg-[#FF4DA3]/20 rounded-full blur-2xl"
+                  <div
+                    className="absolute inset-0 bg-[#FF4DA3]/20 rounded-full blur-2xl animate-ui-scale-in"
                   />
                   <CheckCircle2
                     size={80}
@@ -1296,11 +1188,8 @@ export default function CheckoutPage() {
                 </p>
 
                 {placedOrderId && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="w-full max-w-md mx-auto p-5 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] space-y-3"
+                  <div
+                    className="animate-ui-fade-in-up w-full max-w-md mx-auto p-5 rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.02] space-y-3"
                   >
                     <p className="text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40">
                       Your Order ID
@@ -1324,7 +1213,7 @@ export default function CheckoutPage() {
                     <p className="text-[11px] text-black/40 dark:text-white/30 leading-relaxed">
                       Save this ID to track your order&apos;s status anytime.
                     </p>
-                  </motion.div>
+                  </div>
                 )}
 
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -1344,22 +1233,14 @@ export default function CheckoutPage() {
                     Return to Store
                   </button>
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+</div>
 
-        {/* RIGHT COLUMN: Order Summary (5 cols) - shows first on mobile */}
+        {/* RIGHT COLUMN: Order Summary (5 cols) */}
         {step < 3 && (
-          <motion.div
-            className="md:col-span-5 order-1 md:order-2"
-            animate={{
-              opacity: orderCelebrating ? 0.22 : 1,
-              scale: orderCelebrating ? 0.94 : 1,
-              y: orderCelebrating ? 20 : 0,
-              pointerEvents: orderCelebrating ? "none" : "auto",
-            }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          <div
+            className={`md:col-span-5 order-2 transition-all duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${orderCelebrating ? "opacity-[0.22] scale-[0.94] translate-y-5 pointer-events-none" : ""}`}
           >
             <div className="md:sticky md:top-32 p-5 sm:p-8 rounded-2xl sm:rounded-[2rem] bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5">
               <div className="flex items-center gap-2 mb-5 sm:mb-8 border-b border-black/5 dark:border-white/5 pb-4">
@@ -1379,6 +1260,8 @@ export default function CheckoutPage() {
                       <img
                         src={item.image}
                         alt={item.name}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -1401,35 +1284,18 @@ export default function CheckoutPage() {
                 <label className="text-[10px] uppercase tracking-[0.25em] opacity-60 ml-1">
                   Discount code
                 </label>
-                <AnimatePresence mode="wait" initial={false}>
-                  {discount ? (
-                    <motion.div
+                {discount ? (
+                    <div
                       key="discount-applied"
-                      initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 320,
-                        damping: 24,
-                      }}
                       className="mt-2 flex items-center justify-between gap-3 p-3 rounded-xl bg-[#FF4DA3]/10 border border-[#FF4DA3]/30"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <motion.span
-                          initial={{ scale: 0, rotate: -90 }}
-                          animate={{ scale: 1, rotate: 0 }}
-                          transition={{
-                            delay: 0.05,
-                            type: "spring",
-                            stiffness: 400,
-                            damping: 18,
-                          }}
+                        <span
                           className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#FF4DA3] text-white"
                           aria-hidden="true"
                         >
                           <Check size={12} strokeWidth={3} />
-                        </motion.span>
+                        </span>
                         <Tag size={14} className="text-[#FF4DA3] shrink-0" />
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-[#FF4DA3] truncate">
@@ -1448,14 +1314,10 @@ export default function CheckoutPage() {
                       >
                         <X size={14} />
                       </button>
-                    </motion.div>
+                    </div>
                   ) : (
-                    <motion.div
+                    <div
                       key="discount-input"
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: 0.18 }}
                       className={`mt-2 flex gap-2 transition-opacity ${applyingCode ? "opacity-70 pointer-events-none" : ""}`}
                       aria-busy={applyingCode}
                     >
@@ -1498,23 +1360,17 @@ export default function CheckoutPage() {
                           "Apply"
                         )}
                       </button>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
-                <AnimatePresence>
-                  {codeError && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
+{codeError && (
+                    <p
                       className="flex items-center gap-1.5 text-xs text-red-500 mt-2 ml-1"
                     >
                       <AlertCircle size={12} strokeWidth={2.5} />
                       {codeError}
-                    </motion.p>
+                    </p>
                   )}
-                </AnimatePresence>
-              </div> */}
+</div> */}
 
               <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-black/10 dark:border-white/10 space-y-3 sm:space-y-4">
                 <div className="flex justify-between text-xs sm:text-sm opacity-50">
@@ -1548,16 +1404,14 @@ export default function CheckoutPage() {
                     Total
                   </span>
                   <div className="text-right">
-                    <motion.span
+                    <span
                       key={finalTotal ?? "pending"}
-                      initial={{ opacity: 0.5, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
                       className="text-base sm:text-lg font-semibold"
                     >
                       {finalTotal != null
                         ? `EGP ${finalTotal.toLocaleString()}`
                         : "—"}
-                    </motion.span>
+                    </span>
                     {/*  <div className="text-[9px] sm:text-[10px] opacity-30 uppercase tracking-widest mt-1">
                       Including VAT
                     </div> */}
@@ -1565,7 +1419,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
       </section>
     </main>

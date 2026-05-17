@@ -16,7 +16,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   --animate-shimmer: shimmer 1.2s ease-in-out;
 
@@ -30,12 +30,21 @@
   }
 }
 
+html {
+  overflow-x: clip;
+}
+
 html,
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+body {
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 /* ---------- Themed Scrollbar (global) ---------- */
@@ -143,6 +152,484 @@ html {
 }
 .animate-gradient2 {
   animation: gradient2 3s linear infinite;
+}
+
+/* Hero — CSS-only animations (no framer-motion on first paint) */
+@keyframes hero-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.15);
+  }
+}
+@keyframes hero-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes hero-radial-pulse {
+  0%,
+  100% {
+    opacity: 0.05;
+  }
+  50% {
+    opacity: 0.1;
+  }
+}
+@keyframes hero-scroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(48px);
+  }
+}
+@keyframes drop-glow-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(30px, -20px);
+  }
+}
+@keyframes drop-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hero-glow-a {
+  animation: hero-glow-pulse 8s ease-in-out infinite;
+}
+.hero-glow-b {
+  animation: hero-glow-pulse 10s ease-in-out infinite reverse;
+}
+.hero-enter {
+  animation: hero-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-radial {
+  animation: hero-radial-pulse 6s ease-in-out infinite;
+}
+.hero-scroll-hint {
+  animation: hero-enter 1s ease 1.2s both;
+}
+.hero-scroll-line {
+  animation: hero-scroll 1.5s ease-in-out infinite;
+}
+.drop-glow {
+  animation: drop-glow-drift 12s ease-in-out infinite;
+}
+.drop-content {
+  animation: drop-content-in 0.8s ease both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-glow-a,
+  .hero-glow-b,
+  .hero-radial,
+  .hero-scroll-line,
+  .drop-glow,
+  .drop-content,
+  .animate-gradient {
+    animation: none !important;
+  }
+}
+
+.fade-in-view {
+  animation: hero-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ---------- UI motion (CSS replacements for framer-motion) ---------- */
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ui-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ui-fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ui-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 80px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+@keyframes ui-nav-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes ui-icon-in {
+  from {
+    opacity: 0;
+    transform: rotate(-45deg) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+@keyframes ui-logo-unlock {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.1) rotate(5deg);
+  }
+  75% {
+    transform: scale(0.9) rotate(-5deg);
+  }
+}
+@keyframes ui-loader-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes ui-intro-exit {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ui-intro-wipe {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes ui-intro-sweep {
+  from {
+    transform: translateX(-120%) skewX(12deg);
+  }
+  to {
+    transform: translateX(120%) skewX(12deg);
+  }
+}
+@keyframes ui-404-glow {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.15);
+  }
+}
+@keyframes ui-404-zero {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(5deg) scale(1.05);
+  }
+}
+
+.animate-ui-fade-in {
+  animation: ui-fade-in 0.5s ease both;
+}
+.animate-ui-fade-in-up {
+  animation: ui-fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-ui-fade-in-down {
+  animation: ui-fade-in-down 0.35s ease both;
+}
+.animate-ui-scale-in {
+  animation: ui-scale-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-ui-toast {
+  animation: ui-toast-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-nav-enter {
+  animation: ui-nav-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-theme-icon {
+  animation: ui-icon-in 0.2s ease both;
+}
+.animate-logo-unlock {
+  animation: ui-logo-unlock 0.4s ease;
+}
+.animate-loader-sweep {
+  animation: ui-loader-sweep 1.2s ease-in-out infinite;
+}
+.animate-404-glow-a {
+  animation: ui-404-glow 8s ease-in-out infinite;
+}
+.animate-404-glow-b {
+  animation: ui-404-glow 10s ease-in-out infinite reverse;
+}
+.animate-404-zero {
+  animation: ui-404-zero 4s ease-in-out infinite;
+}
+
+/* Navbar shell — hide when cart drawer is open */
+.nav-fixed-shell {
+  pointer-events: auto;
+  transition:
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    padding-top 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nav-fixed-shell[data-cart-open="true"] {
+  transform: translateY(-120%);
+  opacity: 0;
+  pointer-events: none;
+}
+.nav-fixed-shell[data-scrolled="true"] {
+  padding-top: 0.75rem;
+}
+.nav-shell {
+  transition: max-width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nav-bar {
+  transition:
+    padding 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nav-fixed-shell[data-scrolled="true"] .nav-bar {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+.dark .nav-fixed-shell[data-scrolled="true"] .nav-bar {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.nav-link-pill {
+  pointer-events: none;
+}
+.nav-desktop-links {
+  transition: padding 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nav-desktop-links button {
+  white-space: nowrap;
+  transition: padding 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nav-fixed-shell[data-scrolled="true"] .nav-desktop-links button {
+  padding-left: 0.625rem;
+  padding-right: 0.625rem;
+}
+@media (min-width: 1024px) {
+  .nav-fixed-shell[data-scrolled="true"] .nav-desktop-links button {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+}
+
+/* Hamburger → X */
+.menu-line {
+  display: block;
+  height: 1.5px;
+  width: 1rem;
+  border-radius: 9999px;
+  background: currentColor;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
+}
+.menu-line-top[data-open="true"] {
+  transform: rotate(45deg) translateY(4px);
+}
+.menu-line-mid[data-open="true"] {
+  opacity: 0;
+}
+.menu-line-bot[data-open="true"] {
+  transform: rotate(-45deg) translateY(-4px);
+}
+
+/* Stagger children (mobile menu links) */
+.stagger-in > * {
+  animation: ui-fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stagger-in > *:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.stagger-in > *:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.stagger-in > *:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.stagger-in > *:nth-child(4) {
+  animation-delay: 0.2s;
+}
+.stagger-in > *:nth-child(5) {
+  animation-delay: 0.25s;
+}
+.stagger-in > *:nth-child(6) {
+  animation-delay: 0.3s;
+}
+
+/* Intro splash — driven by data-phase on root */
+.intro-root[data-exiting="true"] {
+  animation: ui-intro-exit 0.4s ease forwards;
+}
+.intro-glow {
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.intro-root[data-phase="1"] .intro-glow,
+.intro-root[data-phase="2"] .intro-glow,
+.intro-root[data-phase="3"] .intro-glow {
+  opacity: 0.5;
+}
+.intro-glow-b {
+  transition-delay: 0.2s;
+}
+.intro-corner,
+.intro-counter,
+.intro-skip {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+}
+.intro-corner-l {
+  transform: translateX(-10px);
+}
+.intro-corner-r {
+  transform: translateX(10px);
+}
+.intro-root[data-phase="1"] .intro-corner,
+.intro-root[data-phase="2"] .intro-corner,
+.intro-root[data-phase="3"] .intro-corner {
+  opacity: 1;
+  transform: translate(0);
+}
+.intro-root[data-phase="1"] .intro-counter,
+.intro-root[data-phase="2"] .intro-counter,
+.intro-root[data-phase="3"] .intro-counter,
+.intro-root[data-phase="1"] .intro-skip {
+  opacity: 1;
+  transform: translateY(0);
+}
+.intro-progress {
+  width: 0%;
+  transition: width 1.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-root[data-phase="1"] .intro-progress,
+.intro-root[data-phase="2"] .intro-progress,
+.intro-root[data-phase="3"] .intro-progress {
+  width: 100%;
+}
+.intro-logo {
+  transform: translateY(80px);
+  opacity: 0;
+  transition:
+    transform 1.1s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-root[data-phase="1"] .intro-logo,
+.intro-root[data-phase="2"] .intro-logo,
+.intro-root[data-phase="3"] .intro-logo {
+  transform: translateY(0);
+  opacity: 1;
+}
+.intro-sweep {
+  animation: ui-intro-sweep 1.4s ease-in-out 0.4s both;
+}
+.intro-divider {
+  transform: scaleX(0);
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-root[data-phase="2"] .intro-divider,
+.intro-root[data-phase="3"] .intro-divider {
+  transform: scaleX(1);
+}
+.intro-tagline {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.intro-root[data-phase="2"] .intro-tagline,
+.intro-root[data-phase="3"] .intro-tagline {
+  opacity: 1;
+  transform: translateY(0);
+}
+.intro-wipe-pink,
+.intro-wipe-black {
+  transform: translateY(100%);
+  transition: transform 0.9s cubic-bezier(0.85, 0, 0.15, 1);
+}
+.intro-wipe-black {
+  transition-delay: 0.08s;
+}
+.intro-root[data-phase="3"] .intro-wipe-pink,
+.intro-root[data-phase="3"] .intro-wipe-black {
+  transform: translateY(0);
+}
+.intro-badge {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+.intro-root[data-phase="1"] .intro-badge {
+  opacity: 1;
+  transform: translateY(0);
+}
+.intro-root[data-phase="3"] .intro-badge {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;

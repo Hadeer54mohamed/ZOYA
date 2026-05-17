@@ -53,7 +53,7 @@ const CATEGORIES_QUERY = /* groq */ `
   }
 `;
 
-function mapProduct(raw) {
+function mapProduct(raw, { imageWidth = 1200, imageQuality = 85 } = {}) {
   if (!raw) return null;
   const price = raw.price ?? 0;
   const originalPrice =
@@ -87,7 +87,11 @@ function mapProduct(raw) {
       images: (c?.images || [])
         .map((img) => {
           try {
-            return urlFor(img).width(1200).quality(85).auto("format").url();
+            return urlFor(img)
+              .width(imageWidth)
+              .quality(imageQuality)
+              .auto("format")
+              .url();
           } catch {
             return null;
           }
@@ -105,6 +109,74 @@ function mapProduct(raw) {
         : [],
     })),
   };
+}
+
+const NAVBAR_SEARCH_QUERY = /* groq */ `
+  *[_type == "product"] | order(coalesce(order, 100) asc, _createdAt asc) {
+    "id": slug.current,
+    name,
+    "category": category->title,
+    price,
+    description,
+    "firstImage": colors[0].images[0]
+  }
+`;
+
+function mapNavbarSearchProduct(raw) {
+  if (!raw?.id) return null;
+  let thumb = null;
+  if (raw.firstImage) {
+    try {
+      thumb = urlFor(raw.firstImage)
+        .width(200)
+        .height(200)
+        .quality(75)
+        .auto("format")
+        .url();
+    } catch {
+      thumb = null;
+    }
+  }
+  return {
+    id: raw.id,
+    name: raw.name,
+    category: raw.category || "Uncategorized",
+    price: raw.price ?? 0,
+    description: raw.description || "",
+    colors: thumb ? [{ images: [thumb] }] : [],
+  };
+}
+
+/** Lightweight product list for global navbar search (avoids full catalog on every page). */
+export async function getNavbarSearchProducts() {
+  try {
+    const data = await client.fetch(
+      NAVBAR_SEARCH_QUERY,
+      {},
+      { next: { revalidate: 60 } },
+    );
+    return (data || []).map(mapNavbarSearchProduct).filter(Boolean);
+  } catch (err) {
+    console.error("[sanity] getNavbarSearchProducts failed:", err?.message || err);
+    return [];
+  }
+}
+
+/** Homepage catalog — smaller images + short cache for faster TTFB. */
+export async function getHomepageProducts() {
+  try {
+    const data = await client.fetch(
+      PRODUCTS_QUERY,
+      {},
+      { next: { revalidate: 60 } },
+    );
+    return (data || [])
+      .map((raw) => mapProduct(raw, { imageWidth: 800, imageQuality: 80 }))
+      .filter((p) => p && p.id);
+  } catch (err) {
+    console.error("[sanity] getHomepageProducts failed:", err?.message || err);
+    return [];
+  }
 }
 
 export async function getAllProducts() {

@@ -1,61 +1,70 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import ProductCard from "./ProductCard";
+
+const PAGE_SIZE = 4;
 
 export default function ProductSection({ products = [], categories = ["All"] }) {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [page, setPage] = useState(0);
 
-  const filteredProducts =
-    activeCategory === "All"
-      ? products
-      : products.filter((p) => p.category === activeCategory);
+  const filteredProducts = useMemo(
+    () =>
+      activeCategory === "All"
+        ? products
+        : products.filter((p) => p.category === activeCategory),
+    [products, activeCategory],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+
+  const visibleProducts = filteredProducts.slice(
+    safePage * PAGE_SIZE,
+    safePage * PAGE_SIZE + PAGE_SIZE,
+  );
+
+  const canGoPrev = safePage > 0;
+  const canGoNext = safePage < totalPages - 1;
+  const showPager = filteredProducts.length > PAGE_SIZE;
+
+  useEffect(() => {
+    setPage(0);
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
+  }, [page, totalPages]);
+
+  const goPrev = () => setPage((p) => Math.max(0, p - 1));
+  const goNext = () => setPage((p) => Math.min(totalPages - 1, p + 1));
 
   return (
     <section
       id="products"
-      className="relative bg-white dark:bg-black py-8 md:py-12 px-6 overflow-hidden transition-colors duration-500 scroll-mt-24"
+      className="relative scroll-mt-24 overflow-hidden bg-white px-4 sm:px-6 py-8 transition-colors duration-500 md:py-12 dark:bg-black"
     >
-      {/* Background glow */}
       <div className="pointer-events-none absolute top-1/3 -left-40 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/10 blur-[140px]" />
-      <div className="pointer-events-none absolute bottom-0 -right-40 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/10 blur-[140px]" />
+      <div className="pointer-events-none absolute -right-40 bottom-0 h-[400px] w-[400px] rounded-full bg-[#FF4DA3]/10 blur-[140px]" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 80 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-100px" }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative max-w-6xl mx-auto"
-      >
-        {/* Heading */}
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+      <div className="fade-in-view relative mx-auto max-w-6xl">
+        <div className="mb-12 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-[#FF4DA3] text-[10px] tracking-[0.4em] uppercase font-bold"
-            >
+            <p className="text-[10px] font-bold tracking-[0.4em] text-[#FF4DA3] uppercase">
               ● FEATURED
-            </motion.p>
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.1 }}
-              className="text-black dark:text-white text-4xl md:text-6xl font-black mt-3 leading-none"
-            >
+            </p>
+            <h2 className="mt-3 text-4xl leading-none font-black text-black md:text-6xl dark:text-white">
               Latest Drops
-            </motion.h2>
-            <p className="text-black/60 dark:text-white/50 text-sm mt-3 max-w-md">
+            </h2>
+            <p className="mt-3 max-w-md text-sm text-black/60 dark:text-white/50">
               Handpicked pieces from our newest collection — limited stock,
               unlimited attitude.
             </p>
           </div>
 
-          {/* Category tabs */}
           <div className="flex flex-wrap gap-2">
             {categories.map((cat) => {
               const count =
@@ -65,11 +74,12 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
               return (
                 <button
                   key={cat}
+                  type="button"
                   onClick={() => setActiveCategory(cat)}
-                  className={`px-4 py-2 text-xs tracking-widest uppercase rounded-full border transition flex items-center gap-2 ${
+                  className={`flex items-center gap-2 rounded-full border px-4 py-2 text-xs tracking-widest uppercase transition ${
                     activeCategory === cat
-                      ? "bg-black dark:bg-white text-white dark:text-black border-black dark:border-white"
-                      : "border-black/15 dark:border-white/15 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:border-black/40 dark:hover:border-white/40"
+                      ? "border-black bg-black text-white dark:border-white dark:bg-white dark:text-black"
+                      : "border-black/15 text-black/60 hover:border-black/40 hover:text-black dark:border-white/15 dark:text-white/60 dark:hover:border-white/40 dark:hover:text-white"
                   }`}
                 >
                   {cat}
@@ -88,50 +98,74 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
           </div>
         </div>
 
-        {/* Grid */}
-        <motion.div
-          layout
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 min-h-[200px]"
-        >
-          <AnimatePresence mode="popLayout">
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map((p, i) => (
-                <motion.div
-                  key={p.id}
-                  layout
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                  transition={{
-                    duration: 0.4,
-                    delay: i * 0.08,
-                    ease: "easeOut",
-                  }}
-                >
-                  <ProductCard product={p} />
-                </motion.div>
-              ))
-            ) : (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="col-span-full py-20 text-center"
-              >
-                <p className="text-black/40 dark:text-white/40 text-sm">
-                  No products in this category yet.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+        <div className="grid min-h-[200px] grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {visibleProducts.length > 0 ? (
+            visibleProducts.map((p, i) => (
+              <ProductCard
+                key={p.id}
+                product={p}
+                lite
+                priorityImage={safePage === 0 && i < PAGE_SIZE}
+              />
+            ))
+          ) : (
+            <p className="col-span-full py-20 text-center text-sm text-black/40 dark:text-white/40">
+              No products in this category yet.
+            </p>
+          )}
+        </div>
 
-        {/* View all */}
-        <div className="flex justify-center mt-14">
+        {showPager && (
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={!canGoPrev}
+                aria-label="Previous products"
+                className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-black/5 text-black/70 transition-all hover:border-black/20 hover:bg-black/10 hover:text-black disabled:cursor-not-allowed disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:border-white/20 dark:hover:bg-white/10 dark:hover:text-white"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <span className="min-w-[4.5rem] text-center text-[10px] font-bold tracking-[0.25em] text-black/50 uppercase tabular-nums dark:text-white/50">
+                {safePage + 1} / {totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!canGoNext}
+                aria-label="Next products"
+                className="grid h-11 w-11 place-items-center rounded-full border border-black/10 bg-black/5 text-black/70 transition-all hover:border-black/20 hover:bg-black/10 hover:text-black disabled:cursor-not-allowed disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:border-white/20 dark:hover:bg-white/10 dark:hover:text-white"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setPage(i)}
+                  aria-label={`Go to page ${i + 1}`}
+                  aria-current={i === safePage ? "true" : undefined}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i === safePage
+                      ? "w-6 bg-[#FF4DA3]"
+                      : "w-1.5 bg-black/20 hover:bg-black/40 dark:bg-white/20 dark:hover:bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-14 flex justify-center">
           <Link
             href="/products"
-            className="group flex items-center gap-2 px-6 py-3 rounded-full border border-black/15 dark:border-white/15 text-black/80 dark:text-white/80 text-sm hover:border-black/40 dark:hover:border-white/40 hover:text-black dark:hover:text-white transition"
+            className="group flex items-center gap-2 rounded-full border border-black/15 px-6 py-3 text-sm text-black/80 transition hover:border-black/40 hover:text-black dark:border-white/15 dark:text-white/80 dark:hover:border-white/40 dark:hover:text-white"
           >
             View All Products
             <svg
@@ -143,14 +177,14 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="group-hover:translate-x-1 transition"
+              className="transition group-hover:translate-x-1"
             >
               <path d="M5 12h14" />
               <path d="m12 5 7 7-7 7" />
             </svg>
           </Link>
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 }

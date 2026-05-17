@@ -34,6 +34,7 @@ export default function ProductGallery({
     () => colorImageList(selectedColor),
     [selectedColor],
   );
+  const MotionImage = motion(Image);
   const safeIndex =
     slides.length > 0
       ? ((activeIndex % slides.length) + slides.length) % slides.length
@@ -63,7 +64,7 @@ export default function ProductGallery({
                   key={color.name}
                   onClick={() => onColorChange(color.name)}
                   aria-label={`Select ${color.name}`}
-                  className={`group relative flex-shrink-0 w-20 h-24 rounded-xl overflow-hidden transition-all duration-300 ${
+                  className={`group relative flex-shrink-0 w-16 h-20 sm:w-20 sm:h-24 rounded-xl overflow-hidden transition-all duration-300 ${
                     isActive
                       ? "ring-2 ring-[#FF4DA3] scale-[1.03] shadow-[0_0_20px_rgba(255,77,163,0.4)]"
                       : "opacity-60 hover:opacity-100 ring-1 ring-black/10 dark:ring-white/10 hover:ring-black/30 dark:hover:ring-white/30"
@@ -99,7 +100,7 @@ export default function ProductGallery({
           {/* Main Image */}
           <div
             ref={imageRef}
-            className="group relative aspect-[3/4] flex-1 overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
+            className="group relative aspect-[3/4] max-h-[min(72svh,640px)] w-full flex-1 overflow-hidden rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10"
           >
             {/* Identity tone wash */}
             <motion.div
@@ -124,13 +125,14 @@ export default function ProductGallery({
               }}
             >
               <AnimatePresence mode="wait">
-                <motion.img
+                <motion.div
                   key={activeImage}
-                  src={activeImage}
-                  alt={`${product.name} in ${selectedColor.name}`}
                   initial={{ opacity: 0, scale: 1.08, filter: "blur(14px)" }}
                   animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
                   exit={{ opacity: 0, scale: 1.02, filter: "blur(10px)" }}
+                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                  draggable={false}
+                  className="absolute inset-0"
                   onMouseMove={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     setMouse({
@@ -138,10 +140,16 @@ export default function ProductGallery({
                       y: e.clientY - rect.top,
                     });
                   }}
-                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                  draggable={false}
-                  className="absolute inset-0 w-full h-full object-cover select-none group-hover:scale-105 transition-transform duration-700"
-                />
+                >
+                  <MotionImage
+                    src={activeImage}
+                    alt={`${product.name} in ${selectedColor.name}`}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    priority={safeIndex === 0}
+                    className="object-cover select-none group-hover:scale-105 transition-transform duration-700"
+                  />
+                </motion.div>
               </AnimatePresence>
             </motion.div>
 
@@ -159,13 +167,13 @@ export default function ProductGallery({
 
             {/* Product badge */}
             {product.badge && (
-              <div className="absolute top-4 left-4 z-[4] px-3 py-1.5 rounded-full bg-[#FF4DA3] text-black text-[10px] font-bold tracking-widest uppercase shadow-lg">
+              <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-[4] px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-[#FF4DA3] text-black text-[9px] sm:text-[10px] font-bold tracking-widest uppercase shadow-lg">
                 {product.badge}
               </div>
             )}
 
             {/* Color label */}
-            <div className="absolute top-4 right-4 z-[4] px-3 py-1.5 rounded-full bg-white/90 dark:bg-black/60 backdrop-blur-md border border-black/10 dark:border-white/10 text-black dark:text-white text-[10px] font-bold tracking-widest uppercase">
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[4] max-w-[45%] truncate px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-white/90 dark:bg-black/60 backdrop-blur-md border border-black/10 dark:border-white/10 text-black dark:text-white text-[9px] sm:text-[10px] font-bold tracking-widest uppercase">
               {selectedColor.name}
             </div>
 
@@ -205,14 +213,14 @@ export default function ProductGallery({
                 <button
                   onClick={goPrev}
                   aria-label="Previous image"
-                  className="absolute top-1/2 left-4 z-[4] -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-white/80 dark:bg-black/60 backdrop-blur-md border border-black/10 dark:border-white/10 text-black dark:text-white opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
+                  className="absolute top-1/2 left-2 sm:left-4 z-[4] -translate-y-1/2 h-9 w-9 sm:h-10 sm:w-10 grid place-items-center rounded-full bg-white/90 dark:bg-black/70 backdrop-blur-md border border-black/10 dark:border-white/10 text-black dark:text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all active:scale-95 sm:hover:scale-110 shadow-md"
                 >
                   <ChevronLeft size={18} />
                 </button>
                 <button
                   onClick={goNext}
                   aria-label="Next image"
-                  className="absolute top-1/2 right-4 z-[4] -translate-y-1/2 h-10 w-10 grid place-items-center rounded-full bg-white/80 dark:bg-black/60 backdrop-blur-md border border-black/10 dark:border-white/10 text-black dark:text-white opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
+                  className="absolute top-1/2 right-2 sm:right-4 z-[4] -translate-y-1/2 h-9 w-9 sm:h-10 sm:w-10 grid place-items-center rounded-full bg-white/90 dark:bg-black/70 backdrop-blur-md border border-black/10 dark:border-white/10 text-black dark:text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all active:scale-95 sm:hover:scale-110 shadow-md"
                 >
                   <ChevronRight size={18} />
                 </button>

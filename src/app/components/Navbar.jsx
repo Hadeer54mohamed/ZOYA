@@ -1,31 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
 import { ShoppingBag, Sun, Moon, Monitor, Search } from "lucide-react";
-import SearchOverlay from "./SearchOverlay";
+import dynamic from "next/dynamic";
+import {
+  navigateToSection,
+  scrollToSection,
+  setSectionHash,
+} from "../lib/navScroll";
+
+const SearchOverlay = dynamic(() => import("./SearchOverlay"), { ssr: false });
 
 const links = [
-  { label: "Home", href: "home" },
-  { label: "Shop", href: "/products" },
-  { label: "Collections", href: "collections" },
-  { label: "About", href: "about" },
-  { label: "Contact", href: "contact" },
-  { label: "Track Order", href: "/track" },
+  { label: "Home", href: "home", type: "section" },
+  { label: "Shop", href: "/products", type: "route" },
+  { label: "Collections", href: "collections", type: "section" },
+  { label: "About", href: "about", type: "section" },
+  { label: "Contact", href: "contact", type: "section" },
+  { label: "Track Order", href: "/track", type: "route" },
 ];
-
-const NAV_OFFSET = -100;
-
-const scrollToSection = (id) => {
-  const el = document.getElementById(id);
-  if (!el) return false;
-  const y = el.getBoundingClientRect().top + window.pageYOffset + NAV_OFFSET;
-  window.scrollTo({ top: y, behavior: "smooth" });
-  return true;
-};
 
 export default function Navbar({ products = [] }) {
   const [open, setOpen] = useState(false);
@@ -39,20 +37,17 @@ export default function Navbar({ products = [] }) {
   const router = useRouter();
   const isHome = pathname === "/";
 
-  // 🔥 Admin system Logic (Unchanged)
   const [tapCount, setTapCount] = useState(0);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const tapTimeoutRef = useRef(null);
   const pressTimerRef = useRef(null);
+  const navShellRef = useRef(null);
 
   const triggerUnlock = () => {
     if (isUnlocking) return;
     setIsUnlocking(true);
     if (navigator.vibrate) navigator.vibrate(50);
-
-    setTimeout(() => {
-      router.push("/admin-gate");
-    }, 1000);
+    setTimeout(() => router.push("/admin-gate"), 1000);
   };
 
   const handleLogoTap = () => {
@@ -67,26 +62,34 @@ export default function Navbar({ products = [] }) {
     }
     tapTimeoutRef.current = setTimeout(() => {
       if (nextCount === 1) {
-        if (isHome) window.location.reload();
-        else router.push("/");
+        if (isHome) {
+          setSectionHash("home");
+          scrollToSection("home");
+          setActive("Home");
+        } else {
+          navigateToSection("home", pathname, router);
+        }
       }
       setTapCount(0);
     }, 400);
   };
 
   const handlePressStart = () => {
-    pressTimerRef.current = setTimeout(() => { triggerUnlock(); }, 800);
+    pressTimerRef.current = setTimeout(triggerUnlock, 800);
   };
 
-  const handlePressEnd = () => { clearTimeout(pressTimerRef.current); };
+  const handlePressEnd = () => {
+    clearTimeout(pressTimerRef.current);
+  };
 
-  const handleNavClick = (href) => {
-    if (href.startsWith("/")) {
-      router.push(href);
-      return;
-    }
-    if (isHome) scrollToSection(href);
-    else router.push(`/#${href}`);
+  const handleSectionClick = (sectionId) => {
+    setOpen(false);
+    const label =
+      links.find((l) => l.type === "section" && l.href === sectionId)?.label ||
+      "Home";
+    setActive(label);
+
+    navigateToSection(sectionId, pathname, router);
   };
 
   useEffect(() => {
@@ -116,12 +119,40 @@ export default function Navbar({ products = [] }) {
   }, [cartCount]);
 
   useEffect(() => {
+    if (!open) return;
+    const closeIfOutside = (e) => {
+      if (navShellRef.current && !navShellRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", closeIfOutside);
+    document.addEventListener("touchstart", closeIfOutside);
+    return () => {
+      document.removeEventListener("mousedown", closeIfOutside);
+      document.removeEventListener("touchstart", closeIfOutside);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
     if (!isHome) {
       const matched = links.find((l) => l.href === pathname);
       setActive(matched?.label || "");
       return;
     }
-    const sectionLinks = links.filter((l) => !l.href.startsWith("/"));
+    const sectionLinks = links.filter((l) => l.type === "section");
     const handleScroll = () => {
       let current = "home";
       sectionLinks.forEach(({ href: id }) => {
@@ -130,7 +161,8 @@ export default function Navbar({ products = [] }) {
         const rect = el.getBoundingClientRect();
         if (rect.top <= 120 && rect.bottom >= 120) current = id;
       });
-      const activeLabel = sectionLinks.find((l) => l.href === current)?.label || "Home";
+      const activeLabel =
+        sectionLinks.find((l) => l.href === current)?.label || "Home";
       setActive(activeLabel);
     };
     handleScroll();
@@ -147,148 +179,211 @@ export default function Navbar({ products = [] }) {
         ? "Light mode. Click for dark mode."
         : "Dark mode. Click to follow device.";
 
+  const linkClass = (label) =>
+    `relative shrink-0 px-3 lg:px-5 py-2 text-[10px] tracking-[0.15em] lg:tracking-[0.2em] uppercase font-bold cursor-pointer transition-colors ${
+      active === label
+        ? "text-white"
+        : "text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white"
+    }`;
+
   return (
     <>
-      <motion.nav
-        initial={{ y: -100, opacity: 0 }}
-        animate={
-          isCartOpen
-            ? { y: -120, opacity: 0 }
-            : { y: 0, opacity: 1 }
-        }
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className={`fixed top-0 left-0 w-full px-4 pt-6 ${
-          isCartOpen ? "z-30 pointer-events-none" : "z-50"
-        }`}
+      <header
+        data-cart-open={isCartOpen ? "true" : "false"}
+        data-scrolled={scrolled ? "true" : "false"}
+        className="nav-fixed-shell fixed top-0 left-0 z-50 w-full px-4 pt-6"
       >
-        <div className={`mx-auto transition-all duration-700 ease-in-out ${scrolled ? "max-w-[850px]" : "max-w-6xl"}`}>
-          <motion.div
-            className={`relative flex items-center justify-between rounded-full px-2 py-2 sm:px-4 sm:py-2 border border-white/10 dark:border-white/5 backdrop-blur-2xl backdrop-saturate-150 transition-all duration-500 ${
-              isDark 
-                ? "bg-[#0A0A0A]/80 shadow-[0_20px_50px_rgba(0,0,0,0.5)]" 
+        <div
+          ref={navShellRef}
+          className="nav-shell relative mx-auto w-full max-w-6xl"
+        >
+          <div
+            className={`nav-bar relative flex min-h-[52px] items-center rounded-full border border-white/10 px-2 py-2 backdrop-blur-2xl backdrop-saturate-150 sm:min-h-[56px] sm:px-4 ${
+              isDark
+                ? "bg-[#0A0A0A]/80 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
                 : "bg-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.1)]"
             }`}
           >
-            {/* LOGO SECTION */}
-            <motion.div
+            {/* Logo */}
+            <button
+              type="button"
               onClick={handleLogoTap}
               onTouchStart={handlePressStart}
               onTouchEnd={handlePressEnd}
-              className="pl-3 sm:pl-4 z-50 cursor-pointer shrink-0"
-              animate={isUnlocking ? { scale: [1, 1.1, 0.9, 1], rotate: [0, 5, -5, 0] } : {}}
+              className={`relative z-20 shrink-0 rounded-lg pl-2 sm:pl-3 cursor-pointer ${isUnlocking ? "animate-logo-unlock" : ""}`}
+              aria-label="ZØYA home"
             >
-              <img src="/images/LOGO2.png" alt="ZØYA" className="h-6 sm:h-8 w-auto object-contain" />
-            </motion.div>
+              <Image
+                src="/images/LOGO2.webp"
+                alt=""
+                width={120}
+                height={32}
+                className={`pointer-events-none w-auto object-contain transition-all duration-500 ${
+                  scrolled ? "h-5 sm:h-6" : "h-6 sm:h-8"
+                }`}
+              />
+            </button>
 
-            {/* DESKTOP LINKS - Matches the Image Style */}
-            <div className="hidden md:flex items-center bg-black/5 dark:bg-white/5 rounded-full p-1 mx-4">
-              {links.map((link) => (
-                <button
-                  key={link.label}
-                  onClick={() => handleNavClick(link.href)}
-                  className="relative px-6 py-2 text-[10px] tracking-[0.2em] uppercase font-bold transition-all"
-                >
-                  <span className={`relative z-10 transition-colors duration-300 ${active === link.label ? "text-white dark:text-white" : "text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white"}`}>
-                    {link.label}
-                  </span>
-                  {active === link.label && (
-                    <motion.span
-                      layoutId="nav-pill"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      className="absolute inset-0 rounded-full bg-[#1A1A1A] dark:bg-white/10 shadow-inner"
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
+            {/* Desktop links — centered overlay, clicks only on buttons */}
+            <nav
+              className="pointer-events-none absolute inset-0 z-30 hidden md:flex items-center justify-center"
+              aria-label="Main navigation"
+            >
+              <div className="nav-desktop-links pointer-events-auto flex max-w-[min(100%,42rem)] items-center overflow-x-auto rounded-full bg-black/5 p-1 no-scrollbar dark:bg-white/5">
+                {links.map((link) =>
+                  link.type === "route" ? (
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      onClick={() => setOpen(false)}
+                      className={linkClass(link.label)}
+                    >
+                      <span className="relative z-10">{link.label}</span>
+                      {active === link.label && (
+                        <span className="nav-link-pill absolute inset-0 rounded-full bg-[#1A1A1A] shadow-inner dark:bg-white/10" />
+                      )}
+                    </Link>
+                  ) : (
+                    <button
+                      key={link.label}
+                      type="button"
+                      onClick={() => handleSectionClick(link.href)}
+                      className={linkClass(link.label)}
+                    >
+                      <span className="relative z-10">{link.label}</span>
+                      {active === link.label && (
+                        <span className="nav-link-pill absolute inset-0 rounded-full bg-[#1A1A1A] shadow-inner dark:bg-white/10" />
+                      )}
+                    </button>
+                  ),
+                )}
+              </div>
+            </nav>
 
-            {/* ACTION BUTTONS */}
-            <div className="flex items-center gap-1 sm:gap-2 pr-1">
-              <button onClick={() => setSearchOpen(true)} className="p-2 text-black/50 dark:text-white/50 hover:text-[#FF4DA3] transition-colors">
+            {/* Actions */}
+            <div className="relative z-20 ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1 pr-0.5 sm:pr-1">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="rounded-full p-2 text-black/50 transition-colors hover:text-[#FF4DA3] dark:text-white/50 cursor-pointer"
+                aria-label="Search"
+              >
                 <Search size={18} />
               </button>
-              
+
               <button
                 type="button"
                 onClick={toggleTheme}
                 aria-label={themeToggleAria}
-                className="hidden sm:block p-2 text-black/50 dark:text-white/50 hover:text-[#FF4DA3] transition-colors"
+                className="hidden rounded-full p-2 text-black/50 transition-colors hover:text-[#FF4DA3] dark:text-white/50 sm:block cursor-pointer"
               >
-                {theme === "system" ? (
-                  <Monitor size={18} />
-                ) : theme === "dark" ? (
-                  <Moon size={18} />
-                ) : (
-                  <Sun size={18} />
-                )}
+                <span key={theme} className="inline-flex animate-theme-icon">
+                  {theme === "system" ? (
+                    <Monitor size={18} />
+                  ) : theme === "dark" ? (
+                    <Moon size={18} />
+                  ) : (
+                    <Sun size={18} />
+                  )}
+                </span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setIsCartOpen(true)}
                 ref={cartIconRef}
-                className={`group relative flex items-center gap-2 rounded-full bg-[#FF4DA3] pl-4 pr-1.5 py-1.5 transition-all duration-300 hover:bg-[#FF2E92] hover:shadow-[0_8px_25px_rgba(255,77,163,0.45)] hover:-translate-y-[1px] active:scale-95 ${pulse ? "scale-110" : ""}`}
+                className={`group relative flex cursor-pointer items-center gap-2 rounded-full bg-[#FF4DA3] py-1.5 pl-3 pr-1.5 transition-all duration-300 hover:-translate-y-px hover:bg-[#FF2E92] hover:shadow-[0_8px_25px_rgba(255,77,163,0.45)] active:scale-95 sm:pl-4 ${pulse ? "scale-110" : ""}`}
               >
                 <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
-                <div className="flex h-6 min-w-[30px] items-center justify-center rounded-full bg-black text-[10px] font-black text-white px-1">
+                <span className="flex h-6 min-w-[30px] items-center justify-center rounded-full bg-black px-1 text-[10px] font-black text-white">
                   {cartCount ?? 0}
-                </div>
+                </span>
               </button>
 
-              {/* MOBILE TOGGLE */}
               <button
-                onClick={() => setOpen(!open)}
-                className="md:hidden ml-1 h-9 w-9 flex flex-col gap-1 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                type="button"
+                onClick={() => setOpen((prev) => !prev)}
+                aria-expanded={open}
+                aria-label={open ? "Close menu" : "Open menu"}
+                className="ml-0.5 flex h-9 w-9 cursor-pointer flex-col items-center justify-center gap-1 rounded-full text-black transition-colors hover:bg-black/5 dark:text-white dark:hover:bg-white/5 md:hidden"
               >
-                <motion.span animate={open ? { rotate: 45, y: 4 } : { rotate: 0, y: 0 }} className="h-[1.5px] w-4 bg-black dark:bg-white rounded-full" />
-                <motion.span animate={open ? { opacity: 0 } : { opacity: 1 }} className="h-[1.5px] w-4 bg-black dark:bg-white rounded-full" />
-                <motion.span animate={open ? { rotate: -45, y: -4 } : { rotate: 0, y: 0 }} className="h-[1.5px] w-4 bg-black dark:bg-white rounded-full" />
+                <span
+                  data-open={open ? "true" : "false"}
+                  className="menu-line menu-line-top"
+                />
+                <span
+                  data-open={open ? "true" : "false"}
+                  className="menu-line menu-line-mid"
+                />
+                <span
+                  data-open={open ? "true" : "false"}
+                  className="menu-line menu-line-bot"
+                />
               </button>
             </div>
-          </motion.div>
+          </div>
 
-          {/* MOBILE MENU - Floating Style */}
-          <AnimatePresence>
-            {open && (
-              <motion.div
-                initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                className={`absolute top-full left-0 right-0 mt-3 overflow-hidden rounded-[2.5rem] backdrop-blur-3xl border md:hidden ${
-                  isDark
-                    ? "bg-[#0F0F0F]/95 border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.8)]"
-                    : "bg-white/95 border-black/5 shadow-[0_30px_60px_rgba(0,0,0,0.15)]"
-                }`}
-              >
-                <div className="flex flex-col p-3 gap-1">
-                  {links.map((link, i) => (
-                    <motion.button
+          {open && (
+            <div
+              className={`absolute left-0 right-0 top-full z-40 mt-3 overflow-hidden rounded-[2.5rem] border backdrop-blur-3xl md:hidden animate-ui-scale-in ${
+                isDark
+                  ? "border-white/10 bg-[#0F0F0F]/95 shadow-[0_30px_60px_rgba(0,0,0,0.8)]"
+                  : "border-black/5 bg-white/95 shadow-[0_30px_60px_rgba(0,0,0,0.15)]"
+              }`}
+            >
+              <div className="flex flex-col gap-1 p-3">
+                {links.map((link) =>
+                  link.type === "route" ? (
+                    <Link
                       key={link.label}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      onClick={() => { setOpen(false); setTimeout(() => handleNavClick(link.href), 300); }}
-                      className={`w-full text-left px-8 py-5 rounded-[1.8rem] text-[10px] tracking-[0.4em] uppercase font-bold transition-all ${
+                      href={link.href}
+                      onClick={() => setOpen(false)}
+                      className={`block w-full rounded-[1.8rem] px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.4em] transition-all ${
                         active === link.label
                           ? isDark
                             ? "bg-white text-black"
                             : "bg-black text-white"
                           : isDark
-                            ? "text-white/40 hover:text-white hover:bg-white/5"
-                            : "text-black/40 hover:text-black hover:bg-black/5"
+                            ? "text-white/40 hover:bg-white/5 hover:text-white"
+                            : "text-black/40 hover:bg-black/5 hover:text-black"
                       }`}
                     >
                       {link.label}
-                    </motion.button>
-                  ))}
-                  {/* Theme toggle inside mobile menu for convenience */}
-                  <div className={`flex justify-between items-center px-8 py-5 mt-2 border-t ${isDark ? "border-white/5" : "border-black/5"}`}>
-                    <span className={`text-[9px] tracking-[0.3em] uppercase ${isDark ? "text-white/30" : "text-black/30"}`}>Switch Theme</span>
+                    </Link>
+                  ) : (
                     <button
+                      key={link.label}
                       type="button"
-                      onClick={toggleTheme}
-                      aria-label={themeToggleAria}
-                      className={`p-2 rounded-full transition-colors ${isDark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}
+                      onClick={() => handleSectionClick(link.href)}
+                      className={`w-full cursor-pointer rounded-[1.8rem] px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.4em] transition-all ${
+                        active === link.label
+                          ? isDark
+                            ? "bg-white text-black"
+                            : "bg-black text-white"
+                          : isDark
+                            ? "text-white/40 hover:bg-white/5 hover:text-white"
+                            : "text-black/40 hover:bg-black/5 hover:text-black"
+                      }`}
                     >
+                      {link.label}
+                    </button>
+                  ),
+                )}
+                <div
+                  className={`mt-2 flex items-center justify-between border-t px-8 py-5 ${isDark ? "border-white/5" : "border-black/5"}`}
+                >
+                  <span
+                    className={`text-[9px] uppercase tracking-[0.3em] ${isDark ? "text-white/30" : "text-black/30"}`}
+                  >
+                    Switch Theme
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    aria-label={themeToggleAria}
+                    className={`cursor-pointer rounded-full p-2 transition-colors ${isDark ? "bg-white/10 text-white hover:bg-white/20" : "bg-black/10 text-black hover:bg-black/20"}`}
+                  >
+                    <span key={theme} className="inline-flex animate-theme-icon">
                       {theme === "system" ? (
                         <Monitor size={16} />
                       ) : theme === "dark" ? (
@@ -296,17 +391,20 @@ export default function Navbar({ products = [] }) {
                       ) : (
                         <Sun size={16} />
                       )}
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            </div>
+          )}
         </div>
+      </header>
 
-        <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} products={products} />
-      </motion.nav>
-
+      <SearchOverlay
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        products={products}
+      />
     </>
   );
 }

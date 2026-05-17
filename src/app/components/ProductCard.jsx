@@ -1,9 +1,11 @@
 "use client";
 
 import { motion, useMotionValue, useSpring } from "framer-motion";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import QuickView from "./QuickView";
+
+const QuickView = dynamic(() => import("./QuickView"), { ssr: false });
 import Skeleton from "./Skeleton";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -12,10 +14,21 @@ import { colorImageList } from "../lib/colorImages";
 const FALLBACK_COLOR = {
   name: "Default",
   value: "#0a0a0a",
-  images: ["/images/placeholder.jpg"],
+  images: ["/images/placeholder.webp"],
 };
 
-export default function ProductCard({ product }) {
+function CardShell({ lite, className, children, ...motionProps }) {
+  if (lite) {
+    return <div className={className}>{children}</div>;
+  }
+  return (
+    <motion.div className={className} {...motionProps}>
+      {children}
+    </motion.div>
+  );
+}
+
+export default function ProductCard({ product, lite = false, priorityImage = false }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const colors =
@@ -38,10 +51,20 @@ export default function ProductCard({ product }) {
       ? Math.min(Math.max(0, imgIdx), slideCount - 1)
       : 0;
 
+  const [tiltEnabled, setTiltEnabled] = useState(false);
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
   const smoothX = useSpring(rotateX, { stiffness: 150, damping: 20 });
   const smoothY = useSpring(rotateY, { stiffness: 150, damping: 20 });
+
+  useEffect(() => {
+    if (lite) return;
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const update = () => setTiltEnabled(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [lite]);
 
   const originalPrice =
     typeof product.originalPrice === "number" &&
@@ -52,6 +75,11 @@ export default function ProductCard({ product }) {
   const discount = hasDiscount
     ? Math.round(((originalPrice - product.price) / originalPrice) * 100)
     : 0;
+
+  const badgeLabel =
+    typeof product.badge === "string" && product.badge.trim()
+      ? product.badge.trim()
+      : null;
 
   const selectActiveColor = useCallback((c) => {
     setActiveColor(c);
@@ -94,29 +122,45 @@ export default function ProductCard({ product }) {
     router.push(`/product/${product.id}`);
   };
 
+  const cardClass =
+    "group relative rounded-2xl overflow-hidden bg-gradient-to-b from-black/[0.04] to-black/[0.01] dark:from-white/[0.06] dark:to-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 hover:shadow-[0_20px_60px_-15px_rgba(255,46,136,0.25)] transition-all duration-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3]" +
+    (lite ? " hover:-translate-y-1" : "");
+
   return (
     <>
-      <motion.div
-        onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-
-          rotateX.set(-(y - rect.height / 2) / 35);
-          rotateY.set((x - rect.width / 2) / 35);
-        }}
-        onMouseLeave={() => {
-          rotateX.set(0);
-          rotateY.set(0);
-        }}
-        whileHover={{ y: -10 }}
-        transition={{ type: "spring", stiffness: 200, damping: 20 }}
-        style={{
-          rotateX: smoothX,
-          rotateY: smoothY,
-          transformStyle: "preserve-3d",
-        }}
-        className="group relative rounded-2xl overflow-hidden bg-gradient-to-b from-black/[0.04] to-black/[0.01] dark:from-white/[0.06] dark:to-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 hover:shadow-[0_20px_60px_-15px_rgba(255,46,136,0.25)] transition-all duration-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3]"
+      <CardShell
+        lite={lite}
+        className={cardClass}
+        onMouseMove={
+          !lite && tiltEnabled
+            ? (e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                rotateX.set(-(y - rect.height / 2) / 35);
+                rotateY.set((x - rect.width / 2) / 35);
+              }
+            : undefined
+        }
+        onMouseLeave={
+          !lite && tiltEnabled
+            ? () => {
+                rotateX.set(0);
+                rotateY.set(0);
+              }
+            : undefined
+        }
+        whileHover={!lite && tiltEnabled ? { y: -10 } : !lite ? { y: -4 } : undefined}
+        transition={lite ? undefined : { type: "spring", stiffness: 200, damping: 20 }}
+        style={
+          !lite && tiltEnabled
+            ? {
+                rotateX: smoothX,
+                rotateY: smoothY,
+                transformStyle: "preserve-3d",
+              }
+            : undefined
+        }
       >
         {/* Image Section — clickable to open QuickView */}
         <div
@@ -160,13 +204,13 @@ export default function ProductCard({ product }) {
                   alt={`${product.name} — ${activeColor.name} (${i + 1})`}
                   fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  priority={priorityImage && i === 0}
+                  loading={priorityImage && i === 0 ? "eager" : "lazy"}
                   onLoad={() => {
                     if (i === safeIdx) setIsLoaded(true);
                   }}
-                  className="object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:rotate-[0.5deg] opacity-100"
-                  style={{
-                    transform: `translateZ(40px) scale(1.05)`,
-                  }}
+                  className="object-cover transition duration-700 ease-out group-hover:scale-105 opacity-100"
+                  style={tiltEnabled ? { transform: "translateZ(40px) scale(1.05)" } : undefined}
                 />
               </div>
             ))}
@@ -196,7 +240,7 @@ export default function ProductCard({ product }) {
                 type="button"
                 onClick={goPrevImg}
                 aria-label="Previous photo"
-                className="hidden sm:grid absolute left-2 top-1/2 z-[6] -translate-y-1/2 h-8 w-8 place-items-center rounded-full bg-black/55 text-white opacity-0 transition hover:bg-black/80 group-hover:opacity-100"
+                className="grid absolute left-2 top-1/2 z-[6] -translate-y-1/2 h-8 w-8 place-items-center rounded-full bg-black/55 text-white opacity-100 sm:opacity-0 transition hover:bg-black/80 sm:group-hover:opacity-100"
               >
                 <ChevronLeft size={16} strokeWidth={2.5} />
               </button>
@@ -204,7 +248,7 @@ export default function ProductCard({ product }) {
                 type="button"
                 onClick={goNextImg}
                 aria-label="Next photo"
-                className="hidden sm:grid absolute right-2 top-1/2 z-[6] -translate-y-1/2 h-8 w-8 place-items-center rounded-full bg-black/55 text-white opacity-0 transition hover:bg-black/80 group-hover:opacity-100"
+                className="grid absolute right-2 top-1/2 z-[6] -translate-y-1/2 h-8 w-8 place-items-center rounded-full bg-black/55 text-white opacity-100 sm:opacity-0 transition hover:bg-black/80 sm:group-hover:opacity-100"
               >
                 <ChevronRight size={16} strokeWidth={2.5} />
               </button>
@@ -239,17 +283,21 @@ export default function ProductCard({ product }) {
 
           {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition duration-500 z-[2]" />
-          {/* Top badges */}
-          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex flex-col gap-1 sm:gap-1.5 z-[3]">
-            <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-[#FF4DA3] text-black text-[9px] sm:text-[10px] font-bold tracking-widest uppercase shadow-lg">
-              NEW
-            </span>
-            {discount > 0 && (
-              <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-white text-[9px] sm:text-[10px] font-bold tracking-widest">
-                -{discount}%
-              </span>
-            )}
-          </div>
+          {/* Top badges — label from Sanity `badge` field */}
+          {(badgeLabel || discount > 0) && (
+            <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex flex-col gap-1 sm:gap-1.5 z-[3]">
+              {badgeLabel && (
+                <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-[#FF4DA3] text-white text-[9px] sm:text-[10px] font-bold tracking-widest uppercase shadow-lg">
+                  {badgeLabel}
+                </span>
+              )}
+              {discount > 0 && (
+                <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-white text-[9px] sm:text-[10px] font-bold tracking-widest">
+                  -{discount}%
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Mobile: always-visible actions (Details + Quick Add) */}
           <div className="md:hidden absolute bottom-2 right-2 z-[3] flex items-center gap-2">
@@ -410,8 +458,7 @@ export default function ProductCard({ product }) {
           </div>
         </div>
 
-      </motion.div>
-
+      </CardShell>
 
       {isOpen && (
         <QuickView

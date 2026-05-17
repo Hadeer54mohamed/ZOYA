@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import AdminFooter from "../components/admin-F";
 import ThemeToggle from "../components/ThemeToggle";
 import PasswordGate from "../components/PasswordGate";
 
+import { useLockBodyScroll } from "../../lib/useLockBodyScroll";
 import {
   Loader2,
   Package,
@@ -242,6 +242,15 @@ function AdminDashboard({ password }) {
   useEffect(() => {
     if (newsletterPickModalOpen) setNewsletterPickSearch("");
   }, [newsletterPickModalOpen]);
+
+  const hasOpenModal =
+    profitModalOpen ||
+    productsModalOpen ||
+    newsletterPickModalOpen ||
+    discountModalOpen ||
+    Boolean(selectedOrder);
+
+  useLockBodyScroll(hasOpenModal);
 
   const newsletterPickedProduct = useMemo(
     () => newsletterCatalog.find((p) => p.id === newsletterProductId) ?? null,
@@ -517,18 +526,19 @@ function AdminDashboard({ password }) {
   return (
     <main className="min-h-screen bg-white dark:bg-black text-black dark:text-white transition-colors duration-500">
       <header className="sticky top-0 z-30 w-full border-b border-black/5 dark:border-white/5 bg-white/70 dark:bg-black/70 backdrop-blur-md transition-colors duration-500">
-        <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.png')] opacity-[0.03] dark:opacity-[0.05]" />
+        <div className="pointer-events-none absolute inset-0 bg-[url('/images/noise.webp')] opacity-[0.03] dark:opacity-[0.05]" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-8 h-20 flex items-center justify-between gap-4">
-          {/* Left: brand */}
-          <div className="flex items-center gap-5">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 py-3 sm:py-0 sm:min-h-20 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* Brand row */}
+          <div className="flex items-center justify-between gap-3 min-w-0 sm:justify-start">
+            <div className="flex items-center gap-3 sm:gap-5 min-w-0">
             <Link
               href="/"
               aria-label="Back to home"
               className="shrink-0 transition-opacity hover:opacity-70 active:scale-95"
             >
               <Image
-                src="/images/LOGO2.png"
+                src="/images/LOGO2.webp"
                 alt="ZØYA"
                 width={90}
                 height={28}
@@ -544,19 +554,29 @@ function AdminDashboard({ password }) {
                 Admin <span className="mx-1 text-[#FF4DA3]/40">/</span> Orders
               </span>
             </div>
+
+            <p className="sm:hidden text-[9px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40 font-semibold truncate">
+              Admin · Orders
+            </p>
+            </div>
+
+            <div className="shrink-0 sm:hidden">
+              <ThemeToggle />
+            </div>
           </div>
 
-          {/* Right: actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar sm:overflow-visible">
+            <div className="flex items-center gap-2 w-max sm:w-auto sm:flex-wrap sm:justify-end">
+              <div className="flex items-center gap-2 shrink-0 pr-2 sm:pr-0 border-r border-black/10 dark:border-white/10 sm:border-r-0">
               <button
                 type="button"
                 onClick={() => setNewsletterPickModalOpen(true)}
                 disabled={sendDropLoading || !password}
                 title="Pick newsletter product (or latest product)"
+                aria-label="Pick newsletter product"
                 aria-haspopup="dialog"
                 aria-expanded={newsletterPickModalOpen}
-                className="flex items-center gap-2 pl-1 pr-2.5 sm:pr-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 pl-1 pr-2 sm:pr-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
               >
                 <span className="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden bg-black/[0.06] dark:bg-white/[0.08] ring-1 ring-black/10 dark:ring-white/10 grid place-items-center">
                   {newsletterPickedProduct?.image ? (
@@ -591,12 +611,13 @@ function AdminDashboard({ password }) {
                 type="button"
                 onClick={sendManualDropEmail}
                 disabled={sendDropLoading || !password}
-                className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed"
+                aria-label={sendDropLoading ? "Sending drop email" : "Send drop email"}
+                className="group relative flex h-10 w-10 sm:h-auto sm:w-auto items-center justify-center gap-2.5 sm:px-5 sm:py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
                 title="Send Manual Drop via Resend (batched + retries). Optional: pick a product or use latest."
               >
                 <Send
-                  size={14}
-                  className={`text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors ${
+                  size={16}
+                  className={`sm:w-[14px] sm:h-[14px] text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors ${
                     sendDropLoading ? "animate-pulse" : ""
                   }`}
                 />
@@ -609,7 +630,8 @@ function AdminDashboard({ password }) {
 
             <button
               onClick={() => setProductsModalOpen(true)}
-              className={`group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border transition-all active:scale-95 ${
+              aria-label="Products and stock"
+              className={`group relative flex h-10 w-10 sm:h-auto sm:w-auto items-center justify-center gap-2.5 sm:px-5 sm:py-2.5 rounded-full bg-black/5 dark:bg-white/5 border transition-all active:scale-95 shrink-0 ${
                 stockUrgentCount > 0
                   ? "border-red-500/40 hover:border-red-500/60"
                   : stockAlertCount > 0
@@ -618,8 +640,8 @@ function AdminDashboard({ password }) {
               }`}
             >
               <Boxes
-                size={14}
-                className={`transition-colors ${
+                size={16}
+                className={`sm:w-[14px] sm:h-[14px] transition-colors ${
                   stockUrgentCount > 0
                     ? "text-red-500"
                     : stockAlertCount > 0
@@ -648,11 +670,12 @@ function AdminDashboard({ password }) {
             <button
               type="button"
               onClick={() => setDiscountModalOpen(true)}
-              className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30 transition-all active:scale-95"
+              aria-label="Discount codes"
+              className="group relative flex h-10 w-10 sm:h-auto sm:w-auto items-center justify-center gap-2.5 sm:px-5 sm:py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30 transition-all active:scale-95 shrink-0"
             >
               <Tag
-                size={14}
-                className="text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors"
+                size={16}
+                className="sm:w-[14px] sm:h-[14px] text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors"
               />
               <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] font-semibold text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors">
                 Discount Code
@@ -663,11 +686,12 @@ function AdminDashboard({ password }) {
             <button
               onClick={() => fetchOrders({ silent: true })}
               disabled={refreshing}
-              className="group relative flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30 transition-all active:scale-95 disabled:opacity-50"
+              aria-label={refreshing ? "Refreshing orders" : "Refresh orders"}
+              className="group relative flex h-10 w-10 sm:h-auto sm:w-auto items-center justify-center gap-2.5 sm:px-5 sm:py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10 hover:border-[#FF4DA3]/30 transition-all active:scale-95 disabled:opacity-50 shrink-0"
             >
               <RefreshCw
-                size={14}
-                className={`text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors ${
+                size={16}
+                className={`sm:w-[14px] sm:h-[14px] text-black/60 dark:text-white/70 group-hover:text-[#FF4DA3] transition-colors ${
                   refreshing ? "animate-spin" : ""
                 }`}
               />
@@ -677,7 +701,10 @@ function AdminDashboard({ password }) {
               <div className="absolute inset-0 rounded-full bg-[#FF4DA3]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
 
-            <ThemeToggle />
+            <div className="hidden sm:block shrink-0">
+              <ThemeToggle />
+            </div>
+            </div>
           </div>
         </div>
       </header>
@@ -686,15 +713,8 @@ function AdminDashboard({ password }) {
         {/* Stock alert banner — shown when there are out-of-stock or
             oversold variants the admin needs to refill. Dismissible per
             session so the dashboard isn't loud after they've acknowledged. */}
-        <AnimatePresence>
-          {stockSummary && stockUrgentCount > 0 && !stockBannerDismissed && (
-            <motion.div
-              initial={{ opacity: 0, y: -10, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: "auto" }}
-              exit={{ opacity: 0, y: -10, height: 0 }}
-              transition={{ duration: 0.25 }}
-              className="overflow-hidden"
-            >
+        {stockSummary && stockUrgentCount > 0 && !stockBannerDismissed && (
+            <div className="animate-ui-fade-in-down overflow-hidden">
               <div
                 className={`flex items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 rounded-2xl border ${
                   (stockSummary.summary?.oversold || 0) > 0
@@ -747,11 +767,9 @@ function AdminDashboard({ password }) {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
-
-        {/* Stats */}
+{/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard
             label="Total"
@@ -934,8 +952,7 @@ function AdminDashboard({ password }) {
         )}
       </div>
 
-      <AnimatePresence>
-        {selectedOrder && (
+      {selectedOrder && (
           <OrderModal
             order={selectedOrder}
             onClose={() => setSelectedOrder(null)}
@@ -944,43 +961,27 @@ function AdminDashboard({ password }) {
             customerOrderInfo={getCustomerOrderInfo(orders, selectedOrder)}
           />
         )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {profitModalOpen && (
+{profitModalOpen && (
           <ProfitAnalyticsModal
             orders={orders}
             onClose={() => setProfitModalOpen(false)}
           />
         )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {productsModalOpen && (
+{productsModalOpen && (
           <ProductAnalyticsModal
             password={password}
             onClose={() => setProductsModalOpen(false)}
           />
         )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {newsletterPickModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+{newsletterPickModalOpen && (
+          <div
+            className="animate-ui-fade-in fixed inset-0 z-[60] bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
             onClick={() => setNewsletterPickModalOpen(false)}
             role="presentation"
           >
-            <motion.div
-              initial={{ y: 40, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
-              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+            <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-3xl max-h-[88vh] flex flex-col bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/25"
+              className="animate-ui-fade-in-up w-full max-w-3xl max-h-[88vh] flex flex-col bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/25"
               role="dialog"
               aria-modal="true"
               aria-labelledby="newsletter-pick-title"
@@ -1113,18 +1114,13 @@ function AdminDashboard({ password }) {
                   </p>
                 )}
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {discountModalOpen && (
+{discountModalOpen && (
           <DiscountCodeModal onClose={() => setDiscountModalOpen(false)} />
         )}
-      </AnimatePresence>
-
-      <AdminFooter />
+<AdminFooter />
     </main>
   );
 }
@@ -1522,21 +1518,14 @@ function DiscountCodeModal({ onClose }) {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+    <div
+      className="animate-ui-fade-in fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
       role="presentation"
     >
-      <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 40, opacity: 0 }}
-        transition={{ type: "spring", damping: 28, stiffness: 320 }}
+      <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md max-h-[90vh] flex flex-col bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/25"
+        className="animate-ui-fade-in-up w-full max-w-md max-h-[90vh] flex flex-col bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/25"
         role="dialog"
         aria-modal="true"
         aria-labelledby="discount-title"
@@ -1765,8 +1754,8 @@ function DiscountCodeModal({ onClose }) {
             </>
           ) : null}
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
@@ -2025,19 +2014,13 @@ function ProfitAnalyticsModal({ orders, onClose }) {
   }, [orders]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+    <div
+      className="animate-ui-fade-in fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
-      <motion.div
-        initial={{ y: 50, scale: 0.97 }}
-        animate={{ y: 0, scale: 1 }}
-        exit={{ y: 50, scale: 0.97 }}
+      <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
+        className="animate-ui-fade-in-up w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#0c0c0c]/95 backdrop-blur">
           <div className="flex items-center gap-3 min-w-0">
@@ -2145,8 +2128,8 @@ function ProfitAnalyticsModal({ orders, onClose }) {
             </p>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
@@ -2331,19 +2314,13 @@ function ProductAnalyticsModal({ password, onClose }) {
   }, [data, productSearch]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+    <div
+      className="animate-ui-fade-in fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
-      <motion.div
-        initial={{ y: 50, scale: 0.97 }}
-        animate={{ y: 0, scale: 1 }}
-        exit={{ y: 50, scale: 0.97 }}
+      <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
+        className="animate-ui-fade-in-up w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#0c0c0c]/95 backdrop-blur">
           <div className="flex items-center gap-3 min-w-0">
@@ -2574,8 +2551,8 @@ function ProductAnalyticsModal({ password, onClose }) {
             </>
           ) : null}
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
@@ -3317,19 +3294,13 @@ function OrderModal({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+    <div
+      className="animate-ui-fade-in fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
-      <motion.div
-        initial={{ y: 50, scale: 0.97 }}
-        animate={{ y: 0, scale: 1 }}
-        exit={{ y: 50, scale: 0.97 }}
+      <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
+        className="animate-ui-fade-in-up w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
       >
         <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#0c0c0c]/95 backdrop-blur">
           <div className="min-w-0">
@@ -3741,8 +3712,8 @@ function OrderModal({
             </button>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 

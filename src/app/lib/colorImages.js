@@ -1,4 +1,4 @@
-const DEFAULT_FALLBACK = "/images/placeholder.jpg";
+const DEFAULT_FALLBACK = "/images/placeholder.webp";
 
 /** All image URLs for a color variant (supports `images[]` or legacy `image`). */
 export function colorImageList(color, fallback = DEFAULT_FALLBACK) {

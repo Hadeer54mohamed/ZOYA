@@ -6,10 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "optimize-images": "node scripts/optimize-images.mjs"
   },
   "dependencies": {
-    "@react-email/components": "^1.0.12",
     "@sanity/color-input": "^6.0.4",
     "@sanity/image-url": "^2.1.1",
     "@sanity/vision": "^5.22.0",
@@ -28,8 +28,10 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "critters": "^0.0.23",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4"
   }
 }

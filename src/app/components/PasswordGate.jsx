@@ -27,9 +27,22 @@ export default function PasswordGate({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, scope }),
       });
-      const data = await res.json();
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+
       if (!res.ok || !data?.success) {
-        setError(data?.error || "Invalid Access Key");
+        if (res.status >= 500) {
+          setError(
+            "Server error — check dev terminal or free disk space on D: then restart npm run dev.",
+          );
+        } else {
+          setError(data?.error || "Invalid Access Key");
+        }
         setIsChecking(false);
         if (typeof navigator !== "undefined" && navigator.vibrate) {
           navigator.vibrate([50, 100, 50]);
@@ -39,7 +52,9 @@ export default function PasswordGate({
       setAuthorized(true);
       onAuthorized?.(password);
     } catch {
-      setError("Network error. Please try again.");
+      setError(
+        "Could not reach the server. Stop dev, free space on D:, delete .next, then run npm run dev again.",
+      );
       setIsChecking(false);
     }
   };
@@ -49,7 +64,7 @@ export default function PasswordGate({
       <main className="min-h-screen flex items-center justify-center bg-white dark:bg-[#050505] text-black dark:text-white p-4 transition-colors duration-500 relative overflow-hidden">
         
         {/* Background Accents */}
-        <div className="absolute inset-0 bg-[url('/images/noise.png')] opacity-[0.03] dark:opacity-[0.05] pointer-events-none" />
+        <div className="absolute inset-0 bg-[url('/images/noise.webp')] opacity-[0.03] dark:opacity-[0.05] pointer-events-none" />
         <div className="absolute top-[-20%] right-[-10%] h-[500px] w-[500px] bg-[#FF4DA3]/10 blur-[120px] rounded-full" />
         
         <div className="absolute top-5 right-5 z-50">
