@@ -13,6 +13,16 @@ import {
 import { postOrderSheetsWebhook } from "../../../lib/ordersSheetsWebhook";
 import { sendOrderToSheet } from "../../../lib/sendOrderToSheet";
 import { computeDiscountAmountEgp } from "../../lib/discountAmount";
+import {
+  attachFulfillmentAlertsToItems,
+  computeFulfillmentIssues,
+} from "../../lib/fulfillmentAlerts";
+import { getProductStockMap } from "../../../sanity/lib/products";
+import {
+  computeOrderProfit,
+  orderNetRevenue,
+  orderProfit,
+} from "../../lib/orderMoney";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -99,8 +109,6 @@ async function sendEmailSafe(payload, { timeoutMs = 8000 } = {}) {
       console.error(
         `[orders] Resend send failed meta=${safeJson(meta)} err=${safeJson(errInfo)}`,
       );
-    } else {
-      console.log("[orders] Email queued:", meta, result?.data?.id);
     }
     return result;
   } catch (err) {
@@ -647,7 +655,12 @@ export async function POST(req) {
       0,
       itemsSubtotal + shippingFee - discountAmount,
     );
-    const profit = itemsSubtotal - discountAmount - totalCost;
+    const profit = computeOrderProfit({
+      status: "pending",
+      items: sanitizedItems,
+      discount_amount: discountAmount,
+      total_cost: totalCost,
+    });
 
     // Reserve (decrement) stock for tracked products. We intentionally do NOT
     // refuse the order if a variant goes out of stock — the customer always
@@ -675,13 +688,13 @@ export async function POST(req) {
     const stockAlerts = Array.isArray(stockResult.alerts)
       ? stockResult.alerts
       : [];
+    const itemsForOrder = attachFulfillmentAlertsToItems(
+      sanitizedItems,
+      stockAlerts,
+    );
     if (stockAlerts.length > 0) {
-      // The admin dashboard reads live stock from Sanity, so we don't persist
-      // these alerts on the order. A console line gives us a paper trail in
-      // server logs in case anyone needs to trace which order tipped a
-      // variant negative.
       console.warn(
-        "[orders] stock alerts triggered by this order:",
+        "[orders] fulfillment alerts on new order:",
         stockAlerts,
       );
     }
@@ -697,7 +710,7 @@ export async function POST(req) {
           governorate: trimmedGovernorate,
           payment_method: paymentMethod,
           shipping_fee: shippingFee,
-          items: sanitizedItems,
+          items: itemsForOrder,
           total_price: totalPrice,
           total_cost: totalCost,
           profit,
@@ -864,7 +877,19 @@ export async function GET(req) {
         );
       }
 
-      return Response.json({ success: true, orders: data ?? [] });
+      const stockMap = await getProductStockMap();
+      const orders = (data ?? []).map((order) => {
+        const fulfillment_issues = computeFulfillmentIssues(order, stockMap);
+        return {
+          ...order,
+          net_product_revenue: orderNetRevenue(order),
+          net_product_profit: orderProfit(order),
+          fulfillment_issues,
+          needs_fulfillment: fulfillment_issues.length > 0,
+        };
+      });
+
+      return Response.json({ success: true, orders });
     }
 
     return Response.json(

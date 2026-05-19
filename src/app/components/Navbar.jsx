@@ -5,9 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "../context/CartContext";
+import { eagerImageProps } from "../lib/imageLoading";
 import { useTheme } from "../context/ThemeContext";
 import { ShoppingBag, Sun, Moon, Monitor, Search } from "lucide-react";
 import dynamic from "next/dynamic";
+import { forceUnlockBodyScroll } from "../lib/bodyScrollLock";
+import { scrollPageToTopReliable } from "../lib/scrollToTop";
 import {
   navigateToSection,
   scrollToSection,
@@ -89,7 +92,23 @@ export default function Navbar({ products = [] }) {
       "Home";
     setActive(label);
 
+    if (isHome) {
+      setSectionHash(sectionId);
+      scrollToSection(sectionId);
+      return;
+    }
     navigateToSection(sectionId, pathname, router);
+  };
+
+  const handleRouteClick = (href, label) => (e) => {
+    e.preventDefault();
+    setOpen(false);
+    setActive(label);
+    if (pathname === href) {
+      scrollPageToTopReliable();
+      return;
+    }
+    router.push(href, { scroll: true });
   };
 
   useEffect(() => {
@@ -144,6 +163,8 @@ export default function Navbar({ products = [] }) {
 
   useEffect(() => {
     setOpen(false);
+    setSearchOpen(false);
+    forceUnlockBodyScroll();
   }, [pathname]);
 
   useEffect(() => {
@@ -215,9 +236,11 @@ export default function Navbar({ products = [] }) {
             >
               <Image
                 src="/images/LOGO2.webp"
-                alt=""
+                alt="ZØYA logo"
                 width={120}
                 height={32}
+                aria-hidden
+                {...eagerImageProps()}
                 className={`pointer-events-none w-auto object-contain transition-all duration-500 ${
                   scrolled ? "h-5 sm:h-6" : "h-6 sm:h-8"
                 }`}
@@ -226,23 +249,23 @@ export default function Navbar({ products = [] }) {
 
             {/* Desktop links — centered overlay, clicks only on buttons */}
             <nav
-              className="pointer-events-none absolute inset-0 z-30 hidden md:flex items-center justify-center"
+              className="pointer-events-none absolute inset-0 z-[25] hidden md:flex items-center justify-center"
               aria-label="Main navigation"
             >
               <div className="nav-desktop-links pointer-events-auto flex max-w-[min(100%,42rem)] items-center overflow-x-auto rounded-full bg-black/5 p-1 no-scrollbar dark:bg-white/5">
                 {links.map((link) =>
                   link.type === "route" ? (
-                    <Link
+                    <a
                       key={link.label}
                       href={link.href}
-                      onClick={() => setOpen(false)}
+                      onClick={handleRouteClick(link.href, link.label)}
                       className={linkClass(link.label)}
                     >
                       <span className="relative z-10">{link.label}</span>
                       {active === link.label && (
                         <span className="nav-link-pill absolute inset-0 rounded-full bg-[#1A1A1A] shadow-inner dark:bg-white/10" />
                       )}
-                    </Link>
+                    </a>
                   ) : (
                     <button
                       key={link.label}
@@ -260,12 +283,12 @@ export default function Navbar({ products = [] }) {
               </div>
             </nav>
 
-            {/* Actions */}
-            <div className="relative z-20 ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1 pr-0.5 sm:pr-1">
+            {/* Actions — z-[35] above desktop link overlay (z-25) */}
+            <div className="relative z-[35] ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1 pr-0.5 sm:pr-1">
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className="rounded-full p-2 text-black/50 transition-colors hover:text-[#FF4DA3] dark:text-white/50 cursor-pointer"
+                className="rounded-full p-2 text-black/60 transition-colors hover:text-[#FF4DA3] dark:text-white/65 cursor-pointer"
                 aria-label="Search"
               >
                 <Search size={18} />
@@ -275,7 +298,7 @@ export default function Navbar({ products = [] }) {
                 type="button"
                 onClick={toggleTheme}
                 aria-label={themeToggleAria}
-                className="hidden rounded-full p-2 text-black/50 transition-colors hover:text-[#FF4DA3] dark:text-white/50 sm:block cursor-pointer"
+                className="hidden rounded-full p-2 text-black/60 transition-colors hover:text-[#FF4DA3] dark:text-white/65 sm:block cursor-pointer"
               >
                 <span key={theme} className="inline-flex animate-theme-icon">
                   {theme === "system" ? (
@@ -292,6 +315,11 @@ export default function Navbar({ products = [] }) {
                 type="button"
                 onClick={() => setIsCartOpen(true)}
                 ref={cartIconRef}
+                aria-label={
+                  cartCount > 0
+                    ? `Open cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`
+                    : "Open cart"
+                }
                 className={`group relative flex cursor-pointer items-center gap-2 rounded-full bg-[#FF4DA3] py-1.5 pl-3 pr-1.5 transition-all duration-300 hover:-translate-y-px hover:bg-[#FF2E92] hover:shadow-[0_8px_25px_rgba(255,77,163,0.45)] active:scale-95 sm:pl-4 ${pulse ? "scale-110" : ""}`}
               >
                 <ShoppingBag className="h-4 w-4 text-white" strokeWidth={2.5} />
@@ -334,10 +362,10 @@ export default function Navbar({ products = [] }) {
               <div className="flex flex-col gap-1 p-3">
                 {links.map((link) =>
                   link.type === "route" ? (
-                    <Link
+                    <a
                       key={link.label}
                       href={link.href}
-                      onClick={() => setOpen(false)}
+                      onClick={handleRouteClick(link.href, link.label)}
                       className={`block w-full rounded-[1.8rem] px-8 py-5 text-left text-[10px] font-bold uppercase tracking-[0.4em] transition-all ${
                         active === link.label
                           ? isDark
@@ -349,7 +377,7 @@ export default function Navbar({ products = [] }) {
                       }`}
                     >
                       {link.label}
-                    </Link>
+                    </a>
                   ) : (
                     <button
                       key={link.label}
@@ -373,7 +401,7 @@ export default function Navbar({ products = [] }) {
                   className={`mt-2 flex items-center justify-between border-t px-8 py-5 ${isDark ? "border-white/5" : "border-black/5"}`}
                 >
                   <span
-                    className={`text-[9px] uppercase tracking-[0.3em] ${isDark ? "text-white/30" : "text-black/30"}`}
+                    className={`text-[9px] uppercase tracking-[0.3em] ${isDark ? "text-white/50" : "text-black/50"}`}
                   >
                     Switch Theme
                   </span>

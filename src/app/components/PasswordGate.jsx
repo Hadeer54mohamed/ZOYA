@@ -4,6 +4,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertCircle, Lock, ShieldCheck, ArrowRight } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import ZoyaHeading from "./ZoyaHeading";
+import { setAdminSessionPassword } from "../lib/adminSession";
 
 export default function PasswordGate({
   children,
@@ -50,6 +52,9 @@ export default function PasswordGate({
         return;
       }
       setAuthorized(true);
+      if (scope === "admin") {
+        setAdminSessionPassword(password);
+      }
       onAuthorized?.(password);
     } catch {
       setError(
@@ -85,14 +90,26 @@ export default function PasswordGate({
             </div>
           </div>
 
-          <div className="text-center space-y-2 mb-10">
-            <h1 className="text-[10px] tracking-[0.8em] uppercase text-black/40 dark:text-white/40 font-mono">
-              {label}
-            </h1>
-            <h2 className="text-2xl font-serif italic tracking-wide">
-              {subtitle}
-            </h2>
-          </div>
+          {scope === "admin" ? (
+            <ZoyaHeading
+              label={label}
+              title={subtitle}
+              as="h2"
+              size="sm"
+              align="center"
+              className="mb-10"
+              titleClassName="!mt-2"
+            />
+          ) : (
+            <div className="text-center space-y-2 mb-10">
+              <h1 className="text-[10px] tracking-[0.8em] uppercase text-black/40 dark:text-white/40 font-mono">
+                {label}
+              </h1>
+              <h2 className="text-2xl font-serif italic tracking-wide">
+                {subtitle}
+              </h2>
+            </div>
+          )}
 
           <div className="space-y-4">
             <div className="relative group">

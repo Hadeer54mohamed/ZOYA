@@ -5,6 +5,9 @@
 :root {
   --background: #fafafa;
   --foreground: #0a0a0a;
+  --zoya-pink: #ff4da3;
+  --zoya-pink-hover: #ff2e92;
+  --zoya-pink-rgb: 255, 77, 163;
 }
 
 .dark {
@@ -15,6 +18,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-zoya-pink: var(--zoya-pink);
   --font-sans: var(--font-geist-sans);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
@@ -47,14 +51,114 @@ body {
   max-width: 100%;
 }
 
+/* ---------- ZOYA editorial typography (PasswordGate style) ---------- */
+.zoya-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.8em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 40%, transparent);
+}
+
+.zoya-eyebrow-pink {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--zoya-pink);
+}
+
+.zoya-heading {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+.zoya-heading-sm {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.zoya-heading-md {
+  font-size: 1.875rem;
+  line-height: 1.15;
+}
+
+@media (min-width: 640px) {
+  .zoya-heading-md {
+    font-size: 2.25rem;
+  }
+}
+
+.zoya-heading-lg {
+  font-size: 2.25rem;
+  line-height: 1.1;
+}
+
+@media (min-width: 640px) {
+  .zoya-heading-lg {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .zoya-heading-lg {
+    font-size: 3.75rem;
+  }
+}
+
+.zoya-heading-xl {
+  font-size: 2.5rem;
+  line-height: 1.05;
+}
+
+@media (min-width: 640px) {
+  .zoya-heading-xl {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .zoya-heading-xl {
+    font-size: 4.5rem;
+  }
+}
+
+.zoya-heading-hero {
+  font-size: 2.25rem;
+  line-height: 1.05;
+}
+
+@media (min-width: 640px) {
+  .zoya-heading-hero {
+    font-size: 3.75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .zoya-heading-hero {
+    font-size: 5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .zoya-heading-hero {
+    font-size: 6rem;
+  }
+}
+
 /* ---------- Themed Scrollbar (global) ---------- */
 /* Firefox */
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 77, 163, 0.45) transparent;
+  scrollbar-color: rgba(var(--zoya-pink-rgb), 0.45) transparent;
 }
 .dark {
-  scrollbar-color: rgba(255, 77, 163, 0.55) transparent;
+  scrollbar-color: rgba(var(--zoya-pink-rgb), 0.55) transparent;
 }
 
 /* WebKit (Chrome / Safari / Edge) */
@@ -68,8 +172,8 @@ html {
 *::-webkit-scrollbar-thumb {
   background: linear-gradient(
     180deg,
-    rgba(255, 77, 163, 0.55),
-    rgba(255, 77, 163, 0.35)
+    rgba(var(--zoya-pink-rgb), 0.55),
+    rgba(var(--zoya-pink-rgb), 0.35)
   );
   border-radius: 999px;
   border: 2px solid var(--background);
@@ -79,8 +183,8 @@ html {
 *::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(
     180deg,
-    rgba(255, 77, 163, 0.85),
-    rgba(255, 77, 163, 0.6)
+    rgba(var(--zoya-pink-rgb), 0.85),
+    rgba(var(--zoya-pink-rgb), 0.6)
   );
   background-clip: padding-box;
 }
@@ -92,8 +196,8 @@ html {
 .dark *::-webkit-scrollbar-thumb {
   background: linear-gradient(
     180deg,
-    rgba(255, 77, 163, 0.7),
-    rgba(255, 77, 163, 0.4)
+    rgba(var(--zoya-pink-rgb), 0.7),
+    rgba(var(--zoya-pink-rgb), 0.4)
   );
   border: 2px solid var(--background);
   background-clip: padding-box;
@@ -101,8 +205,8 @@ html {
 .dark *::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(
     180deg,
-    rgba(255, 77, 163, 0.95),
-    rgba(255, 77, 163, 0.65)
+    rgba(var(--zoya-pink-rgb), 0.95),
+    rgba(var(--zoya-pink-rgb), 0.65)
   );
   background-clip: padding-box;
 }
@@ -638,7 +742,7 @@ html {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 77, 163, 0.2);
+  background: rgba(var(--zoya-pink-rgb), 0.2);
   border-radius: 10px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {

@@ -5,6 +5,7 @@ import {
 } from "../../../lib/shipping";
 import { getShippingFeesMapCached } from "../../../../sanity/lib/shippingFees";
 import { getProductCostsByIds } from "../../../../sanity/lib/products";
+import { computeOrderProfit } from "../../../lib/orderMoney";
 import { postOrderSheetsWebhook } from "../../../../lib/ordersSheetsWebhook";
 import { notifyCustomerTrackOrderChange } from "../../../../lib/customerOrderEditedEmail";
 
@@ -462,12 +463,19 @@ export async function PATCH(req) {
         const costComplete = sanitizedItems.every((it) => it.cost_known);
         updates.total_cost = totalCost;
         updates.cost_complete = costComplete;
-        updates.profit = itemsSubtotal - discountAmount - totalCost;
+        updates.profit = computeOrderProfit({
+          ...existing,
+          items: sanitizedItems,
+          discount_amount: discountAmount,
+          total_cost: totalCost,
+        });
       } else if (existing.total_cost !== null && existing.total_cost !== undefined) {
         // Only shipping/discount changed — items (and therefore cost) are the
-        // same, so profit can be derived from the existing cost.
-        const totalCost = Number(existing.total_cost) || 0;
-        updates.profit = itemsSubtotal - discountAmount - totalCost;
+        // same; profit stays on products only (shipping excluded).
+        updates.profit = computeOrderProfit({
+          ...existing,
+          discount_amount: discountAmount,
+        });
       }
     }
 

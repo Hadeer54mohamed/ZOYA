@@ -209,7 +209,7 @@ export const productType = defineType({
                 let badge = "";
                 if (oversold) badge = "  ⚠️ oversold";
                 else if (out) badge = "  ⛔ out";
-                else if (total <= 5) badge = "  🟡 low";
+                else if (total <= 3) badge = "  🟡 low";
                 subtitle = `${entries.length} sizes · ${total} units${badge}`;
               } else {
                 subtitle = `${subtitle ? subtitle + " · " : ""}untracked`;
@@ -340,7 +340,7 @@ export const productType = defineType({
           let badge = "";
           if (oversold) badge = "  ⚠️ OVERSOLD";
           else if (anyOut) badge = "  ⛔ Some sizes out";
-          else if (total <= 5) badge = "  🟡 LOW";
+          else if (total <= 3) badge = "  🟡 LOW";
           subtitle = `${categoryTitle || ""}${categoryTitle ? " · " : ""}${total} units${badge}`;
         }
       }

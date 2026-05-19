@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { scrollPageToTopReliable } from "../lib/scrollToTop";
 import {
   PackageSearch,
   Loader2,
@@ -125,6 +126,10 @@ function TrackContent() {
   const govRef = useRef(null);
 
   const [shippingFees, setShippingFees] = useState(null);
+
+  useEffect(() => {
+    scrollPageToTopReliable();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

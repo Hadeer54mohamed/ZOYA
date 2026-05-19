@@ -114,8 +114,6 @@ export async function PATCH(request, context) {
       );
     }
 
-    console.log("Updating discount code:", id, updates);
-
     const { error } = await supabaseServer
       .from("discount_codes")
       .update(updates)
@@ -152,8 +150,6 @@ export async function DELETE(request, context) {
     if (!id || id === "undefined") {
       return NextResponse.json({ error: "Missing or invalid discount code id" }, { status: 400 });
     }
-
-    console.log("Deleting discount code:", id);
 
     const { error } = await supabaseServer
       .from("discount_codes")

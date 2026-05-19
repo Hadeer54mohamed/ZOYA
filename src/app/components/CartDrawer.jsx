@@ -57,7 +57,7 @@ export default function CartDrawer() {
                         onClick={() => setIsCartOpen(false)}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+                        exit={{ opacity: 0, pointerEvents: "none" }}
                         transition={{ duration: 0.35, ease: "easeOut" }}
                         className="fixed inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-sm z-[60]"
                     />

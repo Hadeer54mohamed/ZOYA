@@ -6,7 +6,10 @@ import FeaturedDropSection from "./components/FeaturedDropSection";
 import HashScroller from "./components/HashScroller";
 import SectionSkeleton from "./components/SectionSkeleton";
 import LazyInView from "./components/LazyInView";
-import SocialSection from "./components/SocialSection";
+
+const SocialSection = dynamic(() => import("./components/SocialSection"), {
+  loading: () => <SectionSkeleton className="min-h-[320px]" />,
+});
 import TestimonialsSection from "./components/home/TestimonialsSection";
 import { getHomepageProducts, getAllCategories } from "../sanity/lib/products";
 
@@ -50,12 +53,12 @@ export default async function Home() {
       <Suspense fallback={<SectionSkeleton className="h-80 md:h-96" />}>
         <TestimonialsSection />
       </Suspense>
-      <LazyInView minHeight="400px">
+      <LazyInView minHeight="400px" alsoMountOn={["contact"]}>
         <Suspense fallback={<SectionSkeleton className="h-72 md:h-96" />}>
           <ReelsBlock />
         </Suspense>
       </LazyInView>
-      <div id="contact" className="scroll-mt-28">
+      <div id="contact" className="scroll-mt-28 min-h-[320px]">
         <SocialSection />
       </div>
     </main>

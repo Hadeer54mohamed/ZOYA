@@ -1,4 +1,5 @@
-// Client-safe helpers for reasoning about per-variant stock.
+// Stock helpers for admin/server use only — storefront products do not include
+// stockEntries (inventory is dashboard + Sanity Studio only).
 // Mirrors the server-side rules used in `sanity/lib/products.reserveStock`:
 //   • A product with NO stockEntries on any color = untracked → always available.
 //   • A product WITH stockEntries on some colors = tracked → strictly enforced.
@@ -6,7 +7,7 @@
 //     stock > 0. Combos missing from stockEntries are treated as unavailable.
 //
 // Threshold for "low stock" — keep in sync with the admin analytics view.
-export const LOW_STOCK_THRESHOLD = 3;
+export { LOW_STOCK_THRESHOLD } from "./inventoryAlerts";
 
 export function isProductStockTracked(product) {
   if (!product || !Array.isArray(product.colors)) return false;

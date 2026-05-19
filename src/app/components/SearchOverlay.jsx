@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { lockBodyScroll, unlockBodyScroll } from "../lib/bodyScrollLock";
 
 export default function SearchOverlay({ open, onClose, products = [] }) {
   const router = useRouter();
@@ -17,11 +18,11 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
     return () => {
       clearTimeout(t);
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      releaseScroll();
     };
   }, [open, onClose]);
 
@@ -66,8 +67,11 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0, pointerEvents: "none" }}
           transition={{ duration: 0.2 }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search products"
           className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-20 sm:pt-24"
           onClick={onClose}
         >
@@ -97,18 +101,19 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="text-black/40 dark:text-white/40 shrink-0"
+                className="text-black/60 dark:text-white/60 shrink-0"
               >
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.3-4.3" />
               </svg>
               <input
                 ref={inputRef}
-                type="text"
+                type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search for pieces, collections, vibes..."
-                className="flex-1 bg-transparent text-black dark:text-white text-base placeholder:text-black/40 dark:placeholder:text-white/30 focus:outline-none"
+                aria-label="Search products"
+                className="flex-1 bg-transparent text-black dark:text-white text-base placeholder:text-black/60 dark:placeholder:text-white/60 focus:outline-none"
               />
               {query && (
                 <button
@@ -135,7 +140,7 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
                   </svg>
                 </button>
               )}
-              <kbd className="hidden sm:inline-flex items-center px-2 py-1 rounded-md bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/40 text-[10px] font-semibold tracking-widest shrink-0">
+              <kbd className="hidden sm:inline-flex items-center px-2 py-1 rounded-md bg-black/5 dark:bg-white/10 text-black/60 dark:text-white/60 text-[10px] font-semibold tracking-widest shrink-0">
                 ESC
               </kbd>
             </form>
@@ -144,14 +149,16 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
             <div className="max-h-[60vh] overflow-y-auto">
               {query.trim() === "" ? (
                 <div className="p-5">
-                  <p className="text-[10px] tracking-[0.3em] uppercase text-black/40 dark:text-white/30 mb-3">
+                  <p className="text-[10px] tracking-[0.3em] uppercase text-black/60 dark:text-white/60 mb-3">
                     Quick Picks
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {suggestions.map((s) => (
                       <button
                         key={s}
+                        type="button"
                         onClick={() => setQuery(s)}
+                        aria-label={`Search for ${s}`}
                         className="px-3 py-1.5 rounded-full border border-black/10 dark:border-white/10 text-black/70 dark:text-white/70 text-xs hover:text-black dark:hover:text-white hover:border-[#FF4DA3]/50 hover:bg-[#FF4DA3]/5 transition"
                       >
                         {s}
@@ -166,7 +173,9 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
                     return (
                       <li key={p.id}>
                         <button
+                          type="button"
                           onClick={() => goToProduct(p.id)}
+                          aria-label={`View ${p.name}`}
                           className="group w-full flex items-center gap-4 p-3 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 transition text-left"
                         >
                           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
@@ -181,7 +190,7 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[10px] tracking-[0.2em] uppercase text-black/50 dark:text-white/40">
+                            <p className="text-[10px] tracking-[0.2em] uppercase text-black/60 dark:text-white/60">
                               {p.category}
                             </p>
                             <p className="text-black dark:text-white text-sm font-semibold truncate group-hover:text-[#FF4DA3] transition-colors">
@@ -200,7 +209,7 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
                             strokeWidth="2.2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            className="text-black/40 dark:text-white/30 shrink-0 group-hover:translate-x-1 group-hover:text-[#FF4DA3] transition"
+                            className="text-black/60 dark:text-white/60 shrink-0 group-hover:translate-x-1 group-hover:text-[#FF4DA3] transition"
                           >
                             <path d="M5 12h14" />
                             <path d="m12 5 7 7-7 7" />
@@ -230,7 +239,7 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
                   <p className="text-black dark:text-white text-sm font-semibold">
                     No matches for &ldquo;{query}&rdquo;
                   </p>
-                  <p className="text-black/50 dark:text-white/40 text-xs mt-1">
+                  <p className="text-black/60 dark:text-white/60 text-xs mt-1">
                     Try a different word or browse all products.
                   </p>
                 </div>
@@ -240,7 +249,7 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
             {/* Footer action */}
             {query.trim() !== "" && (
               <div className="px-5 py-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-3">
-                <p className="text-[10px] tracking-[0.25em] uppercase text-black/40 dark:text-white/30">
+                <p className="text-[10px] tracking-[0.25em] uppercase text-black/60 dark:text-white/60">
                   Press{" "}
                   <kbd className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 text-black/60 dark:text-white/60 font-semibold">
                     Enter
@@ -248,7 +257,9 @@ export default function SearchOverlay({ open, onClose, products = [] }) {
                   to see all
                 </p>
                 <button
+                  type="button"
                   onClick={handleSubmit}
+                  aria-label="View all search results"
                   className="px-4 py-2 rounded-full bg-[#FF4DA3] text-white text-[10px] font-bold tracking-widest uppercase hover:shadow-[0_0_20px_-5px_#FF4DA3] transition"
                 >
                   View All Results

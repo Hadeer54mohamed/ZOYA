@@ -36,11 +36,6 @@ const PRODUCTS_QUERY = /* groq */ `
         asset,
         hotspot,
         crop
-      },
-      "stockEntries": stockEntries[]{
-        size,
-        stock,
-        initialStock
       }
     }
   }
@@ -97,16 +92,6 @@ function mapProduct(raw, { imageWidth = 1200, imageQuality = 85 } = {}) {
           }
         })
         .filter(Boolean),
-      stockEntries: Array.isArray(c?.stockEntries)
-        ? c.stockEntries
-            .filter((s) => s && typeof s.size === "string")
-            .map((s) => ({
-              size: s.size,
-              stock: Number(s.stock) || 0,
-              initialStock:
-                typeof s.initialStock === "number" ? s.initialStock : null,
-            }))
-        : [],
     })),
   };
 }
@@ -405,6 +390,7 @@ export async function getProductStockMap() {
       /* groq */ `*[_type == "product"]{
         "id": slug.current,
         name,
+        sizes,
         "colors": colors[]{
           name,
           "images": images[]{
@@ -465,6 +451,10 @@ export async function getProductStockMap() {
       map[row.id] = {
         name: row.name || row.id,
         image,
+        sizes:
+          Array.isArray(row.sizes) && row.sizes.length
+            ? row.sizes.filter(Boolean)
+            : ["S", "M", "L"],
         tracked,
         totalStock,
         totalInitial,

@@ -254,8 +254,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      console.log("[checkout] Discount validated:", result.discount);
-
       // Cache the validated discount so re-typing / re-applying skips the network.
       discountCache.current[cacheKey] = {
         data: result.discount,
@@ -451,7 +449,6 @@ export default function CheckoutPage() {
       }
 
       const orderId = result.order?.order_id ?? result.order?.id ?? "";
-      console.log("Order placed:", orderId);
       setPlacedOrderId(orderId);
 
       setOrderCelebrating(true);

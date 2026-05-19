@@ -13,7 +13,9 @@ export default function LazyInView({
   rootMargin = "200px 0px",
   minHeight = "1px",
   sectionId,
+  alsoMountOn,
 }) {
+  const mountKey = (alsoMountOn ?? []).join(",");
   const ref = useRef(null);
   const [visible, setVisible] = useState(() =>
     shouldEagerMountSection(sectionId),
@@ -43,13 +45,17 @@ export default function LazyInView({
   }, [rootMargin]);
 
   useEffect(() => {
-    if (!sectionId) return;
+    if (!sectionId && !mountKey) return;
+    const mountOn = mountKey ? mountKey.split(",") : [];
     const onNav = (e) => {
-      if (e.detail?.id === sectionId) setVisible(true);
+      const navId = e.detail?.id;
+      if (!navId) return;
+      if (sectionId && navId === sectionId) setVisible(true);
+      if (mountOn.includes(navId)) setVisible(true);
     };
     window.addEventListener("zoya:section-navigate", onNav);
     return () => window.removeEventListener("zoya:section-navigate", onNav);
-  }, [sectionId]);
+  }, [sectionId, mountKey]);
 
   const anchorClass = sectionId
     ? `scroll-mt-28 ${className}`.trim()

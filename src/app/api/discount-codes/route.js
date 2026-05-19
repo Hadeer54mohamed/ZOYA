@@ -125,8 +125,6 @@ export async function POST(request) {
       usage_limit: usageLimitVal,
     };
 
-    console.log("Inserting discount code:", insertData);
-
     const { error } = await supabaseServer
       .from("discount_codes")
       .insert([insertData]);

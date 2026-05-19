@@ -59,7 +59,7 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
             <h2 className="mt-3 text-4xl leading-none font-black text-black md:text-6xl dark:text-white">
               Latest Drops
             </h2>
-            <p className="mt-3 max-w-md text-sm text-black/60 dark:text-white/50">
+            <p className="mt-3 max-w-md text-sm text-black/60 dark:text-white/60">
               Handpicked pieces from our newest collection — limited stock,
               unlimited attitude.
             </p>
@@ -87,7 +87,7 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
                     className={`text-[10px] ${
                       activeCategory === cat
                         ? "text-white/60 dark:text-black/60"
-                        : "text-black/40 dark:text-white/40"
+                        : "text-black/60 dark:text-white/60"
                     }`}
                   >
                     {count}
@@ -100,16 +100,16 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
 
         <div className="grid min-h-[200px] grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {visibleProducts.length > 0 ? (
-            visibleProducts.map((p, i) => (
+            visibleProducts.map((p) => (
               <ProductCard
                 key={p.id}
                 product={p}
                 lite
-                priorityImage={safePage === 0 && i < PAGE_SIZE}
+                priorityImage={false}
               />
             ))
           ) : (
-            <p className="col-span-full py-20 text-center text-sm text-black/40 dark:text-white/40">
+            <p className="col-span-full py-20 text-center text-sm text-black/60 dark:text-white/60">
               No products in this category yet.
             </p>
           )}
@@ -128,7 +128,7 @@ export default function ProductSection({ products = [], categories = ["All"] }) 
                 <ChevronLeft size={18} />
               </button>
 
-              <span className="min-w-[4.5rem] text-center text-[10px] font-bold tracking-[0.25em] text-black/50 uppercase tabular-nums dark:text-white/50">
+              <span className="min-w-[4.5rem] text-center text-[10px] font-bold tracking-[0.25em] text-black/60 uppercase tabular-nums dark:text-white/60">
                 {safePage + 1} / {totalPages}
               </span>
 
