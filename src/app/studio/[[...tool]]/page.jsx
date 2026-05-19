@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import config from "../../../../sanity.config";
 import PasswordGate from "../../components/PasswordGate";
-import AdminFooter from "../../components/admin-F";
+import AdminFooter from "../../components/AdminFooter";
 import ThemeToggle from "../../components/ThemeToggle";
 
 export default function StudioPage() {
