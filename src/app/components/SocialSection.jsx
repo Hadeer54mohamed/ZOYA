@@ -97,6 +97,7 @@ export default function SocialSection() {
                 href={social.link}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label={`Follow ZØYA on ${social.name}`}
                 className="group relative flex flex-col items-center rounded-[2rem] border border-black/10 bg-white p-6 text-center transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#FF4DA3]/10 md:rounded-[3rem] md:p-8 dark:border-white/10 dark:bg-white/[0.03]"
               >
                 <div

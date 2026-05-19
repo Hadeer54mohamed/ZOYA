@@ -37,7 +37,7 @@ export default function BrandSection() {
             <span className="text-[#FF4DA3]"> it&apos;s about presence.</span>
           </h2>
 
-          <p className="mt-6 max-w-md text-sm leading-relaxed text-black/60 dark:text-white/50">
+          <p className="mt-6 max-w-md text-sm leading-relaxed text-black/60 dark:text-white/60">
             <span className="text-[#FF4DA3]"> ZOYA </span> is built for expression,
             not approval. Every piece is designed to reflect identity, attitude,
             and movement.
@@ -55,7 +55,7 @@ export default function BrandSection() {
               >
                 <Image
                   src={img}
-                  alt=""
+                  alt={`ZOYA brand — lookbook image ${i + 1} of ${images.length}`}
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover"

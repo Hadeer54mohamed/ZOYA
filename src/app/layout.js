@@ -1,11 +1,16 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import Script from "next/script";
-import { Geist } from "next/font/google";
+import { Cormorant_Garamond, Geist } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./context/CartContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import LayoutShell from "./components/LayoutShell";
+import IntroRoot from "./components/IntroRoot";
 import { getNavbarSearchProducts } from "../sanity/lib/products";
+import { HERO_BG_DESKTOP } from "./lib/heroImages";
+import { getSiteUrl } from "../lib/siteUrl";
+
+const siteUrl = getSiteUrl();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,9 +19,40 @@ const geistSans = Geist({
   preload: true,
 });
 
+const cormorant = Cormorant_Garamond({
+  variable: "--font-cormorant",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
 export const metadata = {
-  title: "ZOYA",
-  description: "ZØYA - Wear Your Identity",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "ZØYA — Wear Your Identity",
+    template: "%s · ZØYA",
+  },
+  description:
+    "ZØYA — premium streetwear. Shop limited drops, express your identity. Cairo-based fashion brand.",
+  keywords: ["ZOYA", "streetwear", "fashion", "Egypt", "limited drops"],
+  authors: [{ name: "ZØYA" }],
+  creator: "ZØYA",
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: siteUrl,
+    siteName: "ZØYA",
+    title: "ZØYA — Wear Your Identity",
+    description: "Shop limited drops. Crafted for presence. Designed to stand out.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ZØYA — Wear Your Identity",
+    description: "Shop limited drops. Crafted for presence. Designed to stand out.",
+  },
+  alternates: { canonical: "/" },
 };
 
 export const viewport = {
@@ -37,11 +73,13 @@ export default async function RootLayout({ children }) {
   const isDark = theme === "dark";
 
   const products = await getNavbarSearchProducts();
+  const headersList = await headers();
+  const isHome = headersList.get("x-zoya-pathname") === "/";
 
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} h-full antialiased ${
+      className={`${geistSans.variable} ${cormorant.variable} h-full antialiased ${
         isDark ? "dark" : ""
       }`}
       style={{
@@ -50,6 +88,16 @@ export default async function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <head>
+        {isHome ? (
+          <link
+            rel="preload"
+            as="image"
+            href={HERO_BG_DESKTOP}
+            type="image/webp"
+            media="(min-width: 768px)"
+            fetchPriority="high"
+          />
+        ) : null}
         <Script
           id="zoya-theme-init"
           strategy="beforeInteractive"
@@ -59,6 +107,7 @@ export default async function RootLayout({ children }) {
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
         <ThemeProvider initialTheme={theme}>
           <CartProvider>
+            <IntroRoot />
             <LayoutShell products={products}>{children}</LayoutShell>
           </CartProvider>
         </ThemeProvider>

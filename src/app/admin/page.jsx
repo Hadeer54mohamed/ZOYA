@@ -1,13 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import AdminFooter from "../components/admin-F";
 import ThemeToggle from "../components/ThemeToggle";
 import PasswordGate from "../components/PasswordGate";
+import { consumeOpenProfitModalRequest } from "../lib/adminSession";
 
 import { useLockBodyScroll } from "../../lib/useLockBodyScroll";
+import {
+  countInventoryNotifications,
+  getStockLevel,
+  LOW_STOCK_THRESHOLD,
+} from "../lib/inventoryAlerts";
+import {
+  fulfillmentIssueMessage,
+  fulfillmentReasonLabel,
+  itemMatchesFulfillmentIssue,
+  orderNeedsFulfillment,
+} from "../lib/fulfillmentAlerts";
+import { orderNetRevenue, orderProfit } from "../lib/orderMoney";
 import {
   Loader2,
   Package,
@@ -31,9 +45,6 @@ import {
   BarChart3,
   Calendar,
   Trash2,
-  ArrowUp,
-  ArrowDown,
-  Minus,
   Boxes,
   Send,
   Palette,
@@ -43,6 +54,19 @@ import {
   Mail,
   ExternalLink,
 } from "lucide-react";
+
+const ProfitAnalyticsModal = dynamic(() => import("./ProfitAnalyticsModal"), {
+  loading: () => <ProfitModalLoading />,
+  ssr: false,
+});
+
+function ProfitModalLoading() {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center">
+      <Loader2 size={28} className="animate-spin text-[#FF4DA3]" />
+    </div>
+  );
+}
 
 const STATUS_META = {
   pending: {
@@ -196,15 +220,16 @@ function AdminDashboard({ password }) {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [profitModalOpen, setProfitModalOpen] = useState(false);
   const [productsModalOpen, setProductsModalOpen] = useState(false);
+  const [inventoryAlertsModalOpen, setInventoryAlertsModalOpen] = useState(false);
   const [sendDropLoading, setSendDropLoading] = useState(false);
   const [newsletterProductId, setNewsletterProductId] = useState("");
   const [newsletterCatalog, setNewsletterCatalog] = useState([]);
   const [newsletterPickModalOpen, setNewsletterPickModalOpen] = useState(false);
   const [newsletterPickSearch, setNewsletterPickSearch] = useState("");
   const [stockSummary, setStockSummary] = useState(null);
-  const [stockBannerDismissed, setStockBannerDismissed] = useState(false);
+  const [stockInventoryLoading, setStockInventoryLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const ordersPerPage = 9;
+  const ordersPerPage = 6;
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const adminFetch = async (url, init = {}) => {
     return fetch(url, {
@@ -243,9 +268,16 @@ function AdminDashboard({ password }) {
     if (newsletterPickModalOpen) setNewsletterPickSearch("");
   }, [newsletterPickModalOpen]);
 
+  useEffect(() => {
+    if (consumeOpenProfitModalRequest()) {
+      setProfitModalOpen(true);
+    }
+  }, []);
+
   const hasOpenModal =
     profitModalOpen ||
     productsModalOpen ||
+    inventoryAlertsModalOpen ||
     newsletterPickModalOpen ||
     discountModalOpen ||
     Boolean(selectedOrder);
@@ -348,60 +380,108 @@ function AdminDashboard({ password }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const loadStockSummary = useCallback(async () => {
+    if (!password) {
+      setStockInventoryLoading(false);
+      return;
+    }
+    setStockInventoryLoading(true);
+    try {
+      const res = await adminFetch("/api/products/analytics");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data?.success) return;
+      setStockSummary({
+        summary: data.summary,
+        alerts: Array.isArray(data.alerts) ? data.alerts : [],
+        catalogAlerts: Array.isArray(data.catalogAlerts)
+          ? data.catalogAlerts
+          : [],
+        stockAlerts: Array.isArray(data.stockAlerts) ? data.stockAlerts : [],
+      });
+    } catch {
+      /* silent — banner is non-critical */
+    } finally {
+      setStockInventoryLoading(false);
+    }
+  }, [password]);
+
   // Poll stock health for the dashboard banner / Products button badge.
-  // Aggregates live Sanity stock with Supabase sales — refreshed every 60s
-  // and on tab focus so the owner sees new alerts within a minute of an
-  // order coming in.
   useEffect(() => {
     if (!password) return;
-    let cancelled = false;
-    const loadStock = async () => {
-      try {
-        const res = await adminFetch("/api/products/analytics");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled || !data?.success) return;
-        setStockSummary((prev) => {
-          const nextUrgent =
-            (data.summary?.outOfStock || 0) + (data.summary?.oversold || 0);
-          const prevUrgent = prev
-            ? (prev.summary?.outOfStock || 0) + (prev.summary?.oversold || 0)
-            : 0;
-          // If a new urgent alert popped up since the last poll, un-dismiss
-          // the banner so the owner gets re-pinged instead of missing it.
-          if (nextUrgent > prevUrgent) {
-            setStockBannerDismissed(false);
-          }
-          return {
-            summary: data.summary,
-            alerts: Array.isArray(data.alerts) ? data.alerts : [],
-          };
-        });
-      } catch {
-        /* silent — banner is non-critical */
-      }
-    };
-    loadStock();
-    const interval = setInterval(loadStock, 60_000);
-    const onFocus = () => loadStock();
+    loadStockSummary();
+    const interval = setInterval(loadStockSummary, 60_000);
+    const onFocus = () => loadStockSummary();
     window.addEventListener("focus", onFocus);
     return () => {
-      cancelled = true;
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password]);
+  }, [password, loadStockSummary]);
 
-  const stockAlertCount = stockSummary
-    ? (stockSummary.summary?.outOfStock || 0) +
-      (stockSummary.summary?.oversold || 0) +
-      (stockSummary.summary?.lowStock || 0)
-    : 0;
-  const stockUrgentCount = stockSummary
-    ? (stockSummary.summary?.outOfStock || 0) +
-      (stockSummary.summary?.oversold || 0)
-    : 0;
+  const inventoryNotifications = stockSummary
+    ? countInventoryNotifications(stockSummary)
+    : { total: 0, urgent: 0 };
+  const stockAlertCount = inventoryNotifications.total;
+  const stockUrgentCount = inventoryNotifications.urgent;
+
+  const inventoryBannerTitle = useMemo(() => {
+    if (!stockSummary?.summary) return "";
+    const s = stockSummary.summary;
+    const parts = [];
+    if (s.oversold > 0 || s.variantOversold > 0)
+      parts.push(
+        `${(s.oversold || 0) + (s.variantOversold || 0)} oversold`,
+      );
+    if (s.outOfStock > 0 || s.variantOut > 0)
+      parts.push(
+        `${(s.outOfStock || 0) + (s.variantOut || 0)} out of stock`,
+      );
+    if (s.lowStock > 0 || s.variantLow > 0)
+      parts.push(
+        `${(s.lowStock || 0) + (s.variantLow || 0)} running low`,
+      );
+    if (s.colorsWithoutStock > 0)
+      parts.push(`${s.colorsWithoutStock} color(s) missing stock rows`);
+    if (s.missingSizes > 0) parts.push(`${s.missingSizes} missing size(s)`);
+    if (s.untrackedProducts > 0)
+      parts.push(`${s.untrackedProducts} not tracking stock`);
+    return parts.length
+      ? `Inventory: ${parts.join(" · ")}`
+      : "Inventory attention needed";
+  }, [stockSummary]);
+
+  const inventoryBannerDetail = useMemo(() => {
+    if (!stockSummary) return "";
+    const lines = [
+      ...(stockSummary.catalogAlerts || []).slice(0, 2).map((a) => a.message),
+      ...(stockSummary.stockAlerts || []).slice(0, 2).map((a) => a.message),
+    ];
+    if (lines.length) return lines.join(" · ");
+    return (stockSummary.alerts || [])
+      .slice(0, 3)
+      .map((a) =>
+        a.severity === "oversold"
+          ? `${a.name} (${a.totalStock})`
+          : `${a.name}${a.severity === "low" ? ` · ${a.totalStock} left` : ""}`,
+      )
+      .join(" · ");
+  }, [stockSummary]);
+
+  const inventoryBannerTone = useMemo(() => {
+    const s = stockSummary?.summary || {};
+    const catalog = stockSummary?.catalogAlerts || [];
+    if (
+      s.oversold > 0 ||
+      s.variantOversold > 0 ||
+      catalog.some((a) => a.severity === "error")
+    ) {
+      return "urgent";
+    }
+    if (s.outOfStock > 0 || s.variantOut > 0) return "warning";
+    if (s.lowStock > 0 || s.variantLow > 0) return "low";
+    return "setup";
+  }, [stockSummary]);
 
   const updateStatus = async (orderId, newStatus) => {
     try {
@@ -463,38 +543,38 @@ function AdminDashboard({ password }) {
     for (const o of orders) {
       if (counts[o.status] !== undefined) counts[o.status] += 1;
       if (o.status !== "cancelled") {
-        counts.revenue += Number(o.total_price ?? 0);
+        counts.revenue += Number(
+          o.net_product_revenue ?? orderNetRevenue(o),
+        );
         counts.discountsTotal += Number(o.discount_amount ?? 0);
 
         if (o.cost_complete === false) {
           counts.profitIncomplete += 1;
         } else {
-          // Profit = (items subtotal − discount) − total cost.
-          // Shipping is excluded (it isn't ours to keep). We derive the items
-          // subtotal from the line items so the math stays correct even if a
-          // legacy order has a stale `total_price`.
-          const itemsSubtotal = Array.isArray(o.items)
-            ? o.items.reduce(
-                (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
-                0,
-              )
-            : Math.max(
-                0,
-                Number(o.total_price ?? 0) - Number(o.shipping_fee ?? 0),
-              );
-          const discount = Number(o.discount_amount ?? 0);
-          const totalCost = Number(o.total_cost ?? 0);
-          counts.profit += itemsSubtotal - discount - totalCost;
+          const p =
+            o.net_product_profit !== null && o.net_product_profit !== undefined
+              ? Number(o.net_product_profit)
+              : orderProfit(o);
+          if (p !== null && !Number.isNaN(p)) counts.profit += p;
         }
       }
     }
     return counts;
   }, [orders]);
 
+  const ordersNeedingFulfillment = useMemo(
+    () => orders.filter((o) => orderNeedsFulfillment(o)),
+    [orders],
+  );
+
   const filteredOrders = useMemo(() => {
     const q = search.trim().toLowerCase();
     return orders.filter((o) => {
-      if (statusFilter !== "all" && o.status !== statusFilter) return false;
+      if (statusFilter === "restock") {
+        if (!orderNeedsFulfillment(o)) return false;
+      } else if (statusFilter !== "all" && o.status !== statusFilter) {
+        return false;
+      }
       if (!q) return true;
       return (
         o.order_id?.toLowerCase().includes(q) ||
@@ -578,7 +658,7 @@ function AdminDashboard({ password }) {
                 aria-expanded={newsletterPickModalOpen}
                 className="flex items-center gap-2 pl-1 pr-2 sm:pr-3 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 hover:border-[#FF4DA3]/40 transition-all active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed shrink-0"
               >
-                <span className="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden bg-black/[0.06] dark:bg-white/[0.08] ring-1 ring-black/10 dark:ring-white/10 grid place-items-center">
+                <span className="relative h-9 w-9 shrink-0 rounded-lg overflow-hidden  grid place-items-center">
                   {newsletterPickedProduct?.image ? (
                     <Image
                       src={newsletterPickedProduct.image}
@@ -597,10 +677,11 @@ function AdminDashboard({ password }) {
                   )}
                 </span>
                 <span className="hidden sm:flex flex-col items-start min-w-0 max-w-[120px] text-left leading-tight">
+                 
+                  <span className="text-[10px] font-bold text-black/75 dark:text-white/80 truncate w-full">
                   <span className="text-[9px] uppercase tracking-[0.2em] text-black/40 dark:text-white/45 font-semibold">
                     Newsletter
-                  </span>
-                  <span className="text-[10px] font-bold text-black/75 dark:text-white/80 truncate w-full">
+                  </span> {""}
                     {newsletterProductId
                       ? newsletterPickedProduct?.name || newsletterProductId
                       : "Latest product"}
@@ -659,7 +740,7 @@ function AdminDashboard({ password }) {
                       ? "bg-red-500 text-white"
                       : "bg-amber-500 text-white"
                   }`}
-                  title={`${stockAlertCount} stock alert${stockAlertCount === 1 ? "" : "s"}`}
+                  title={`${stockAlertCount} inventory alert${stockAlertCount === 1 ? "" : "s"}`}
                 >
                   {stockAlertCount > 99 ? "99+" : stockAlertCount}
                 </span>
@@ -709,66 +790,126 @@ function AdminDashboard({ password }) {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Stock alert banner — shown when there are out-of-stock or
-            oversold variants the admin needs to refill. Dismissible per
-            session so the dashboard isn't loud after they've acknowledged. */}
-        {stockSummary && stockUrgentCount > 0 && !stockBannerDismissed && (
-            <div className="animate-ui-fade-in-down overflow-hidden">
-              <div
-                className={`flex items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 rounded-2xl border ${
-                  (stockSummary.summary?.oversold || 0) > 0
-                    ? "bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300"
-                    : "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
-                }`}
-              >
-                <AlertTriangle
+      {(stockInventoryLoading || stockAlertCount > 0) && (
+        <div
+          className={`border-b ${
+            stockInventoryLoading
+              ? "bg-black/[0.02] dark:bg-white/[0.02] border-black/10 dark:border-white/10"
+              : inventoryBannerTone === "urgent"
+                ? "bg-red-500/15 border-red-500/40"
+                : inventoryBannerTone === "warning" ||
+                    inventoryBannerTone === "low"
+                  ? "bg-amber-500/15 border-amber-500/40"
+                  : "bg-violet-500/15 border-violet-500/40"
+          }`}
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-start sm:items-center gap-3 sm:gap-4">
+            {stockInventoryLoading ? (
+              <>
+                <Loader2
                   size={18}
-                  strokeWidth={2.5}
-                  className="shrink-0 mt-0.5 sm:mt-0"
+                  className="shrink-0 animate-spin text-black/40 dark:text-white/40"
                 />
-                <div className="flex-1 min-w-0 text-sm leading-relaxed">
-                  <p className="font-bold mb-0.5">
-                    {(stockSummary.summary?.oversold || 0) > 0
-                      ? `${stockSummary.summary.oversold} product${stockSummary.summary.oversold === 1 ? "" : "s"} oversold — restock needed`
-                      : `${stockSummary.summary.outOfStock} product${stockSummary.summary.outOfStock === 1 ? "" : "s"} out of stock`}
+                <p className="text-sm text-black/60 dark:text-white/60">
+                  Checking inventory…
+                </p>
+              </>
+            ) : (
+              <>
+                <AlertTriangle
+                  size={20}
+                  strokeWidth={2.5}
+                  className={`shrink-0 mt-0.5 sm:mt-0 ${
+                    inventoryBannerTone === "urgent"
+                      ? "text-red-600 dark:text-red-400"
+                      : inventoryBannerTone === "setup"
+                        ? "text-violet-700 dark:text-violet-300"
+                        : "text-amber-600 dark:text-amber-400"
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={`text-sm sm:text-base font-bold leading-snug ${
+                      inventoryBannerTone === "urgent"
+                        ? "text-red-800 dark:text-red-200"
+                        : inventoryBannerTone === "setup"
+                          ? "text-violet-900 dark:text-violet-100"
+                          : "text-amber-900 dark:text-amber-100"
+                    }`}
+                  >
+                    {inventoryBannerTitle}
                   </p>
-                  <p className="text-xs opacity-80">
-                    {stockSummary.alerts
-                      .slice(0, 3)
-                      .map((a) =>
-                        a.severity === "oversold"
-                          ? `${a.name} (${a.totalStock})`
-                          : `${a.name}${a.severity === "low" ? ` · ${a.totalStock} left` : ""}`,
-                      )
-                      .join(" · ")}
-                    {stockSummary.alerts.length > 3
-                      ? ` · +${stockSummary.alerts.length - 3} more`
+                  <p
+                    className={`text-xs sm:text-sm mt-0.5 ${
+                      inventoryBannerTone === "urgent"
+                        ? "text-red-700/90 dark:text-red-200/80"
+                        : inventoryBannerTone === "setup"
+                          ? "text-violet-800/90 dark:text-violet-100/80"
+                          : "text-amber-800/90 dark:text-amber-100/80"
+                    }`}
+                  >
+                    {inventoryBannerDetail}
+                    {stockAlertCount > 4
+                      ? ` · +${stockAlertCount - 4} more`
                       : ""}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => setProductsModalOpen(true)}
-                    className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest px-3 py-2 rounded-lg transition ${
-                      (stockSummary.summary?.oversold || 0) > 0
-                        ? "bg-red-600 text-white hover:bg-red-700"
-                        : "bg-amber-600 text-white hover:bg-amber-700"
-                    }`}
-                  >
-                    Review
-                  </button>
-                  <button
-                    onClick={() => setStockBannerDismissed(true)}
-                    aria-label="Dismiss"
-                    className="h-8 w-8 grid place-items-center rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setInventoryAlertsModalOpen(true)}
+                  className={`shrink-0 text-[10px] sm:text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-xl transition ${
+                    inventoryBannerTone === "urgent"
+                      ? "bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-500/25"
+                      : inventoryBannerTone === "setup"
+                        ? "bg-violet-600 text-white hover:bg-violet-700"
+                        : "bg-amber-600 text-white hover:bg-amber-700 shadow-lg shadow-amber-500/20"
+                  }`}
+                >
+                  View issues
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {ordersNeedingFulfillment.length > 0 && (
+        <div className="border-b border-red-500/40 bg-red-600/10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <Package
+                size={20}
+                className="shrink-0 text-red-600 dark:text-red-400 mt-0.5"
+              />
+              <div className="min-w-0">
+                <p className="text-sm sm:text-base font-bold text-red-900 dark:text-red-100">
+                  {ordersNeedingFulfillment.length} order
+                  {ordersNeedingFulfillment.length === 1 ? "" : "s"} need
+                  restock — customer ordered unavailable items
+                </p>
+                <p className="text-xs sm:text-sm text-red-800/90 dark:text-red-200/80 mt-0.5 truncate">
+                  {ordersNeedingFulfillment
+                    .slice(0, 2)
+                    .map((o) => o.order_id)
+                    .join(" · ")}
+                  {ordersNeedingFulfillment.length > 2
+                    ? ` · +${ordersNeedingFulfillment.length - 2} more`
+                    : ""}
+                </p>
               </div>
             </div>
-          )}
+            <button
+              type="button"
+              onClick={() => setStatusFilter("restock")}
+              className="shrink-0 text-[10px] sm:text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-xl bg-red-600 text-white hover:bg-red-700 transition"
+            >
+              Show orders
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard
@@ -817,6 +958,7 @@ function AdminDashboard({ password }) {
             icon={CreditCard}
             accent="text-[#FF4DA3]"
             small
+            hint="Products only · shipping excluded"
           />
           <StatCard
             label={
@@ -833,9 +975,32 @@ function AdminDashboard({ password }) {
             }
             small
             onClick={() => setProfitModalOpen(true)}
-            hint="Click for breakdown"
+            hint="Products only · shipping excluded"
           />
         </div>
+
+        <Link
+          href="/admin/monthly"
+          className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-[#FF4DA3]/25 bg-[#FF4DA3]/[0.04] dark:bg-[#FF4DA3]/[0.06] hover:border-[#FF4DA3]/50 transition-colors group"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-xl bg-[#FF4DA3]/10 text-[#FF4DA3]">
+              <Calendar size={16} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-black/70 dark:text-white/70">
+                Monthly profit archive
+              </p>
+              <p className="text-[11px] text-black/50 dark:text-white/50 truncate">
+                Every closed period · profit, revenue & orders
+              </p>
+            </div>
+          </div>
+          <ChevronRight
+            size={18}
+            className="text-[#FF4DA3] shrink-0 group-hover:translate-x-0.5 transition-transform"
+          />
+        </Link>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
@@ -855,6 +1020,7 @@ function AdminDashboard({ password }) {
           <div className="flex flex-wrap gap-2">
             {[
               "all",
+              "restock",
               "pending",
               "confirmed",
               "shipped",
@@ -870,7 +1036,9 @@ function AdminDashboard({ password }) {
                     : "border-black/10 dark:border-white/10 hover:border-black/30 dark:hover:border-white/30 text-black/60 dark:text-white/60"
                 }`}
               >
-                {s}
+                {s === "restock"
+                  ? `restock${ordersNeedingFulfillment.length > 0 ? ` (${ordersNeedingFulfillment.length})` : ""}`
+                  : s}
               </button>
             ))}
           </div>
@@ -898,8 +1066,7 @@ function AdminDashboard({ password }) {
           </div>
         ) : (
           <>
-            {/* Orders Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               {paginatedOrders.map((o) => (
                 <OrderCard
                   key={o.id}
@@ -910,30 +1077,56 @@ function AdminDashboard({ password }) {
               ))}
             </div>
 
-            {/* Pagination — only when more than one page */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-4 mt-10 pb-10">
+            <div className="mt-8 pb-10 flex flex-col items-center gap-4 border-t border-black/10 dark:border-white/10 pt-6">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-black/45 dark:text-white/45 text-center">
+                Showing{" "}
+                <span className="font-bold text-black/70 dark:text-white/70">
+                  {(currentPage - 1) * ordersPerPage + 1}–
+                  {Math.min(currentPage * ordersPerPage, filteredOrders.length)}
+                </span>{" "}
+                of{" "}
+                <span className="font-bold text-black/70 dark:text-white/70">
+                  {filteredOrders.length}
+                </span>{" "}
+                orders · 6 per page
+              </p>
+
+              {totalPages > 1 ? (
+              <div className="flex flex-wrap items-center justify-center gap-2 max-w-full">
                 <button
                   type="button"
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FF4DA3]/10 hover:border-[#FF4DA3]/30 transition-all font-medium text-sm"
+                  aria-label="Previous page"
+                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FF4DA3]/10 hover:border-[#FF4DA3]/30 transition-all text-[10px] sm:text-xs font-bold uppercase tracking-widest"
                 >
                   <ChevronRight className="rotate-180" size={16} />
+                  Prev
                 </button>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold tracking-widest text-[#FF4DA3]">
-                    {currentPage}
-                  </span>
-                  <span className="text-xs text-black/40 dark:text-white/40">
-                    /
-                  </span>
-                  <span className="text-xs text-black/60 dark:text-white/60">
-                    {totalPages}
-                  </span>
+                <div className="flex items-center gap-1 px-1 max-w-[min(100%,16rem)] overflow-x-auto no-scrollbar">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        aria-label={`Page ${page}`}
+                        aria-current={
+                          page === currentPage ? "page" : undefined
+                        }
+                        className={`min-w-[2.25rem] h-9 px-2 rounded-full text-xs font-bold shrink-0 transition-all ${
+                          page === currentPage
+                            ? "bg-[#FF4DA3] text-white shadow-[0_0_20px_-6px_#FF4DA3]"
+                            : "bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-black/60 dark:text-white/60 hover:border-[#FF4DA3]/30 hover:text-[#FF4DA3]"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ),
+                  )}
                 </div>
 
                 <button
@@ -942,12 +1135,15 @@ function AdminDashboard({ password }) {
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FF4DA3]/10 hover:border-[#FF4DA3]/30 transition-all font-medium text-sm"
+                  aria-label="Next page"
+                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#FF4DA3]/10 hover:border-[#FF4DA3]/30 transition-all text-[10px] sm:text-xs font-bold uppercase tracking-widest"
                 >
+                  Next
                   <ChevronRight size={16} />
                 </button>
               </div>
-            )}
+              ) : null}
+            </div>
           </>
         )}
       </div>
@@ -964,7 +1160,20 @@ function AdminDashboard({ password }) {
 {profitModalOpen && (
           <ProfitAnalyticsModal
             orders={orders}
+            adminFetch={adminFetch}
             onClose={() => setProfitModalOpen(false)}
+          />
+        )}
+{inventoryAlertsModalOpen && (
+          <InventoryAlertsModal
+            stockSummary={stockSummary}
+            loading={stockInventoryLoading}
+            onClose={() => setInventoryAlertsModalOpen(false)}
+            onRefresh={loadStockSummary}
+            onOpenFullInventory={() => {
+              setInventoryAlertsModalOpen(false);
+              setProductsModalOpen(true);
+            }}
           />
         )}
 {productsModalOpen && (
@@ -1760,258 +1969,97 @@ function DiscountCodeModal({ onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Profit analytics helpers
-// All bucketing uses Africa/Cairo to match how orders are displayed elsewhere,
-// so "today" / "this week" line up with the operator's local clock.
+// Inventory issues only — missing stock, low, oversold, catalog gaps
 // ─────────────────────────────────────────────────────────────────────────────
-const CAIRO_TZ = "Africa/Cairo";
-
-// Fallback when there are no dated orders yet — same as launch in Terms.
-// month is 0-indexed: 4 = May.
-const BRAND_START_DATE = new Date(2026, 4, 1);
-
-function fmtLongDate(d) {
-  return d.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function toCairoDate(iso) {
-  if (!iso) return null;
-  const normalized =
-    typeof iso === "string" &&
-    !/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) &&
-    /\d{2}:\d{2}/.test(iso)
-      ? `${iso}Z`
-      : iso;
-  const utc = new Date(normalized);
-  if (isNaN(utc)) return null;
-  // Re-construct a Date object whose y/m/d/h match Cairo wall-clock time.
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: CAIRO_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(utc);
-  const get = (t) => Number(parts.find((p) => p.type === t)?.value || 0);
-  return new Date(
-    get("year"),
-    get("month") - 1,
-    get("day"),
-    get("hour") % 24,
-    get("minute"),
-    get("second"),
-  );
-}
-
-/** “Now” on the Cairo wall clock — use for week/day buckets so labels match order dates. */
-function cairoWallNow() {
-  return toCairoDate(new Date().toISOString()) ?? new Date();
-}
-
-function startOfDay(d) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-/** Earliest Cairo calendar day of a non-cancelled order; else any order; else null. */
-function getFirstOrderDayStart(orders) {
-  if (!Array.isArray(orders) || orders.length === 0) return null;
-  let min = null;
-  for (const o of orders) {
-    if (o?.status === "cancelled") continue;
-    const d = toCairoDate(o?.created_at);
-    if (!d) continue;
-    const day = startOfDay(d);
-    if (!min || day < min) min = day;
+function inventoryIssueTone(issue) {
+  if (issue.severity === "oversold" || issue.reason === "oversold") {
+    return "urgent";
   }
-  if (min) return min;
-  for (const o of orders) {
-    const d = toCairoDate(o?.created_at);
-    if (!d) continue;
-    const day = startOfDay(d);
-    if (!min || day < min) min = day;
+  if (
+    issue.severity === "out" ||
+    issue.severity === "error" ||
+    issue.reason === "depleted"
+  ) {
+    return "urgent";
   }
-  return min;
+  if (issue.severity === "low" || issue.reason === "low") {
+    return "low";
+  }
+  return "setup";
 }
 
-// Week starts on Saturday — that's the standard week start in Egypt.
-function startOfWeek(d) {
-  const x = startOfDay(d);
-  const day = x.getDay(); // 0 = Sun, 6 = Sat
-  const diff = (day - 6 + 7) % 7;
-  x.setDate(x.getDate() - diff);
-  return x;
-}
+const ISSUE_SECTION_STYLES = {
+  urgent: {
+    title: "Urgent — restock now",
+    wrap: "border-red-500/35 bg-red-500/10",
+    heading: "text-red-800 dark:text-red-200",
+    item: "bg-red-500/5 border-red-500/25 text-red-900/95 dark:text-red-100/95",
+    badge: "bg-red-500/20 text-red-700 dark:text-red-300",
+  },
+  low: {
+    title: "Running low",
+    wrap: "border-amber-500/35 bg-amber-500/10",
+    heading: "text-amber-900 dark:text-amber-100",
+    item: "bg-amber-500/5 border-amber-500/25 text-amber-900/95 dark:text-amber-100/95",
+    badge: "bg-amber-500/20 text-amber-800 dark:text-amber-300",
+  },
+  setup: {
+    title: "Catalog setup",
+    wrap: "border-violet-500/35 bg-violet-500/10",
+    heading: "text-violet-900 dark:text-violet-100",
+    item: "bg-violet-500/5 border-violet-500/25 text-violet-900/95 dark:text-violet-100/95",
+    badge: "bg-violet-500/20 text-violet-800 dark:text-violet-300",
+  },
+};
 
-function startOfMonth(d) {
-  const x = new Date(d);
-  x.setDate(1);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
+function InventoryAlertsModal({
+  stockSummary,
+  loading,
+  onClose,
+  onRefresh,
+  onOpenFullInventory,
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState("all");
 
-function startOfYear(d) {
-  const x = new Date(d);
-  x.setMonth(0, 1);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
+  const grouped = useMemo(() => {
+    const urgent = [];
+    const low = [];
+    const setup = [];
+    if (!stockSummary) return { urgent, low, setup, all: [] };
 
-function addDays(d, n) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
-
-function addMonths(d, n) {
-  const x = new Date(d);
-  x.setMonth(x.getMonth() + n);
-  return x;
-}
-
-function fmtShortDate(d) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function fmtMonthYear(d) {
-  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-}
-
-// Profit math kept in one place — matches the per-order Profit breakdown card.
-//   profit = (items subtotal − discount) − total cost  (shipping excluded)
-// Returns null when the order has no cost data so we can flag/skip it.
-function orderProfit(o) {
-  if (o?.status === "cancelled") return null;
-  if (o?.cost_complete === false) return null;
-  const itemsSubtotal = Array.isArray(o?.items)
-    ? o.items.reduce(
-        (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
-        0,
-      )
-    : Math.max(0, Number(o?.total_price ?? 0) - Number(o?.shipping_fee ?? 0));
-  const discount = Number(o?.discount_amount ?? 0);
-  const totalCost = Number(o?.total_cost ?? 0);
-  return itemsSubtotal - discount - totalCost;
-}
-
-function aggregateInRange(orders, from, to) {
-  let revenue = 0;
-  let profit = 0;
-  let discounts = 0;
-  let count = 0;
-  let incomplete = 0;
-  for (const o of orders) {
-    if (o?.status === "cancelled") continue;
-    const d = toCairoDate(o?.created_at);
-    if (!d) continue;
-    if (d < from || d >= to) continue;
-    count += 1;
-    revenue += Number(o?.total_price ?? 0);
-    discounts += Number(o?.discount_amount ?? 0);
-    const p = orderProfit(o);
-    if (p === null) {
-      incomplete += 1;
-    } else {
-      profit += p;
+    for (const a of stockSummary.stockAlerts || []) {
+      const issue = { ...a, kind: "stock" };
+      const tone = inventoryIssueTone(issue);
+      if (tone === "urgent") urgent.push(issue);
+      else if (tone === "low") low.push(issue);
+      else setup.push(issue);
     }
-  }
-  return { revenue, profit, discounts, count, incomplete };
-}
-
-function ProfitAnalyticsModal({ orders, onClose }) {
-  const buckets = useMemo(() => {
-    const now = cairoWallNow();
-    const firstOrderDay = getFirstOrderDayStart(orders);
-    const floorDate = firstOrderDay ?? BRAND_START_DATE;
-    const analyticsFromFirstOrder = firstOrderDay !== null;
-
-    const todayStart = startOfDay(now);
-    const yesterdayStart = addDays(todayStart, -1);
-    const weekStart = startOfWeek(now);
-    const lastWeekStart = addDays(weekStart, -7);
-    const monthStart = startOfMonth(now);
-    const lastMonthStart = addMonths(monthStart, -1);
-    const yearStart = startOfYear(now);
-
-    const today = aggregateInRange(orders, todayStart, addDays(todayStart, 1));
-    const yesterday = aggregateInRange(orders, yesterdayStart, todayStart);
-    const thisWeek = aggregateInRange(orders, weekStart, addDays(weekStart, 7));
-    const lastWeek = aggregateInRange(orders, lastWeekStart, weekStart);
-    const thisMonth = aggregateInRange(
-      orders,
-      monthStart,
-      addMonths(monthStart, 1),
-    );
-    const lastMonth = aggregateInRange(orders, lastMonthStart, monthStart);
-    const thisYear = aggregateInRange(
-      orders,
-      yearStart,
-      addMonths(yearStart, 12),
-    );
-
-    // Hide misleading trend badges when the prior period is entirely before
-    // our analytics floor (first real order day, else launch fallback).
-    const yesterdayBeforeBrand = todayStart <= floorDate;
-    const lastWeekBeforeBrand = weekStart <= floorDate;
-    const lastMonthBeforeBrand = monthStart <= floorDate;
-
-    // Last 8 weeks (most recent first), labelled by Saturday → Friday range.
-    // Skip weeks that end on/before the analytics floor (no data window).
-    const weeks = [];
-    for (let i = 0; i < 8; i++) {
-      const start = addDays(weekStart, -7 * i);
-      const end = addDays(start, 7);
-      if (end <= floorDate) break;
-      const stats = aggregateInRange(orders, start, end);
-      const label =
-        i === 0
-          ? "This week"
-          : i === 1
-            ? "Last week"
-            : `${fmtShortDate(start)} – ${fmtShortDate(addDays(end, -1))}`;
-      weeks.push({
-        key: `w-${i}`,
-        label,
-        range: `${fmtShortDate(start)} – ${fmtShortDate(addDays(end, -1))}`,
-        ...stats,
-      });
+    for (const a of stockSummary.catalogAlerts || []) {
+      const issue = { ...a, kind: "catalog" };
+      const tone = inventoryIssueTone(issue);
+      if (tone === "urgent") urgent.push(issue);
+      else setup.push(issue);
     }
 
-    // Last 12 months (most recent first). Skip months ending on/before floor.
-    const months = [];
-    for (let i = 0; i < 12; i++) {
-      const start = addMonths(monthStart, -i);
-      const end = addMonths(start, 1);
-      if (end <= floorDate) break;
-      const stats = aggregateInRange(orders, start, end);
-      months.push({ key: `m-${i}`, label: fmtMonthYear(start), ...stats });
-    }
+    const all = [...urgent, ...low, ...setup];
+    return { urgent, low, setup, all };
+  }, [stockSummary]);
 
-    return {
-      today,
-      yesterday,
-      thisWeek,
-      lastWeek,
-      thisMonth,
-      lastMonth,
-      thisYear,
-      weeks,
-      months,
-      yesterdayBeforeBrand,
-      lastWeekBeforeBrand,
-      lastMonthBeforeBrand,
-      analyticsFloor: floorDate,
-      analyticsFromFirstOrder,
-    };
-  }, [orders]);
+  const visible =
+    filter === "all"
+      ? grouped.all
+      : filter === "urgent"
+        ? grouped.urgent
+        : filter === "low"
+          ? grouped.low
+          : grouped.setup;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await onRefresh?.();
+    setRefreshing(false);
+  };
 
   return (
     <div
@@ -2020,212 +2068,144 @@ function ProfitAnalyticsModal({ orders, onClose }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="animate-ui-fade-in-up w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-black/20 dark:shadow-black/60"
+        className="animate-ui-fade-in-up w-full max-w-lg max-h-[88vh] overflow-hidden flex flex-col bg-white dark:bg-[#0c0c0c] text-black dark:text-white border border-black/10 dark:border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between p-5 border-b border-black/10 dark:border-white/10 bg-white/95 dark:bg-[#0c0c0c]/95 backdrop-blur">
+        <div className="shrink-0 flex items-center justify-between gap-3 p-5 border-b border-black/10 dark:border-white/10">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <TrendingUp size={18} />
+            <div className="p-2.5 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400">
+              <AlertTriangle size={18} />
             </div>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-bold tracking-tight">
-                Profit Analytics
+                Stock issues
               </h2>
               <p className="text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40 mt-0.5">
-                Cairo time · cancelled & incomplete excluded
+                Missing · low · oversold only
               </p>
             </div>
           </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
+              aria-label="Refresh"
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40"
+            >
+              <RefreshCw
+                size={16}
+                className={loading || refreshing ? "animate-spin" : ""}
+              />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="shrink-0 px-5 pt-4 pb-2 flex flex-wrap gap-2">
+          {[
+            { id: "all", label: `All (${grouped.all.length})` },
+            { id: "urgent", label: `Urgent (${grouped.urgent.length})` },
+            { id: "low", label: `Low (${grouped.low.length})` },
+            { id: "setup", label: `Setup (${grouped.setup.length})` },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setFilter(t.id)}
+              className={`px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-bold border transition ${
+                filter === t.id
+                  ? "border-[#FF4DA3] bg-[#FF4DA3]/15 text-[#FF4DA3]"
+                  : "border-black/10 dark:border-white/10 text-black/50 dark:text-white/50"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-5 pt-2 space-y-4">
+          {loading && !stockSummary ? (
+            <div className="flex flex-col items-center py-16 text-black/50 dark:text-white/50">
+              <Loader2 className="animate-spin mb-3" size={26} />
+              <p className="text-xs">Loading issues…</p>
+            </div>
+          ) : grouped.all.length === 0 ? (
+            <div className="text-center py-16 text-black/45 dark:text-white/45 text-sm">
+              No stock issues right now.
+            </div>
+          ) : filter === "all" ? (
+            (["urgent", "low", "setup"]).map((key) => {
+              const items = grouped[key];
+              if (!items.length) return null;
+              const styles = ISSUE_SECTION_STYLES[key];
+              return (
+                <section
+                  key={key}
+                  className={`rounded-2xl border p-3 space-y-2 ${styles.wrap}`}
+                >
+                  <p
+                    className={`text-[10px] uppercase tracking-[0.2em] font-black ${styles.heading}`}
+                  >
+                    {styles.title} ({items.length})
+                  </p>
+                  <ul className="space-y-1.5">
+                    {items.map((issue, i) => (
+                      <li
+                        key={`${issue.kind}-${issue.productId || issue.id}-${issue.colorName || issue.color}-${issue.size}-${i}`}
+                        className={`text-[11px] sm:text-xs leading-relaxed px-3 py-2 rounded-xl border ${styles.item}`}
+                      >
+                        {issue.message ||
+                          `${issue.productName || issue.name}${issue.colorName || issue.color ? ` · ${issue.colorName || issue.color}` : ""}${issue.size ? ` · ${issue.size}` : ""}`}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              );
+            })
+          ) : (
+            <ul className="space-y-1.5">
+              {visible.map((issue, i) => {
+                const tone = inventoryIssueTone(issue);
+                const styles = ISSUE_SECTION_STYLES[tone];
+                return (
+                  <li
+                    key={`${issue.kind}-${issue.productId || issue.id}-${issue.colorName || issue.color}-${issue.size}-${i}`}
+                    className={`text-[11px] sm:text-xs leading-relaxed px-3 py-2.5 rounded-xl border ${styles.item}`}
+                  >
+                    <span
+                      className={`inline-block mr-2 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${styles.badge}`}
+                    >
+                      {issue.kind === "catalog" ? "Setup" : issue.severity || "stock"}
+                    </span>
+                    {issue.message ||
+                      `${issue.productName || issue.name}${issue.colorName || issue.color ? ` · ${issue.colorName || issue.color}` : ""}${issue.size ? ` · ${issue.size}` : ""}`}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="shrink-0 p-5 pt-2 border-t border-black/10 dark:border-white/10 space-y-2">
           <button
-            onClick={onClose}
-            aria-label="Close"
-            className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            type="button"
+            onClick={onOpenFullInventory}
+            className="w-full py-2.5 rounded-xl border border-black/10 dark:border-white/10 text-[10px] font-bold uppercase tracking-widest text-black/60 dark:text-white/60 hover:border-[#FF4DA3]/40 hover:text-[#FF4DA3] transition"
           >
-            <X size={18} />
+            Open full inventory & sales
           </button>
-        </div>
-
-        <div className="p-5 space-y-6">
-          {/* Quick-glance comparison cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <ComparisonCard
-              label="Today"
-              current={buckets.today}
-              previous={buckets.yesterday}
-              previousLabel="vs yesterday"
-              previousStartsBeforeBrand={buckets.yesterdayBeforeBrand}
-            />
-            <ComparisonCard
-              label="This Week"
-              current={buckets.thisWeek}
-              previous={buckets.lastWeek}
-              previousLabel="vs last week"
-              previousStartsBeforeBrand={buckets.lastWeekBeforeBrand}
-            />
-            <ComparisonCard
-              label="This Month"
-              current={buckets.thisMonth}
-              previous={buckets.lastMonth}
-              previousLabel="vs last month"
-              previousStartsBeforeBrand={buckets.lastMonthBeforeBrand}
-            />
-            <ComparisonCard
-              label="This Year"
-              current={buckets.thisYear}
-              accent="text-[#FF4DA3]"
-            />
-          </div>
-
-          {/* Brand opening note */}
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40">
-            <Calendar size={10} />
-            <span>
-              {buckets.analyticsFromFirstOrder ? (
-                <>
-                  Analytics from first order{" "}
-                  <span className="text-[#FF4DA3] font-bold">
-                    {fmtLongDate(buckets.analyticsFloor)}
-                  </span>
-                </>
-              ) : (
-                <>
-                  No orders yet — using launch date{" "}
-                  <span className="text-[#FF4DA3] font-bold">
-                    {fmtLongDate(buckets.analyticsFloor)}
-                  </span>
-                </>
-              )}
-            </span>
-          </div>
-
-          {/* Weekly breakdown */}
-          <BucketTable
-            title="Last 8 Weeks"
-            icon={Calendar}
-            rows={buckets.weeks}
-            subtitle="Each row is one Saturday–Friday week (Cairo). Old rows drop once the week ends on/before your analytics start (first order day, or launch date if there are no orders yet)."
-          />
-
-          {/* Monthly breakdown */}
-          <BucketTable
-            title="Last 12 Months"
-            icon={Calendar}
-            rows={buckets.months}
-          />
-
-          {/* Note */}
-          <div className="p-3 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 text-[11px] leading-relaxed text-black/50 dark:text-white/50">
-            <p>
-              <b>Profit formula:</b>{" "}
-              <span className="font-mono">
-                (items subtotal − discount) − total cost
-              </span>
-              . Shipping fees are excluded since they aren&apos;t kept by the
-              store. Cancelled orders are ignored. Orders with incomplete cost
-              data (missing in Sanity) are counted in the order count but
-              excluded from the profit total — fix them in Sanity to make the
-              analytics fully accurate.
-            </p>
-          </div>
+          <p className="text-[10px] text-center text-black/40 dark:text-white/40">
+            Fix stock in Sanity Studio, then refresh here.
+          </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function ComparisonCard({
-  label,
-  current,
-  previous,
-  previousLabel,
-  accent,
-  previousStartsBeforeBrand,
-}) {
-  // Decide whether we should compare to the previous period at all.
-  // We only show a trend badge when both sides have meaningful data — comparing
-  // a real week to an empty week (e.g. before the brand opened) would produce
-  // a misleading "+∞%" / "-100%" change.
-  const hasPrev =
-    previous !== undefined && !previousStartsBeforeBrand && previous.count > 0;
-
-  let trend = null;
-  let pct = null;
-  if (hasPrev) {
-    const diff = current.profit - previous.profit;
-    if (previous.profit !== 0) {
-      pct = Math.round((diff / Math.abs(previous.profit)) * 100);
-    }
-    trend = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
-  }
-
-  const profitClass =
-    current.profit > 0
-      ? accent || "text-emerald-600 dark:text-emerald-400"
-      : current.profit < 0
-        ? "text-red-600 dark:text-red-400"
-        : "text-black/50 dark:text-white/50";
-
-  const TrendIcon =
-    trend === "up" ? ArrowUp : trend === "down" ? ArrowDown : Minus;
-  const trendCls =
-    trend === "up"
-      ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
-      : trend === "down"
-        ? "text-red-600 dark:text-red-400 bg-red-500/10"
-        : "text-black/40 dark:text-white/40 bg-black/5 dark:bg-white/5";
-
-  // Cap absurd percentages so the badge stays readable when comparing tiny
-  // numbers (e.g. 1 EGP last week vs 200 EGP this week would otherwise show
-  // 19,900%).
-  const formatPct = (p) => {
-    if (p === null) return null;
-    const abs = Math.abs(p);
-    if (abs > 999) return "999+%";
-    return `${abs}%`;
-  };
-
-  return (
-    <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10">
-      <p className="text-[9px] uppercase tracking-[0.25em] text-black/40 dark:text-white/40">
-        {label}
-      </p>
-      <p className={`text-xl sm:text-2xl font-bold mt-1.5 ${profitClass}`}>
-        {Math.round(current.profit).toLocaleString()}{" "}
-        <span className="text-[10px] tracking-widest opacity-60">EGP</span>
-      </p>
-      <p className="text-[10px] text-black/40 dark:text-white/40">
-        {previousLabel}
-      </p>
-      <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
-        <span className="text-black/40 dark:text-white/40">
-          {current.count} {current.count === 1 ? "order" : "orders"}
-        </span>
-        {hasPrev && trend && pct !== null && (
-          <span
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-bold ${trendCls}`}
-            title={previousLabel}
-          >
-            <TrendIcon size={9} strokeWidth={3} />
-            {formatPct(pct)}
-          </span>
-        )}
-        {hasPrev && trend && pct === null && (
-          // Previous had orders but 0 profit (e.g. all incomplete) — show the
-          // direction without a misleading percentage.
-          <span
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-bold ${trendCls}`}
-            title={previousLabel}
-          >
-            <TrendIcon size={9} strokeWidth={3} />
-            new
-          </span>
-        )}
-      </div>
-      {current.incomplete > 0 && (
-        <p className="mt-1.5 text-[10px] text-amber-600 dark:text-amber-400/70">
-          {current.incomplete} incomplete
-        </p>
-      )}
     </div>
   );
 }
@@ -2415,10 +2395,16 @@ function ProductAnalyticsModal({ password, onClose }) {
                 <SummaryCard
                   label="Stock Alerts"
                   value={`${data.summary.outOfStock} out · ${data.summary.lowStock} low`}
-                  hint={`Low ≤ ${data.summary.lowStockThreshold} units`}
+                  hint={
+                    (data.summary.catalogIssues || 0) > 0
+                      ? `${data.summary.catalogIssues} catalog issue(s) · low ≤ ${data.summary.lowStockThreshold}`
+                      : `Low ≤ ${data.summary.lowStockThreshold} units`
+                  }
                   icon={AlertTriangle}
                   accent={
-                    data.summary.outOfStock > 0
+                    data.summary.outOfStock > 0 ||
+                    (data.summary.oversold || 0) > 0 ||
+                    (data.summary.catalogIssues || 0) > 0
                       ? "text-red-600 dark:text-red-400"
                       : data.summary.lowStock > 0
                         ? "text-amber-600 dark:text-amber-400"
@@ -2442,7 +2428,29 @@ function ProductAnalyticsModal({ password, onClose }) {
                 </div>
               )}
 
-              {data.summary.untrackedProducts > 0 && (
+              {Array.isArray(data.catalogAlerts) &&
+                data.catalogAlerts.length > 0 && (
+                  <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-4 space-y-2">
+                    <p className="text-xs font-bold text-violet-800 dark:text-violet-200">
+                      Catalog setup ({data.catalogAlerts.length})
+                    </p>
+                    <ul className="text-[11px] leading-relaxed text-violet-900/90 dark:text-violet-100/90 space-y-1 max-h-40 overflow-y-auto">
+                      {data.catalogAlerts.slice(0, 12).map((a, i) => (
+                        <li key={`${a.type}-${a.productId}-${a.colorName || ""}-${a.size || ""}-${i}`}>
+                          {a.message}
+                        </li>
+                      ))}
+                      {data.catalogAlerts.length > 12 && (
+                        <li className="opacity-70">
+                          +{data.catalogAlerts.length - 12} more…
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+              {data.summary.untrackedProducts > 0 &&
+                !(data.catalogAlerts?.length > 0) && (
                 <p className="text-[11px] text-black/50 dark:text-white/50">
                   <span className="font-bold text-amber-600 dark:text-amber-400">
                     {data.summary.untrackedProducts}
@@ -2577,52 +2585,162 @@ function SummaryCard({ label, value, hint, icon: Icon, accent }) {
   );
 }
 
+function collectDepletedVariants(product) {
+  if (!product?.tracked || !Array.isArray(product.byColor)) return [];
+  const items = [];
+  for (const c of product.byColor) {
+    const colorName = c.name || "Default";
+    const colorLevel = getStockLevel(c.totalStock);
+    const sizes = Array.isArray(c.sizes) ? c.sizes : [];
+    if (sizes.length === 0) continue;
+
+    if (colorLevel === "out" || colorLevel === "oversold") {
+      items.push({
+        key: `color-${colorName}`,
+        label: colorName,
+        level: colorLevel,
+      });
+      continue;
+    }
+
+    for (const s of sizes) {
+      const level = getStockLevel(s.stock);
+      if (level === "out" || level === "oversold") {
+        items.push({
+          key: `${colorName}-${s.size}`,
+          label: `${colorName} · ${s.size}`,
+          level,
+        });
+      }
+    }
+  }
+  return items;
+}
+
+const STOCK_PILL_BASE =
+  "inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1 sm:px-2 sm:py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold leading-tight ring-1";
+
+function StockStatusBadge({ tracked, stockLevel, stock }) {
+  if (!tracked) {
+    return (
+      <span
+        className={`${STOCK_PILL_BASE} bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/50 ring-black/10 dark:ring-white/10`}
+      >
+        Untracked
+      </span>
+    );
+  }
+  if (stockLevel === "oversold") {
+    return (
+      <span
+        className={`${STOCK_PILL_BASE} bg-red-500/15 text-red-700 dark:text-red-300 ring-red-500/35`}
+      >
+        <span>Oversold</span>
+        <span className="tabular-nums normal-case tracking-normal text-[11px] font-extrabold">
+          {stock}
+        </span>
+      </span>
+    );
+  }
+  if (stockLevel === "out") {
+    return (
+      <span
+        className={`${STOCK_PILL_BASE} bg-red-500/15 text-red-700 dark:text-red-300 ring-red-500/35`}
+      >
+        Out of stock
+      </span>
+    );
+  }
+  if (stockLevel === "low") {
+    return (
+      <span
+        className={`${STOCK_PILL_BASE} bg-amber-500/15 text-amber-800 dark:text-amber-200 ring-amber-500/35`}
+      >
+        <span>Low</span>
+        <span className="tabular-nums normal-case tracking-normal text-[11px] font-extrabold">
+          {stock}
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`${STOCK_PILL_BASE} bg-emerald-500/15 text-emerald-800 dark:text-emerald-200 ring-emerald-500/40`}
+    >
+      <span className="opacity-95">In stock</span>
+      <span className="tabular-nums normal-case tracking-normal text-[11px] sm:text-[10px] font-extrabold text-emerald-900 dark:text-emerald-100">
+        {Number(stock).toLocaleString()}
+      </span>
+    </span>
+  );
+}
+
+function DepletedVariantBadges({ variants }) {
+  if (!variants?.length) return null;
+
+  return (
+    <div
+      className="mt-1.5 flex flex-wrap items-center gap-1.5 w-full min-w-0"
+      role="list"
+      aria-label="Out of stock variants"
+    >
+      {variants.map((v) => (
+        <span
+          key={v.key}
+          role="listitem"
+          title={
+            v.level === "oversold"
+              ? `${v.label} oversold`
+              : `${v.label} sold out`
+          }
+          className="inline-flex max-w-full min-w-0 items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-700 dark:text-red-300 text-[9px] uppercase tracking-wide font-bold ring-1 ring-red-500/25"
+        >
+          <AlertTriangle size={9} strokeWidth={2.5} className="shrink-0" />
+          <span className="shrink-0 whitespace-nowrap">
+            {v.level === "oversold" ? "Oversold" : "Sold out"}
+          </span>
+          <span className="text-red-500/50 dark:text-red-300/50 shrink-0">·</span>
+          <span className="min-w-0 truncate normal-case tracking-normal font-semibold">
+            {v.label}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
   const tracked = product.tracked;
   const stock = product.totalStock;
   const initial = product.totalInitial;
   const sold = product.unitsSold;
-  const needsRestock = tracked && stock <= 5;
-  const isOutOfStock = tracked && stock <= 0;
+  const stockLevel = tracked ? getStockLevel(stock) : "ok";
+  const needsRestock =
+    tracked &&
+    (stockLevel === "oversold" ||
+      stockLevel === "out" ||
+      stockLevel === "low");
+  const isUrgentStock = stockLevel === "oversold" || stockLevel === "out";
   // Sell-through is what % of the initial stock has been sold. Only meaningful
   // when initialStock is set in Sanity.
   const sellThrough =
     initial > 0 ? Math.round((Math.min(sold, initial) / initial) * 100) : null;
-
-  let stockBadge;
-  if (!tracked) {
-    stockBadge = (
-      <span className="px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/10 text-[10px] uppercase tracking-widest text-black/50 dark:text-white/50">
-        Untracked
-      </span>
-    );
-  } else if (isOutOfStock) {
-    stockBadge = (
-      <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] uppercase tracking-widest font-bold">
-        Out of stock
-      </span>
-    );
-  } else if (stock <= 5) {
-    stockBadge = (
-      <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] uppercase tracking-widest font-bold">
-        Low · {stock}
-      </span>
-    );
-  } else {
-    stockBadge = (
-      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] uppercase tracking-widest font-bold">
-        In stock · {stock}
-      </span>
-    );
-  }
+  const depletedVariants = collectDepletedVariants(product);
+  const stockBadge = (
+    <StockStatusBadge
+      tracked={tracked}
+      stockLevel={stockLevel}
+      stock={stock}
+    />
+  );
 
   return (
     <div>
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-3 sm:gap-4 px-4 py-3 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
+        className="w-full flex items-start gap-3 sm:items-center sm:gap-4 px-4 py-3 text-left hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors"
       >
-        <span className="shrink-0">
+        <span className="shrink-0 pt-0.5">
           <input
             type="checkbox"
             checked={!!selected}
@@ -2644,19 +2762,23 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <p className="text-sm font-semibold truncate">{product.name}</p>
+          <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-2 min-w-0">
+            <p className="text-sm font-semibold truncate max-w-full">
+              {product.name}
+            </p>
             {needsRestock && (
               <span
-                className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] uppercase tracking-[0.18em] font-black ${
-                  isOutOfStock
+                className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] uppercase tracking-[0.18em] font-black whitespace-nowrap ${
+                  isUrgentStock
                     ? "bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/30"
                     : "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/30"
                 }`}
                 title={
-                  isOutOfStock
-                    ? "Out of stock - restock needed"
-                    : "Low stock - restock soon"
+                  stockLevel === "oversold"
+                    ? "Oversold — restock immediately"
+                    : stockLevel === "out"
+                      ? "Out of stock — restock needed"
+                      : "Low stock — restock soon"
                 }
               >
                 <AlertTriangle size={10} />
@@ -2682,19 +2804,30 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
               </span>
             )}
           </div>
+          {tracked ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 w-full min-w-0 sm:mt-1.5">
+              <div className="sm:hidden shrink-0">{stockBadge}</div>
+              <DepletedVariantBadges variants={depletedVariants} />
+            </div>
+          ) : (
+            <DepletedVariantBadges variants={depletedVariants} />
+          )}
         </div>
 
-        <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
-          {stockBadge}
+        <div className="hidden sm:flex flex-col items-end justify-center gap-1.5 shrink-0 min-w-[6.5rem]">
+          {tracked ? stockBadge : null}
           {tracked && initial > 0 && (
-            <span className="text-[10px] text-black/40 dark:text-white/40">
-              {stock} / {initial}
+            <span className="text-[10px] text-black/45 dark:text-white/45 tabular-nums whitespace-nowrap">
+              <span className="font-semibold text-black/70 dark:text-white/70">
+                {Number(stock).toLocaleString()}
+              </span>
+              <span className="opacity-70"> / {Number(initial).toLocaleString()}</span>
             </span>
           )}
         </div>
         <ChevronRight
           size={16}
-          className={`text-black/30 dark:text-white/30 shrink-0 transition-transform ${
+          className={`text-black/30 dark:text-white/30 shrink-0 mt-0.5 sm:mt-0 transition-transform ${
             expanded ? "rotate-90" : ""
           }`}
         />
@@ -2702,15 +2835,18 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4 bg-black/[0.02] dark:bg-white/[0.02]">
-          {/* Mobile-only stock badge (above the breakdown) */}
-          <div className="sm:hidden pt-3 flex items-center gap-2">
-            {stockBadge}
-            {tracked && initial > 0 && (
-              <span className="text-[10px] text-black/40 dark:text-white/40">
-                {stock} / {initial}
+          {tracked && initial > 0 && (
+            <p className="sm:hidden pt-3 text-[10px] text-black/50 dark:text-white/50 tabular-nums">
+              <span className="font-semibold text-black/70 dark:text-white/70">
+                {Number(stock).toLocaleString()}
               </span>
-            )}
-          </div>
+              <span className="opacity-70"> available</span>
+              <span className="opacity-50"> · </span>
+              <span className="opacity-70">
+                {Number(initial).toLocaleString()} initial
+              </span>
+            </p>
+          )}
 
           {/* Stock breakdown */}
           {tracked && product.byColor.length > 0 && (
@@ -2728,7 +2864,20 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
                     <div className="flex items-center justify-between gap-3 mb-2">
                       <span className="text-xs font-medium">{c.name}</span>
                       <span className="text-[10px] text-black/50 dark:text-white/50">
-                        Total: <b>{c.totalStock}</b>
+                        Total:{" "}
+                        <b
+                          className={
+                            getStockLevel(c.totalStock) === "oversold"
+                              ? "text-red-600 dark:text-red-400"
+                              : getStockLevel(c.totalStock) === "out"
+                                ? "text-red-600 dark:text-red-400"
+                                : getStockLevel(c.totalStock) === "low"
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : ""
+                          }
+                        >
+                          {c.totalStock}
+                        </b>
                         {c.totalInitial > 0 && (
                           <span className="opacity-60">
                             {" "}
@@ -2738,21 +2887,21 @@ function ProductRow({ product, expanded, onToggle, selected, onSelect }) {
                       </span>
                     </div>
                     {c.sizes.length === 0 ? (
-                      <p className="text-[10px] text-black/40 dark:text-white/40">
-                        No sizes set.
+                      <p className="text-[10px] font-medium text-red-600 dark:text-red-400">
+                        No stock rows for this color — add Stock by Size in
+                        Sanity.
                       </p>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-2">
                         {c.sizes.map((s) => {
-                          const isOut = s.stock === 0;
-                          const isLow = !isOut && s.stock <= 5;
+                          const level = getStockLevel(s.stock);
                           return (
                             <div
                               key={s.size}
-                              className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border text-[11px] ${
-                                isOut
+                              className={`flex items-center justify-between gap-3 px-2.5 py-2 sm:py-1.5 rounded-md border text-[11px] min-w-0 ${
+                                level === "oversold" || level === "out"
                                   ? "bg-red-500/5 border-red-500/30 text-red-600 dark:text-red-400"
-                                  : isLow
+                                  : level === "low"
                                     ? "bg-amber-500/5 border-amber-500/30 text-amber-700 dark:text-amber-400"
                                     : "bg-black/[0.03] dark:bg-white/5 border-black/10 dark:border-white/10"
                               }`}
@@ -2881,102 +3030,6 @@ function DistributionTable({ rows, emptyMessage, icon: Icon }) {
   );
 }
 
-function BucketTable({ title, icon: Icon, rows, subtitle }) {
-  // Bar lengths are scaled to the largest positive profit in the visible set
-  // so the chart stays readable regardless of absolute amounts.
-  const maxProfit = Math.max(1, ...rows.map((r) => Math.max(0, r.profit)));
-
-  if (!rows || rows.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="rounded-2xl bg-black/[0.02] dark:bg-white/5 border border-black/10 dark:border-white/10 overflow-hidden">
-      <div className="px-4 py-3 border-b border-black/5 dark:border-white/10">
-        <div className="flex items-center gap-2">
-          <Icon size={13} className="text-[#FF4DA3] shrink-0" />
-          <h3 className="text-[10px] uppercase tracking-[0.25em] font-bold text-black/60 dark:text-white/60">
-            {title}
-          </h3>
-        </div>
-        {subtitle ? (
-          <p className="mt-2 text-[10px] leading-relaxed text-black/45 dark:text-white/45 font-normal tracking-normal normal-case max-w-prose">
-            {subtitle}
-          </p>
-        ) : null}
-      </div>
-      <div className="divide-y divide-black/5 dark:divide-white/5">
-        {rows.map((r) => {
-          const isEmpty = r.count === 0;
-          const profitPct = (Math.max(0, r.profit) / maxProfit) * 100;
-          const profitCls = isEmpty
-            ? "text-black/30 dark:text-white/25"
-            : r.profit > 0
-              ? "text-emerald-600 dark:text-emerald-400"
-              : r.profit < 0
-                ? "text-red-600 dark:text-red-400"
-                : "text-black/40 dark:text-white/40";
-
-          return (
-            <div
-              key={r.key}
-              className={`px-4 py-3 grid grid-cols-12 gap-3 items-center text-xs ${
-                isEmpty ? "opacity-50" : ""
-              }`}
-            >
-              <div className="col-span-5 sm:col-span-4 min-w-0">
-                <p className="font-medium truncate">{r.label}</p>
-                {r.range && r.label !== r.range && (
-                  <p className="text-[10px] text-black/40 dark:text-white/40 truncate">
-                    {r.range}
-                  </p>
-                )}
-              </div>
-              <div className="col-span-3 sm:col-span-2 text-right">
-                <p className="text-black/50 dark:text-white/50">
-                  {isEmpty ? "—" : `${r.count} ord`}
-                </p>
-              </div>
-              <div className="col-span-4 sm:col-span-3 text-right hidden sm:block">
-                <p className="text-black/50 dark:text-white/50">
-                  {isEmpty ? (
-                    "—"
-                  ) : (
-                    <>
-                      {Math.round(r.revenue).toLocaleString()}{" "}
-                      <span className="opacity-60">rev</span>
-                    </>
-                  )}
-                </p>
-              </div>
-              <div className="col-span-4 sm:col-span-3 text-right">
-                <p className={`font-bold ${profitCls}`}>
-                  {isEmpty
-                    ? "—"
-                    : `${Math.round(r.profit).toLocaleString()} EGP`}
-                </p>
-                {r.incomplete > 0 && (
-                  <p className="text-[9px] text-amber-600 dark:text-amber-400/70">
-                    +{r.incomplete} incomplete
-                  </p>
-                )}
-                {r.profit > 0 && (
-                  <div className="mt-1 h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500/60 dark:bg-emerald-400/60 rounded-full"
-                      style={{ width: `${profitPct}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function StatCard({
   label,
   value,
@@ -3039,6 +3092,10 @@ function OrderCard({ order, onClick, customerOrderInfo }) {
   const transferRef = order.transaction_reference?.toString().trim();
   const proofUrl = order.payment_proof_url?.toString().trim();
   const instapayOk = paymentOnline && Boolean(proofUrl);
+  const fulfillmentIssues = Array.isArray(order.fulfillment_issues)
+    ? order.fulfillment_issues
+    : [];
+  const needsFulfillment = orderNeedsFulfillment(order);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" || e.key === " ") {
@@ -3064,11 +3121,22 @@ function OrderCard({ order, onClick, customerOrderInfo }) {
             {formatDateTime(order.created_at)}
           </p>
         </div>
-        <div
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${meta.bg} ${meta.color} ring-1 ${meta.ring} shrink-0`}
-        >
-          <StatusIcon size={11} />
-          {meta.label}
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          {needsFulfillment && (
+            <span
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-500/15 text-red-700 dark:text-red-300 ring-1 ring-red-500/40"
+              title="Customer ordered item(s) that need restock"
+            >
+              <AlertTriangle size={10} />
+              Restock
+            </span>
+          )}
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${meta.bg} ${meta.color} ring-1 ${meta.ring}`}
+          >
+            <StatusIcon size={11} />
+            {meta.label}
+          </div>
         </div>
       </div>
 
@@ -3278,6 +3346,9 @@ function OrderModal({
   const StatusIcon = meta.icon;
   const actions = STATUS_ACTIONS[order.status] ?? [];
   const items = Array.isArray(order.items) ? order.items : [];
+  const fulfillmentIssues = Array.isArray(order.fulfillment_issues)
+    ? order.fulfillment_issues
+    : [];
   const proofUrl = order.payment_proof_url?.toString().trim();
   const [updating, setUpdating] = useState(null);
 
@@ -3349,6 +3420,28 @@ function OrderModal({
               </div>
             )}
           </div>
+
+          {fulfillmentIssues.length > 0 && (
+            <div className="rounded-2xl border-2 border-red-500/40 bg-red-500/10 p-4 space-y-2">
+              <p className="text-xs font-black uppercase tracking-widest text-red-800 dark:text-red-200 flex items-center gap-2">
+                <AlertTriangle size={14} />
+                Restock before shipping
+              </p>
+              <ul className="text-[11px] sm:text-xs leading-relaxed text-red-900/90 dark:text-red-100/90 space-y-1.5">
+                {fulfillmentIssues.map((issue, i) => (
+                  <li key={`${issue.productId}-${issue.color}-${issue.size}-${i}`}>
+                    {fulfillmentIssueMessage(issue)}
+                    {issue.source === "order" && (
+                      <span className="text-red-700/70 dark:text-red-200/60">
+                        {" "}
+                        · flagged at checkout
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <InfoRow label="Customer" value={order.customer_name} />
@@ -3447,10 +3540,18 @@ function OrderModal({
               Items ({items.reduce((s, it) => s + Number(it.quantity ?? 0), 0)})
             </p>
             <div className="space-y-2">
-              {items.map((it, idx) => (
+              {items.map((it, idx) => {
+                const lineIssue = fulfillmentIssues.find((issue) =>
+                  itemMatchesFulfillmentIssue(it, issue),
+                );
+                return (
                 <div
                   key={`${it.id}-${idx}`}
-                  className="flex gap-4 items-center p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/5"
+                  className={`flex gap-4 items-center p-3 rounded-xl border ${
+                    lineIssue
+                      ? "bg-red-500/5 border-red-500/35 dark:bg-red-500/10"
+                      : "bg-black/[0.02] dark:bg-white/[0.03] border-black/5 dark:border-white/5"
+                  }`}
                 >
                   <div className="w-20 h-24 sm:w-24 sm:h-28 rounded-lg overflow-hidden bg-black/5 dark:bg-white/5 shrink-0">
                     {it.image ? (
@@ -3482,6 +3583,11 @@ function OrderModal({
                       <span className="px-2 py-0.5 rounded-full bg-[#FF4DA3]/10 text-[10px] uppercase tracking-wider text-[#FF4DA3] font-bold">
                         × {it.quantity}
                       </span>
+                      {lineIssue && (
+                        <span className="px-2 py-0.5 rounded-full bg-red-500/15 text-[9px] uppercase tracking-wider text-red-700 dark:text-red-300 font-bold">
+                          {fulfillmentReasonLabel(lineIssue.reason)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -3504,7 +3610,8 @@ function OrderModal({
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </div>
 
@@ -3547,7 +3654,7 @@ function OrderModal({
                   </div>
                 )}
                 <div className="flex justify-between items-end pt-2 border-t border-black/10 dark:border-white/10">
-                  <span className="text-sm font-serif italic">Total</span>
+                  <span className="text-sm zoya-heading !text-sm">Total</span>
                   <span className="text-xl font-bold text-[#FF4DA3]">
                     {Number(order.total_price ?? 0).toLocaleString()} EGP
                   </span>
@@ -3564,10 +3671,6 @@ function OrderModal({
               order.profit !== null && order.profit !== undefined;
             if (!hasCost && !hasProfit) return null;
 
-            // Profit math, broken out so it's auditable at a glance:
-            //   itemsSubtotal − discount = netRevenue (what we actually keep on items)
-            //   netRevenue − totalCost   = profit
-            // Shipping is intentionally excluded — it isn't ours to keep.
             const itemsSubtotal = items.reduce(
               (s, it) => s + Number(it.price ?? 0) * Number(it.quantity ?? 0),
               0,
@@ -3575,7 +3678,11 @@ function OrderModal({
             const discountAmount = Number(order.discount_amount ?? 0);
             const totalCost = Number(order.total_cost ?? 0);
             const netRevenue = Math.max(0, itemsSubtotal - discountAmount);
-            const computedProfit = netRevenue - totalCost;
+            const computedProfit =
+              order.net_product_profit !== null &&
+              order.net_product_profit !== undefined
+                ? Number(order.net_product_profit)
+                : orderProfit(order);
             const margin =
               netRevenue > 0
                 ? Math.round((computedProfit / netRevenue) * 100)
@@ -3644,7 +3751,7 @@ function OrderModal({
 
                 <div className="flex justify-between items-end pt-2 border-t border-amber-500/20 dark:border-amber-500/10">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-serif italic">Profit</span>
+                    <span className="text-sm zoya-heading !text-sm">Profit</span>
                     {margin !== null && order.cost_complete !== false && (
                       <span className="text-[10px] uppercase tracking-widest text-black/40 dark:text-white/40">
                         ({margin}% margin)
@@ -3728,3 +3835,6 @@ function InfoRow({ label, value, icon: Icon }) {
     </div>
   );
 }
+
+
+

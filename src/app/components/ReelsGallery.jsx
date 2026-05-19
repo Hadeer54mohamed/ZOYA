@@ -3,19 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Play, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import {
-  Navigation,
-  Pagination,
-  Autoplay,
-  EffectCoverflow,
-} from "swiper/modules";
-
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
-import "swiper/css/effect-coverflow";
-
 const InstagramIcon = (props) => (
   <svg
     viewBox="0 0 24 24"
@@ -96,6 +83,148 @@ function ReelPreview({ reel }) {
   );
 }
 
+function ReelsSwiperCarousel({
+  bundle,
+  reels,
+  enableLoop,
+  inView,
+  slidesPerViewCap,
+  openReel,
+}) {
+  const { Swiper, SwiperSlide } = bundle;
+
+  return (
+    <div className="reels-swiper-wrap relative px-2">
+      <Swiper
+        modules={bundle.modules}
+        effect="coverflow"
+        centeredSlides
+        loop={enableLoop}
+        grabCursor
+        watchSlidesProgress
+        simulateTouch
+        allowTouchMove
+        touchRatio={1}
+        threshold={10}
+        longSwipesMs={280}
+        slidesPerView={Math.min(slidesPerViewCap, 1.3)}
+        spaceBetween={12}
+        speed={450}
+        touchStartPreventDefault={false}
+        preventClicks={false}
+        preventClicksPropagation={false}
+        onTap={(swiper) => openReelFromTap(swiper, reels, openReel)}
+        onClick={(swiper) => openReelFromTap(swiper, reels, openReel)}
+        coverflowEffect={{
+          rotate: 0,
+          stretch: 0,
+          depth: 60,
+          modifier: 1,
+          slideShadows: false,
+        }}
+        breakpoints={{
+          480: {
+            slidesPerView: Math.min(slidesPerViewCap, 1.6),
+            spaceBetween: 14,
+            coverflowEffect: {
+              rotate: 0,
+              stretch: 0,
+              depth: 70,
+              modifier: 1,
+              slideShadows: false,
+            },
+          },
+          640: {
+            slidesPerView: Math.min(slidesPerViewCap, 2.2),
+            spaceBetween: 18,
+            coverflowEffect: {
+              rotate: 0,
+              stretch: 0,
+              depth: 90,
+              modifier: 1.2,
+              slideShadows: false,
+            },
+          },
+          768: {
+            slidesPerView: Math.min(slidesPerViewCap, 3),
+            spaceBetween: 20,
+            coverflowEffect: {
+              rotate: 0,
+              stretch: 0,
+              depth: 100,
+              modifier: 1.3,
+              slideShadows: false,
+            },
+          },
+          1024: {
+            slidesPerView: Math.min(slidesPerViewCap, 3.5),
+            spaceBetween: 24,
+            coverflowEffect: {
+              rotate: 0,
+              stretch: 0,
+              depth: 120,
+              modifier: 1.4,
+              slideShadows: false,
+            },
+          },
+          1280: {
+            slidesPerView: slidesPerViewCap,
+            spaceBetween: 24,
+            coverflowEffect: {
+              rotate: 0,
+              stretch: 0,
+              depth: 130,
+              modifier: 1.5,
+              slideShadows: false,
+            },
+          },
+        }}
+        autoplay={
+          enableLoop && inView
+            ? {
+                delay: 4500,
+                disableOnInteraction: false,
+                pauseOnMouseEnter: true,
+              }
+            : false
+        }
+        navigation={{ prevEl: ".ig-prev", nextEl: ".ig-next" }}
+        pagination={{
+          el: ".reels-pagination",
+          clickable: true,
+          dynamicBullets: true,
+          dynamicMainBullets: 4,
+        }}
+        className="!px-4 !py-6 sm:!px-6 sm:!py-8"
+      >
+        {reels.map((reel) => (
+          <SwiperSlide key={reel.id} className="!h-auto">
+            <ReelSlideCard reel={reel} onOpen={openReel} />
+          </SwiperSlide>
+        ))}
+      </Swiper>
+
+      <button
+        type="button"
+        className="ig-prev absolute top-1/2 left-2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black shadow-lg backdrop-blur-md transition hover:border-[#FF4DA3] hover:bg-[#FF4DA3] hover:text-white md:flex lg:left-6 dark:border-white/10 dark:bg-black/60 dark:text-white"
+        aria-label="Previous"
+      >
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+
+      <button
+        type="button"
+        className="ig-next absolute top-1/2 right-2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black shadow-lg backdrop-blur-md transition hover:border-[#FF4DA3] hover:bg-[#FF4DA3] hover:text-white md:flex lg:right-6 dark:border-white/10 dark:bg-black/60 dark:text-white"
+        aria-label="Next"
+      >
+        <ChevronRight className="h-5 w-5" />
+      </button>
+
+      <div className="reels-pagination !relative !bottom-0 !mt-4 flex justify-center md:hidden" />
+    </div>
+  );
+}
+
 function ReelSlideCard({ reel, onOpen }) {
   return (
     <div className="group relative h-full w-full">
@@ -143,6 +272,7 @@ export default function ReelsGallery({ reels = [] }) {
   const [isModalClosing, setIsModalClosing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [inView, setInView] = useState(false);
+  const [swiperBundle, setSwiperBundle] = useState(null);
   const videoRef = useRef(null);
   const sectionRef = useRef(null);
 
@@ -158,6 +288,37 @@ export default function ReelsGallery({ reels = [] }) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!inView || swiperBundle) return;
+    let cancelled = false;
+    (async () => {
+      await Promise.all([
+        import("swiper/css"),
+        import("swiper/css/navigation"),
+        import("swiper/css/pagination"),
+        import("swiper/css/effect-coverflow"),
+      ]);
+      const [reactMod, modulesMod] = await Promise.all([
+        import("swiper/react"),
+        import("swiper/modules"),
+      ]);
+      if (cancelled) return;
+      setSwiperBundle({
+        Swiper: reactMod.Swiper,
+        SwiperSlide: reactMod.SwiperSlide,
+        modules: [
+          modulesMod.Navigation,
+          modulesMod.Pagination,
+          modulesMod.Autoplay,
+          modulesMod.EffectCoverflow,
+        ],
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inView, swiperBundle]);
 
   const hasReels = Array.isArray(reels) && reels.length > 0;
   const enableLoop = reels.length > 1;
@@ -326,135 +487,23 @@ export default function ReelsGallery({ reels = [] }) {
             </div>
             <p className="text-sm">No reels available yet</p>
           </div>
-        ) : (
-          <div className="reels-swiper-wrap relative px-2">
-            <Swiper
-              modules={[Navigation, EffectCoverflow, Pagination, Autoplay]}
-              effect="coverflow"
-              centeredSlides
-              loop={enableLoop}
-              grabCursor
-              watchSlidesProgress
-              simulateTouch
-              allowTouchMove
-              touchRatio={1}
-              threshold={10}
-              longSwipesMs={280}
-              slidesPerView={Math.min(slidesPerViewCap, 1.3)}
-              spaceBetween={12}
-              speed={450}
-              touchStartPreventDefault={false}
-              preventClicks={false}
-              preventClicksPropagation={false}
-              onTap={(swiper) => openReelFromTap(swiper, reels, openReel)}
-              onClick={(swiper) => openReelFromTap(swiper, reels, openReel)}
-              coverflowEffect={{
-                rotate: 0,
-                stretch: 0,
-                depth: 60,
-                modifier: 1,
-                slideShadows: false,
-              }}
-              breakpoints={{
-                480: {
-                  slidesPerView: Math.min(slidesPerViewCap, 1.6),
-                  spaceBetween: 14,
-                  coverflowEffect: {
-                    rotate: 0,
-                    stretch: 0,
-                    depth: 70,
-                    modifier: 1,
-                    slideShadows: false,
-                  },
-                },
-                640: {
-                  slidesPerView: Math.min(slidesPerViewCap, 2.2),
-                  spaceBetween: 18,
-                  coverflowEffect: {
-                    rotate: 0,
-                    stretch: 0,
-                    depth: 90,
-                    modifier: 1.2,
-                    slideShadows: false,
-                  },
-                },
-                768: {
-                  slidesPerView: Math.min(slidesPerViewCap, 3),
-                  spaceBetween: 20,
-                  coverflowEffect: {
-                    rotate: 0,
-                    stretch: 0,
-                    depth: 100,
-                    modifier: 1.3,
-                    slideShadows: false,
-                  },
-                },
-                1024: {
-                  slidesPerView: Math.min(slidesPerViewCap, 3.5),
-                  spaceBetween: 24,
-                  coverflowEffect: {
-                    rotate: 0,
-                    stretch: 0,
-                    depth: 120,
-                    modifier: 1.4,
-                    slideShadows: false,
-                  },
-                },
-                1280: {
-                  slidesPerView: slidesPerViewCap,
-                  spaceBetween: 24,
-                  coverflowEffect: {
-                    rotate: 0,
-                    stretch: 0,
-                    depth: 130,
-                    modifier: 1.5,
-                    slideShadows: false,
-                  },
-                },
-              }}
-              autoplay={
-                enableLoop && inView
-                  ? {
-                      delay: 4500,
-                      disableOnInteraction: false,
-                      pauseOnMouseEnter: true,
-                    }
-                  : false
-              }
-              navigation={{ prevEl: ".ig-prev", nextEl: ".ig-next" }}
-              pagination={{
-                el: ".reels-pagination",
-                clickable: true,
-                dynamicBullets: true,
-                dynamicMainBullets: 4,
-              }}
-              className="!px-4 !py-6 sm:!px-6 sm:!py-8"
-            >
-              {reels.map((reel) => (
-                <SwiperSlide key={reel.id} className="!h-auto">
-                  <ReelSlideCard reel={reel} onOpen={openReel} />
-                </SwiperSlide>
-              ))}
-            </Swiper>
-
-            <button
-              type="button"
-              className="ig-prev absolute top-1/2 left-2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black shadow-lg backdrop-blur-md transition hover:border-[#FF4DA3] hover:bg-[#FF4DA3] hover:text-white md:flex lg:left-6 dark:border-white/10 dark:bg-black/60 dark:text-white"
-              aria-label="Previous"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-
-            <button
-              type="button"
-              className="ig-next absolute top-1/2 right-2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/80 text-black shadow-lg backdrop-blur-md transition hover:border-[#FF4DA3] hover:bg-[#FF4DA3] hover:text-white md:flex lg:right-6 dark:border-white/10 dark:bg-black/60 dark:text-white"
-              aria-label="Next"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-
-            <div className="reels-pagination !relative !bottom-0 !mt-4 flex justify-center md:hidden" />
+        ) : !swiperBundle ? (
+          <div className="reels-swiper-wrap relative flex min-h-[380px] items-center justify-center px-4 py-8">
+            {reels[0] ? (
+              <div className="w-full max-w-[280px] opacity-90">
+                <ReelSlideCard reel={reels[0]} onOpen={openReel} />
+              </div>
+            ) : null}
           </div>
+        ) : (
+          <ReelsSwiperCarousel
+            bundle={swiperBundle}
+            reels={reels}
+            enableLoop={enableLoop}
+            inView={inView}
+            slidesPerViewCap={slidesPerViewCap}
+            openReel={openReel}
+          />
         )}
       </div>
 
@@ -496,23 +545,52 @@ export default function ReelsGallery({ reels = [] }) {
           opacity: 0.85;
         }
         .reels-swiper-wrap .reels-pagination .swiper-pagination-bullet {
-          background: rgba(0, 0, 0, 0.2);
+          position: relative;
           opacity: 1;
-          width: 6px;
-          height: 6px;
-          margin: 0 3px !important;
+          width: 44px;
+          height: 44px;
+          margin: 0 !important;
+          background: transparent;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .reels-swiper-wrap .reels-pagination .swiper-pagination-bullet::after {
+          content: "";
+          display: block;
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: rgba(0, 0, 0, 0.25);
           transition: all 0.3s ease;
         }
         :global(.dark)
           .reels-swiper-wrap
           .reels-pagination
-          .swiper-pagination-bullet {
-          background: rgba(255, 255, 255, 0.2);
+          .swiper-pagination-bullet::after {
+          background: rgba(255, 255, 255, 0.25);
         }
-        .reels-swiper-wrap .reels-pagination .swiper-pagination-bullet-active {
-          background: #ff4da3;
+        .reels-swiper-wrap
+          .reels-pagination
+          .swiper-pagination-bullet-active::after {
           width: 22px;
-          border-radius: 999px;
+          background: #ff4da3;
+        }
+        @media (min-width: 768px) {
+          .reels-swiper-wrap .reels-pagination .swiper-pagination-bullet {
+            width: 10px;
+            height: 10px;
+            margin: 0 3px !important;
+          }
+          .reels-swiper-wrap .reels-pagination .swiper-pagination-bullet::after {
+            width: 6px;
+            height: 6px;
+          }
+          .reels-swiper-wrap
+            .reels-pagination
+            .swiper-pagination-bullet-active::after {
+            width: 18px;
+          }
         }
       `}</style>
     </section>

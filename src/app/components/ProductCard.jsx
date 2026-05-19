@@ -1,7 +1,6 @@
 "use client";
 
-import { motion, useMotionValue, useSpring } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
@@ -10,6 +9,7 @@ import Skeleton from "./Skeleton";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { colorImageList } from "../lib/colorImages";
+import { imageLoadingProps } from "../lib/imageLoading";
 
 const FALLBACK_COLOR = {
   name: "Default",
@@ -17,18 +17,7 @@ const FALLBACK_COLOR = {
   images: ["/images/placeholder.webp"],
 };
 
-function CardShell({ lite, className, children, ...motionProps }) {
-  if (lite) {
-    return <div className={className}>{children}</div>;
-  }
-  return (
-    <motion.div className={className} {...motionProps}>
-      {children}
-    </motion.div>
-  );
-}
-
-export default function ProductCard({ product, lite = false, priorityImage = false }) {
+export default function ProductCard({ product, priorityImage = false }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const colors =
@@ -50,21 +39,6 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
     slideCount > 0
       ? Math.min(Math.max(0, imgIdx), slideCount - 1)
       : 0;
-
-  const [tiltEnabled, setTiltEnabled] = useState(false);
-  const rotateX = useMotionValue(0);
-  const rotateY = useMotionValue(0);
-  const smoothX = useSpring(rotateX, { stiffness: 150, damping: 20 });
-  const smoothY = useSpring(rotateY, { stiffness: 150, damping: 20 });
-
-  useEffect(() => {
-    if (lite) return;
-    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const update = () => setTiltEnabled(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, [lite]);
 
   const originalPrice =
     typeof product.originalPrice === "number" &&
@@ -123,45 +97,11 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
   };
 
   const cardClass =
-    "group relative rounded-2xl overflow-hidden bg-gradient-to-b from-black/[0.04] to-black/[0.01] dark:from-white/[0.06] dark:to-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 hover:shadow-[0_20px_60px_-15px_rgba(255,46,136,0.25)] transition-all duration-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3]" +
-    (lite ? " hover:-translate-y-1" : "");
+    "group relative rounded-2xl overflow-hidden bg-gradient-to-b from-black/[0.04] to-black/[0.01] dark:from-white/[0.06] dark:to-white/[0.02] border border-black/10 dark:border-white/10 hover:border-black/20 dark:hover:border-white/20 hover:shadow-[0_20px_60px_-15px_rgba(255,46,136,0.25)] transition-all duration-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4DA3] hover:-translate-y-1";
 
   return (
     <>
-      <CardShell
-        lite={lite}
-        className={cardClass}
-        onMouseMove={
-          !lite && tiltEnabled
-            ? (e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                rotateX.set(-(y - rect.height / 2) / 35);
-                rotateY.set((x - rect.width / 2) / 35);
-              }
-            : undefined
-        }
-        onMouseLeave={
-          !lite && tiltEnabled
-            ? () => {
-                rotateX.set(0);
-                rotateY.set(0);
-              }
-            : undefined
-        }
-        whileHover={!lite && tiltEnabled ? { y: -10 } : !lite ? { y: -4 } : undefined}
-        transition={lite ? undefined : { type: "spring", stiffness: 200, damping: 20 }}
-        style={
-          !lite && tiltEnabled
-            ? {
-                rotateX: smoothX,
-                rotateY: smoothY,
-                transformStyle: "preserve-3d",
-              }
-            : undefined
-        }
-      >
+      <div className={cardClass}>
         {/* Image Section — clickable to open QuickView */}
         <div
           ref={imgWrapRef}
@@ -204,13 +144,11 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
                   alt={`${product.name} — ${activeColor.name} (${i + 1})`}
                   fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  priority={priorityImage && i === 0}
-                  loading={priorityImage && i === 0 ? "eager" : "lazy"}
+                  {...imageLoadingProps(priorityImage && i === 0)}
                   onLoad={() => {
                     if (i === safeIdx) setIsLoaded(true);
                   }}
                   className="object-cover transition duration-700 ease-out group-hover:scale-105 opacity-100"
-                  style={tiltEnabled ? { transform: "translateZ(40px) scale(1.05)" } : undefined}
                 />
               </div>
             ))}
@@ -324,12 +262,11 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
                 <path d="m12 5 7 7-7 7" />
               </svg>
             </button>
-            <motion.button
+            <button
               type="button"
               onClick={stopAndOpenQuickView}
-              whileTap={{ scale: 0.92 }}
               aria-label="Quick view — choose color and size"
-              className="h-9 w-9 grid place-items-center rounded-full shadow-lg bg-[#FF4DA3] text-black"
+              className="h-9 w-9 grid place-items-center rounded-full shadow-lg bg-[#FF4DA3] text-black active:scale-95 transition-transform"
             >
               <svg
                 width="14"
@@ -344,7 +281,7 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
                 <path d="M12 5v14" />
                 <path d="M5 12h14" />
               </svg>
-            </motion.button>
+            </button>
           </div>
 
           {/* Desktop: hover actions */}
@@ -357,12 +294,11 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
               >
                 Quick View
               </button>
-              <motion.button
+              <button
                 type="button"
                 onClick={stopAndOpenQuickView}
-                whileTap={{ scale: 0.92 }}
                 aria-label="Quick view — choose color and size"
-                className="h-10 w-10 grid place-items-center rounded-full hover:scale-105 bg-[#FF4DA3] text-black"
+                className="h-10 w-10 grid place-items-center rounded-full hover:scale-105 active:scale-95 bg-[#FF4DA3] text-black transition-transform"
               >
                 <svg
                   width="14"
@@ -377,7 +313,7 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
                   <path d="M12 5v14" />
                   <path d="M5 12h14" />
                 </svg>
-              </motion.button>
+              </button>
             </div>
           </div>
         </div>
@@ -391,7 +327,7 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
             tabIndex={0}
             className="cursor-pointer"
           >
-            <p className="text-black/50 dark:text-white/40 text-[9px] sm:text-[10px] tracking-[0.2em] uppercase">
+            <p className="text-black/60 dark:text-white/60 text-[9px] sm:text-[10px] tracking-[0.2em] uppercase">
               {product.category}
             </p>
             <h3 className="text-black dark:text-white text-sm sm:text-[15px] font-medium truncate mt-0.5 sm:mt-1 group-hover:text-[#FF4DA3] transition-colors duration-300">
@@ -400,12 +336,11 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
 
             {/* Price row */}
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <motion.span
-                whileHover={{ scale: 1.05 }} className="text-[#FF4DA3] text-sm sm:text-base font-bold">
+              <span className="text-[#FF4DA3] text-sm sm:text-base font-bold">
                 EGP {product.price}
-              </motion.span>
+              </span>
               {hasDiscount && (
-                <span className="text-black/40 dark:text-white/30 text-[11px] sm:text-xs line-through">
+                <span className="text-black/60 dark:text-white/60 text-[11px] sm:text-xs line-through">
                   EGP {originalPrice}
                 </span>
               )}
@@ -446,19 +381,19 @@ export default function ProductCard({ product, lite = false, priorityImage = fal
                 />
               ))}
               {colors.length > 5 && (
-                <span className="text-black/50 dark:text-white/40 text-[10px] ml-1">
+                <span className="text-black/60 dark:text-white/60 text-[10px] ml-1">
                   +{colors.length - 5}
                 </span>
               )}
             </div>
 
-            <span className="text-black/50 dark:text-white/40 text-[9px] sm:text-[10px] tracking-widest uppercase truncate">
+            <span className="text-black/60 dark:text-white/60 text-[9px] sm:text-[10px] tracking-widest uppercase truncate">
               {activeColor.name}
             </span>
           </div>
         </div>
 
-      </CardShell>
+      </div>
 
       {isOpen && (
         <QuickView

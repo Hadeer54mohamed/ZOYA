@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ProductCard from "../components/ProductCard";
+import { ABOVE_FOLD_PRODUCT_COUNT } from "../lib/imageLoading";
+import { scrollPageToTopReliable } from "../lib/scrollToTop";
 
 const SORT_OPTIONS = [
   { id: "featured", label: "Featured" },
@@ -129,14 +131,6 @@ function ProductsPageContent({ products, categories }) {
   const gridRef = useRef(null);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    const raf = requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    });
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
-  useEffect(() => {
     setQuery(searchParams.get("q") || "");
   }, [searchParams]);
 
@@ -189,15 +183,24 @@ function ProductsPageContent({ products, categories }) {
     }
   };
 
-  const didMountRef = useRef(false);
+  const filtersReadyRef = useRef(false);
   useEffect(() => {
     setPage(1);
-    if (!didMountRef.current) {
-      didMountRef.current = true;
-      return;
-    }
+    if (!filtersReadyRef.current) return;
     scrollToGrid();
   }, [activeCategory, query, sort]);
+
+  useEffect(() => {
+    const cancel = scrollPageToTopReliable();
+    const readyTimer = window.setTimeout(() => {
+      filtersReadyRef.current = true;
+    }, 800);
+    return () => {
+      cancel?.();
+      window.clearTimeout(readyTimer);
+      filtersReadyRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -405,7 +408,11 @@ function ProductsPageContent({ products, categories }) {
                     className="fade-in-view"
                     style={{ animationDelay: `${Math.min(i * 0.05, 0.4)}s` }}
                   >
-                    <ProductCard product={p} lite />
+                    <ProductCard
+                      product={p}
+                      lite
+                      priorityImage={page === 1 && i < ABOVE_FOLD_PRODUCT_COUNT}
+                    />
                   </div>
                 ))
               ) : (

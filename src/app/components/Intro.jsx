@@ -1,76 +1,60 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { lockBodyScroll, unlockBodyScroll } from "../lib/bodyScrollLock";
+import { markIntroSeen } from "../lib/introSession";
 
-const INTRO_KEY = "zoya-intro-seen";
+const TOTAL_MS = 4200;
+const PHASE_2_MS = 1900;
+const PHASE_3_MS = 2800;
+const COUNTER_MS = 1700;
 
 export default function Intro() {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(true);
   const [phase, setPhase] = useState(0);
   const [exiting, setExiting] = useState(false);
   const [counter, setCounter] = useState(0);
+  const exitingRef = useRef(false);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (sessionStorage.getItem(INTRO_KEY)) return;
-
-    const isMobile = window.matchMedia("(max-width: 767px)").matches;
-    if (isMobile) {
-      try {
-        sessionStorage.setItem(INTRO_KEY, "1");
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-
-    setShow(true);
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-  }, []);
-
-  const finish = () => {
-    if (exiting) return;
+  const finish = useCallback(() => {
+    if (exitingRef.current) return;
+    exitingRef.current = true;
     setExiting(true);
-    setTimeout(() => {
-      document.documentElement.style.overflow = "";
-      document.body.style.overflow = "";
-      try {
-        sessionStorage.setItem(INTRO_KEY, "1");
-      } catch {
-        /* ignore */
-      }
+    window.setTimeout(() => {
+      unlockBodyScroll();
+      markIntroSeen();
       setShow(false);
       setExiting(false);
+      exitingRef.current = false;
     }, 400);
-  };
+  }, []);
 
   useEffect(() => {
     if (!show) return;
 
-    const isMobile = window.matchMedia("(max-width: 767px)").matches;
-    const totalMs = isMobile ? 2800 : 4200;
-    const phase2 = isMobile ? 1200 : 1900;
-    const phase3 = isMobile ? 1800 : 2800;
+    const releaseScroll = lockBodyScroll();
 
-    const t1 = setTimeout(() => setPhase(1), 200);
-    const t2 = setTimeout(() => setPhase(2), phase2);
-    const t3 = setTimeout(() => setPhase(3), phase3);
-    const t4 = setTimeout(() => finish(), totalMs);
+    const t1 = window.setTimeout(() => setPhase(1), 200);
+    const t2 = window.setTimeout(() => setPhase(2), PHASE_2_MS);
+    const t3 = window.setTimeout(() => setPhase(3), PHASE_3_MS);
+    const t4 = window.setTimeout(() => finish(), TOTAL_MS);
 
     return () => {
-      [t1, t2, t3, t4].forEach(clearTimeout);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.clearTimeout(t4);
+      releaseScroll();
     };
-  }, [show]);
+  }, [show, finish]);
 
   useEffect(() => {
     if (!show) return;
     let raf;
     const start = performance.now();
-    const duration = 1700;
 
     const tick = (now) => {
-      const p = Math.min((now - start) / duration, 1);
+      const p = Math.min((now - start) / COUNTER_MS, 1);
       const eased = 1 - Math.pow(1 - p, 3);
       setCounter(Math.floor(eased * 100));
       if (p < 1) raf = requestAnimationFrame(tick);

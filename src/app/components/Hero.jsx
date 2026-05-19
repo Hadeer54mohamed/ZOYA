@@ -50,7 +50,7 @@ export default function Hero() {
             </span>
           </h1>
 
-          <p className="text-black/60 dark:text-white/50 max-w-lg mx-auto mt-10 text-sm md:text-base font-medium leading-relaxed">
+          <p className="text-black/70 dark:text-white/70 max-w-lg mx-auto mt-10 text-sm md:text-base font-medium leading-relaxed">
             More than just fabric. It&apos;s a statement. <br />
             Crafted for presence. Designed to stand out.
           </p>
@@ -70,7 +70,7 @@ export default function Hero() {
               scroll
               prefetch
               onClick={handleLookbookClick}
-              className="text-black/50 dark:text-white/40 text-[11px] font-black uppercase tracking-[0.2em] transition-colors hover:text-[#FF4DA3] inline-block"
+              className="text-black/70 dark:text-white/70 text-[11px] font-black uppercase tracking-[0.2em] transition-colors hover:text-[#FF4DA3] inline-block"
             >
               [ View Lookbook ]
             </Link>
@@ -84,7 +84,7 @@ export default function Hero() {
         aria-label="Scroll to products"
         className="hero-scroll-hint absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 cursor-pointer group"
       >
-        <span className="text-[9px] text-black/30 dark:text-white/20 uppercase tracking-[0.4em] font-bold group-hover:text-[#FF4DA3] transition-colors">
+        <span className="text-[9px] text-black/60 dark:text-white/60 uppercase tracking-[0.4em] font-bold group-hover:text-[#FF4DA3] transition-colors">
           Scroll
         </span>
         <div className="w-px h-12 bg-gradient-to-b from-[#FF4DA3] to-transparent relative overflow-hidden">

@@ -28,7 +28,9 @@ const aboutLinks = [
   { label: "Lookbook", href: "/products", type: "route" },
 ];
 
-const helpLinks = [{ label: "Contact", section: "contact", type: "section" }];
+const helpLinks = [{ label: "Contact", section: "contact", type: "section" },
+  { label: "Tracked Inventory", href: "/track", type: "route" }
+];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -150,7 +152,7 @@ export default function Footer() {
             onSubmit={handleSubscribe}
             className="mt-8 max-w-md flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 rounded-full border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 backdrop-blur-xl focus-within:border-[#FF4DA3]/40 focus-within:shadow-[0_0_0_4px_rgba(255,77,163,0.1)] transition-all"
           >
-            <div className="pl-3 sm:pl-4 text-black/40 dark:text-white/40 shrink-0">
+            <div className="pl-3 sm:pl-4 text-black/60 dark:text-white/60 shrink-0">
               <Mail size={16} />
             </div>
             <input
@@ -158,7 +160,8 @@ export default function Footer() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Your email"
-              className="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-black/30 dark:placeholder:text-white/30 px-1.5 sm:px-2 py-2"
+              aria-label="Email for newsletter"
+              className="flex-1 min-w-0 bg-transparent outline-none text-sm placeholder:text-black/60 dark:placeholder:text-white/60 px-1.5 sm:px-2 py-2"
               required
             />
             <button
@@ -193,7 +196,7 @@ export default function Footer() {
               height={40}
               className="h-9 sm:h-10 w-auto object-contain"
             />
-            <p className="text-sm text-black/60 dark:text-white/50 leading-relaxed max-w-xs">
+            <p className="text-sm text-black/60 dark:text-white/60 leading-relaxed max-w-xs">
               More than just fabric. It&apos;s a statement. Crafted for
               presence. Designed to stand out.
             </p>
@@ -203,7 +206,7 @@ export default function Footer() {
           <div className="md:col-span-3 grid grid-cols-3 gap-4 sm:gap-6">
             {/* Shop */}
             <div>
-              <h4 className="text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-bold text-black/40 dark:text-white/40 mb-4 sm:mb-5">
+              <h4 className="text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-bold text-black/60 dark:text-white/60 mb-4 sm:mb-5">
                 Shop
               </h4>
               <ul className="space-y-2.5 sm:space-y-3">
@@ -217,7 +220,7 @@ export default function Footer() {
 
             {/* About */}
             <div>
-              <h4 className="text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-bold text-black/40 dark:text-white/40 mb-4 sm:mb-5">
+              <h4 className="text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-bold text-black/60 dark:text-white/60 mb-4 sm:mb-5">
                 About
               </h4>
               <ul className="space-y-2.5 sm:space-y-3">
@@ -231,7 +234,7 @@ export default function Footer() {
 
             {/* Help */}
             <div>
-              <h4 className="text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-bold text-black/40 dark:text-white/40 mb-4 sm:mb-5">
+              <h4 className="text-[9px] sm:text-[10px] tracking-[0.25em] sm:tracking-[0.3em] uppercase font-bold text-black/60 dark:text-white/60 mb-4 sm:mb-5">
                 Help
               </h4>
               <ul className="space-y-2.5 sm:space-y-3">
@@ -240,13 +243,14 @@ export default function Footer() {
                     <FooterLink link={l} onSection={handleSection} />
                   </li>
                 ))}
+                
               </ul>
             </div>
           </div>
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-4 sm:mt-6 flex flex-col gap-5 md:flex-row md:items-center md:justify-between text-[10px] tracking-[0.2em] uppercase text-black/40 dark:text-white/40">
+        <div className="mt-4 sm:mt-6 flex flex-col gap-5 md:flex-row md:items-center md:justify-between text-[10px] tracking-[0.2em] uppercase text-black/60 dark:text-white/60">
           {/* Legal row */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <span className="text-[9px] sm:text-[10px]">
@@ -364,7 +368,7 @@ function FooterToast({ toast, onDismiss }) {
         <button
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="h-7 w-7 grid place-items-center rounded-full text-black/50 dark:text-white/40 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
+          className="h-7 w-7 grid place-items-center rounded-full text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition"
         >
           <X size={14} />
         </button>

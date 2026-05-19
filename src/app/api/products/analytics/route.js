@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { getProductStockMap } from "../../../../sanity/lib/products";
+import {
+  buildInventoryAlerts,
+  LOW_STOCK_THRESHOLD,
+} from "../../../lib/inventoryAlerts";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -178,39 +182,8 @@ export async function GET(req) {
       (sum, p) => sum + (p.totalInitial || 0),
       0
     );
-    const lowStockThreshold = 5;
-    const lowStock = trackedProducts.filter(
-      (p) => p.totalStock > 0 && p.totalStock <= lowStockThreshold
-    ).length;
-    // Out of stock = exactly 0; oversold = went negative because we let
-    // orders through after inventory hit zero. Both are alert-worthy.
-    const outOfStock = trackedProducts.filter(
-      (p) => p.totalStock === 0
-    ).length;
-    const oversold = trackedProducts.filter(
-      (p) => p.totalStock < 0
-    ).length;
-    const untrackedCount = products.filter((p) => !p.tracked).length;
 
-    // Surface the actual product entries that are alert-worthy, so the
-    // dashboard can show them without re-deriving from the products list.
-    const alerts = trackedProducts
-      .filter((p) => p.totalStock <= lowStockThreshold)
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        image: p.image || null,
-        totalStock: p.totalStock,
-        totalInitial: p.totalInitial,
-        unitsSold: p.unitsSold,
-        severity:
-          p.totalStock < 0
-            ? "oversold"
-            : p.totalStock === 0
-            ? "out"
-            : "low",
-      }))
-      .sort((a, b) => a.totalStock - b.totalStock);
+    const inventory = buildInventoryAlerts(stockMap);
 
     return Response.json({
       success: true,
@@ -219,16 +192,24 @@ export async function GET(req) {
         totalUnitsSold: totalUnitsSoldAll,
         totalRevenue: totalRevenueAll,
         uniqueProducts: products.filter((p) => p.unitsSold > 0).length,
-        trackedProducts: trackedProducts.length,
-        untrackedProducts: untrackedCount,
+        trackedProducts: inventory.summary.trackedProducts,
+        untrackedProducts: inventory.summary.untrackedProducts,
         totalStock,
         totalInitial,
-        lowStock,
-        outOfStock,
-        oversold,
-        lowStockThreshold,
+        lowStock: inventory.summary.lowStock,
+        outOfStock: inventory.summary.outOfStock,
+        oversold: inventory.summary.oversold,
+        lowStockThreshold: LOW_STOCK_THRESHOLD,
+        colorsWithoutStock: inventory.summary.colorsWithoutStock,
+        missingSizes: inventory.summary.missingSizes,
+        variantOut: inventory.summary.variantOut,
+        variantLow: inventory.summary.variantLow,
+        variantOversold: inventory.summary.variantOversold,
+        catalogIssues: inventory.summary.catalogIssues,
       },
-      alerts,
+      alerts: inventory.alerts,
+      stockAlerts: inventory.stockAlerts,
+      catalogAlerts: inventory.catalogAlerts,
       colorTotals: colorTotalsArr,
       sizeTotals: sizeTotalsArr,
       stockUnavailable: stockMap === null,

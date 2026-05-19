@@ -27,14 +27,13 @@ export default function HashScroller() {
       scrollToSection(id);
     };
 
-    timerId = window.setTimeout(run, 80);
+    timerId = window.setTimeout(run, 120);
 
     const onHashChange = () => {
       if (timerId) window.clearTimeout(timerId);
       repairMalformedHash();
       const id = getHashId();
       if (!id) return;
-      setSectionHash(id);
       scrollToSection(id);
     };
 
