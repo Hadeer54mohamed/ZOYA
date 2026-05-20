@@ -338,6 +338,9 @@ html {
 .hero-scroll-hint {
   animation: hero-enter 1s ease 1.2s both;
 }
+.hero-scroll-line {
+  animation: none;
+}
 .drop-content {
   animation: drop-content-in 0.8s ease both;
 }
@@ -362,7 +365,9 @@ html {
   .hero-glow-a,
   .hero-glow-b,
   .hero-radial,
+  .hero-scroll-hint,
   .hero-scroll-line,
+  .hero-enter,
   .drop-glow,
   .drop-content,
   .animate-gradient {
