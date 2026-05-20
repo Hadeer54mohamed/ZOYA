@@ -86,7 +86,7 @@ export default function FeaturedDropSection() {
             className="mt-4 text-4xl leading-[0.85] font-[900] text-white sm:mt-6 sm:text-6xl md:text-8xl"
           >
             OWN THE <br />
-            <span className="animate-gradient bg-gradient-to-r from-[#FF4DA3] via-pink-300 to-[#FF4DA3] bg-[length:200%_auto] bg-clip-text text-transparent">
+            <span className="md:animate-gradient bg-gradient-to-r from-[#FF4DA3] via-pink-300 to-[#FF4DA3] bg-[length:200%_auto] bg-clip-text text-transparent">
               MOMENT
             </span>
           </m.h2>
