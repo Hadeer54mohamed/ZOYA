@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { lockBodyScroll, unlockBodyScroll } from "../lib/bodyScrollLock";
-import { markIntroSeen } from "../lib/introSession";
+import { isMobileViewport, markIntroSeen } from "../lib/introSession";
 
 const TOTAL_MS = 4200;
 const PHASE_2_MS = 1900;
@@ -31,6 +31,12 @@ export default function Intro() {
 
   useEffect(() => {
     if (!show) return;
+
+    if (isMobileViewport()) {
+      unlockBodyScroll();
+      setShow(false);
+      return;
+    }
 
     const releaseScroll = lockBodyScroll();
 

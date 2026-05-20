@@ -20,7 +20,7 @@ export default function Hero() {
   return (
     <section
       id="home"
-      className="relative h-screen w-full scroll-mt-28 overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500"
+      className="relative min-h-[100dvh] w-full scroll-mt-28 overflow-hidden bg-[#fafafa] dark:bg-[#050505] transition-colors duration-500"
     >
       <div className="absolute inset-0 z-0 pointer-events-none" aria-hidden>
         <div className="hero-glow hero-glow-a absolute top-[-10%] left-[-10%] h-[min(600px,80vw)] w-[min(600px,80vw)] bg-[#FF4DA3] blur-[120px] md:blur-[150px] rounded-full" />
@@ -45,7 +45,7 @@ export default function Hero() {
 
           <h1 className="text-black dark:text-white text-4xl sm:text-6xl md:text-[120px] font-[1000] mt-6 sm:mt-8 leading-[0.85] tracking-tighter uppercase">
             Wear Your <br />
-            <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-[#FF4DA3] via-[#ff7eb6] to-[#FF4DA3] bg-[length:200%_auto] animate-gradient italic inline-block pr-6">
+            <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-[#FF4DA3] via-[#ff7eb6] to-[#FF4DA3] bg-[length:200%_auto] md:animate-gradient italic inline-block pr-6">
               Identity
             </span>
           </h1>

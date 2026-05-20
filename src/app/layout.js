@@ -7,7 +7,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import LayoutShell from "./components/LayoutShell";
 import IntroRoot from "./components/IntroRoot";
 import { getNavbarSearchProducts } from "../sanity/lib/products";
-import { HERO_BG_DESKTOP } from "./lib/heroImages";
+import { HERO_BG_DESKTOP, HERO_BG_MOBILE } from "./lib/heroImages";
 import { getSiteUrl } from "../lib/siteUrl";
 
 const siteUrl = getSiteUrl();
@@ -89,14 +89,24 @@ export default async function RootLayout({ children }) {
     >
       <head>
         {isHome ? (
-          <link
-            rel="preload"
-            as="image"
-            href={HERO_BG_DESKTOP}
-            type="image/webp"
-            media="(min-width: 768px)"
-            fetchPriority="high"
-          />
+          <>
+            <link
+              rel="preload"
+              as="image"
+              href={HERO_BG_MOBILE}
+              type="image/webp"
+              media="(max-width: 767px)"
+              fetchPriority="high"
+            />
+            <link
+              rel="preload"
+              as="image"
+              href={HERO_BG_DESKTOP}
+              type="image/webp"
+              media="(min-width: 768px)"
+              fetchPriority="high"
+            />
+          </>
         ) : null}
         <Script
           id="zoya-theme-init"
