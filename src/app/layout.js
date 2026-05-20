@@ -1,5 +1,4 @@
 import { cookies, headers } from "next/headers";
-import Script from "next/script";
 import { Cormorant_Garamond, Geist } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./context/CartContext";
@@ -108,9 +107,8 @@ export default async function RootLayout({ children }) {
             />
           </>
         ) : null}
-        <Script
+        <script
           id="zoya-theme-init"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
         />
       </head>
